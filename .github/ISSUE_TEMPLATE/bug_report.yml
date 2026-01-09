@@ -1,0 +1,57 @@
+name: 버그 리포트
+title: '[bug] '
+description: 버그 제보 템플릿
+labels: ['bug']
+body:
+  - type: textarea
+    attributes:
+      label: 무엇이 문제인가요?
+      description: 기대한 동작과 다르게 동작하는 내용을 간단히 설명해주세요.
+      placeholder: >
+        예) 미션 저장 버튼을 눌러도 목록에 나타나지 않습니다.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 재현 방법
+      description: 동일한 문제가 발생하도록 따라할 수 있는 단계를 적어주세요.
+      placeholder: |
+        1. 앱 실행
+        2. 홈 > 미션 추가 진입
+        3. 제목 입력 후 저장 탭
+        4. 오류 발생 확인
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 실제 결과
+      placeholder: >
+        예) 저장 후 목록에 항목이 추가되지 않음. 콘솔에 에러 출력.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 기대 결과
+      placeholder: >
+        예) 저장 후 목록 최상단에 새 미션이 표시되어야 함.
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: 환경 정보
+      description: 문제 발생 환경을 알려주세요.
+      placeholder: >
+        앱 버전 / OS(예: iOS 18.1, Android 15) / 디바이스(예: iPhone 14, Pixel 8)
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: 로그 또는 스크린샷 (선택)
+      description: 가능하다면 에러 로그, 스택트레이스, 캡처를 첨부해주세요.
+    validations:
+      required: false
