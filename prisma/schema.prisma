@@ -46,6 +46,11 @@ model User {
   authAccounts AuthAccount[] // 1:N 관계
   settings     UserSettings? // 1:1 관계
   subscription Subscription? // 1:1 관계
+  folders       Folder[]
+  clips         Clip[]
+  tags          Tag[]
+  clipLikes     ClipLike[]
+  clipViews     ClipView[]
 }
 
 // 추후 로그인 확장을 위해 별도 모델로 분리
@@ -81,4 +86,121 @@ model Subscription {
 
   userId String @unique
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+// 클립 콘텐츠 종류
+enum ClipType {
+  TEXT
+  COLOR
+  IMAGE
+}
+
+model Folder {
+  id    String @id @default(cuid()) // 폴더 고유 ID
+  name  String                     // 폴더 이름
+  order Int    @default(0)          // 폴더 정렬 순서 (드래그용)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 폴더 소유자 (유저 삭제 시 폴더도 삭제)
+
+  clips Clip[] // 폴더에 포함된 클립들
+
+  createdAt DateTime @default(now())    // 생성 시각
+  updatedAt DateTime @updatedAt         // 수정 시각
+
+  @@index([userId]) // 유저별 폴더 조회 성능 최적화
+}
+
+
+
+model Clip {
+  id   String   @id @default(cuid()) // 클립 고유 ID
+  type ClipType                      // 클립 타입 (TEXT / COLOR / IMAGE)
+
+  textContent String? // 텍스트 클립일 때만 사용
+  colorHex    String? // 컬러 클립일 때만 사용 (#FFFFFF)
+  imageUrl    String? // 이미지 클립일 때만 사용 (R2 URL)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 클립 소유자
+
+  folderId String
+  folder   Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  // 어느 폴더에 속하는지
+
+  tags  ClipTag[]  // 연결된 태그들
+  likes ClipLike[] // 좋아요 정보
+  views ClipView[] // 조회 기록
+
+  createdAt DateTime @default(now()) // 클립 생성 시각
+  updatedAt DateTime @updatedAt      // 클립 수정 시각
+
+  @@index([userId])   // 유저 기준 클립 조회
+  @@index([folderId]) // 폴더 기준 클립 조회
+}
+
+// 노션 데이터베이스 같은 태그 모델 (하나의 태그 생성이 이를 같은 폴더내의 다른 클립에도 적용이 가능)
+model Tag {
+  id   String @id @default(cuid()) // 태그 고유 ID
+  name String                      // 태그 이름
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 태그 소유자 (유저별 태그)
+
+  clips ClipTag[] // 태그가 연결된 클립들
+
+  @@unique([userId, name]) // 유저 내 태그 이름 중복 방지
+}
+
+model ClipTag {
+  clipId String
+  tagId  String
+
+  clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  // 어떤 클립에 붙은 태그인지
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  // 어떤 태그인지
+
+  @@id([clipId, tagId]) // 같은 태그 중복 연결 방지
+}
+
+
+model ClipLike {
+  id String @id @default(cuid()) // 좋아요 ID
+
+  userId String
+  clipId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 좋아요를 누른 유저
+
+  clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  // 좋아요 대상 클립
+
+  createdAt DateTime @default(now()) // 좋아요 누른 시각
+
+  @@unique([userId, clipId]) // 한 유저는 한 클립에 한 번만 좋아요
+  @@index([clipId])          // 클립별 좋아요 수 조회 최적화
+}
+
+model ClipView {
+  id String @id @default(cuid()) // 조회 기록 ID
+
+  userId String
+  clipId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 조회한 유저
+
+  clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  // 조회된 클립
+
+  viewedAt DateTime @default(now()) // 조회 시각
+
+  @@index([userId, viewedAt]) // 최근 조회 목록 조회 최적화
 }
