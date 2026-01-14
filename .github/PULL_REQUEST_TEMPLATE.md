@@ -1,44 +1,44 @@
 ## Description
-<!--Required. Provide high-level overview of what the change is for.-->
+<!--필수. 변경 목적을 한눈에 알 수 있도록 간단히 설명해주세요.-->
 
 ## Type of change
-<!--Required. Keep only those that apply.-->
+<!--필수. 해당되는 항목만 남겨주세요.-->
 
-* Bug fix (non-breaking change which fixes an issue)
-* Regression fix (non-breaking change which fixes a regression)
-* New feature (non-breaking change which adds functionality)
-* Breaking change (fix or feature that would cause existing functionality to not work as expected)
-* Internal change (not necessarily a bug fix or a new feature)
-* This change has a user-facing impact
+* 버그 수정 (호환성에 영향을 주지 않는 문제 해결)
+* 회귀 수정 (호환성에 영향을 주지 않는 회귀 해결)
+* 신규 기능 (호환성에 영향을 주지 않는 기능 추가)
+* 중대한 변경 (수정/기능으로 인해 기존 동작이 깨질 수 있음)
+* 내부 변경 (버그 수정이나 신규 기능이 아닐 수 있음)
+* 사용자에게 직접 영향을 주는 변경
 
 ## Linked tickets and other PRs
-<!--Required. Keep only those that apply.-->
+<!--필수. 해당되는 항목만 남겨주세요.-->
 
-<!--This PR addresses the following issues.-->
+<!--이 PR이 해결하는 이슈입니다.-->
 * Closes #, refs #
-<!--This PR depends on the following PRs (e.g. planet, satellite, etc.).-->
+<!--이 PR이 의존하는 PR입니다(예: planet, satellite 등).-->
 * Requires #
-<!--This PR is a back-/forward-port of the following PR.-->
+<!--이 PR은 다음 PR의 백/포워드 포트입니다.-->
 * Ports #
 
 ## TODOs
-<!--Required. Keep only those that apply and check them off as they get completed.-->
+<!--필수. 해당되는 항목만 남기고, 완료되면 체크해주세요.-->
 
-- [ ] Self-review the change
-- [ ] Write tests
-- [ ] Perform manual testing
-- [ ] Write documentation
-- [ ] Address review feedback
-- [ ] Update upstream references / tags / versions after upstream PR merges (linked above)
+- [ ] 변경 사항 셀프 리뷰
+- [ ] 테스트 작성
+- [ ] 수동 테스트 수행
+- [ ] 문서 작성
+- [ ] 리뷰 피드백 반영
+- [ ] 상위 PR 병합 후 참조/태그/버전 업데이트(위에 링크)
 
 ## Implementation
-<!--Optional. Add any relevant implementation details that might help the reviewers.-->
+<!--선택. 리뷰에 도움이 되는 구현 세부 사항이 있다면 적어주세요.-->
 
 ## Performance/Scaling
-<!--Optional. Add any relevant details on how this PR reacts when scaled to 1k nodes, and any additional scaling considerations for the reviewers.-->
+<!--선택. 1k 노드 규모에서의 동작 및 추가 스케일링 고려사항이 있으면 적어주세요.-->
 
 ## Testing done
-<!--Required. Explain what kind of testing these changes underwent.-->
+<!--필수. 어떤 테스트를 수행했는지 설명해주세요.-->
 
 ## Additional information
-<!--Optional. Anything else that may be relevant.-->
+<!--선택. 그 외 공유할 내용이 있다면 적어주세요.-->

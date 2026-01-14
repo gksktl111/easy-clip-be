@@ -7,24 +7,78 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 소셜 로그인 제공자 종류
+enum AuthProvider {
+  GOOGLE
+  GITHUB
+}
+
+// 테마 설정
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+// 구독 플랜
+enum SubscriptionPlan {
+  FREE
+  PRO
+  TEAM
+}
+
+// 구독 상태
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
-  items     Item[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
+  avatarUrl String?
 
-model Item {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([ownerId])
+  authAccounts AuthAccount[] // 1:N 관계
+  settings     UserSettings? // 1:1 관계
+  subscription Subscription? // 1:1 관계
 }
 
+// 추후 로그인 확장을 위해 별도 모델로 분리
+// 한 사용자는 여러 소셜 로그인 계정을 가질 수 있음
+// (예: 구글과 깃허브 계정 모두로 로그인 가능)
+model AuthAccount {
+  id              String       @id @default(cuid())
+  provider        AuthProvider
+  providerUserId  String
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+}
+
+model UserSettings {
+  id       String @id @default(cuid())
+  theme    Theme  @default(SYSTEM)
+  language String @default("ko")
+
+  userId String @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  plan      SubscriptionPlan  @default(FREE)
+  status    SubscriptionStatus @default(ACTIVE)
+
+  startedAt DateTime @default(now())
+  expiresAt DateTime?
+
+  userId String @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
