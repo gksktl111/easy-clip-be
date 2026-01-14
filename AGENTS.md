@@ -1,3 +1,7 @@
+## Language Rule
+- **Always respond in Korean.**
+- Regardless of the input language, always reply in Korean.
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
