@@ -1,0 +1,23 @@
+### 회원가입
+
+POST http://localhost:3000/auth/signup  
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "testpassword",
+  "email": "testuser@example.com"
+}
+
+### 로그인 요청
+POST http://localhost:3000/auth/login  
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "testpassword"
+}
+
+### 프로필 요청
+GET http://localhost:3000/auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjMsInVzZXJuYW1lIjoidGVzdHVzZXIiLCJpYXQiOjE3Njg5MTY2ODksImV4cCI6MTc2ODkxNjc0OX0.SodrzR-z9Z_wtUzQaJEC5gv8ndu9UBHEbg0aZnWolqU
