@@ -19,5 +19,38 @@ Content-Type: application/json
 }
 
 ### 프로필 요청
-GET http://localhost:3000/auth/profile
+GET http://localhost:3000/users/me
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjMsInVzZXJuYW1lIjoidGVzdHVzZXIiLCJpYXQiOjE3Njg5MTY2ODksImV4cCI6MTc2ODkxNjc0OX0.SodrzR-z9Z_wtUzQaJEC5gv8ndu9UBHEbg0aZnWolqU
+
+### Google 로그인 시작 (브라우저에서 리다이렉트 확인)
+GET http://localhost:3000/auth/google?mode=login
+
+### Google 계정 연동 시작 (로그인 상태 필요)
+GET http://localhost:3000/auth/google?mode=link
+Authorization: Bearer <ACCESS_TOKEN>
+
+### Google 콜백 (리다이렉트로 전달된 code/state 값 사용)
+GET http://localhost:3000/auth/google/callback?code=<GOOGLE_CODE>&state=<STATE>
+
+### GitHub 로그인 시작 (브라우저에서 리다이렉트 확인)
+GET http://localhost:3000/auth/github?mode=login
+
+### GitHub 계정 연동 시작 (로그인 상태 필요)
+GET http://localhost:3000/auth/github?mode=link
+Authorization: Bearer <ACCESS_TOKEN>
+
+### GitHub 콜백 (리다이렉트로 전달된 code/state 값 사용)
+GET http://localhost:3000/auth/github/callback?code=<GITHUB_CODE>&state=<STATE>
+
+### 계정 목록 조회 (동일 소유자)
+GET http://localhost:3000/auth/accounts
+Authorization: Bearer <ACCESS_TOKEN>
+
+### 연동된 계정 전환
+POST http://localhost:3000/auth/switch-user
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWtucjZtNzkwMDAwZ2Q2bWdsNGtrZmgxIiwiaWF0IjoxNzY4OTg0MDYwLCJleHAiOjE3Njg5ODU4NjB9.SJX8hkGkzEOgCFSbVBFl727MVooNUoyqndK8WF6uYLU
+
+{
+  "authAccountId": "cmknr7l9g0008gd6m9azqxa5h"
+}

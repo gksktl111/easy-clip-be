@@ -22,7 +22,6 @@ enum Theme {
 
 // 구독 플랜
 enum SubscriptionPlan {
-  FREE
   PRO
   TEAM
 }
@@ -34,23 +33,75 @@ enum SubscriptionStatus {
   PAST_DUE
 }
 
+enum WorkspaceType {
+  PERSONAL
+  TEAM
+}
+
+enum WorkspaceRole {
+  OWNER // 결제 책임자, 총 책임자
+  ADMIN // 워크스페이스 관리자
+  MEMBER // 일반 멤버
+}
+
+// 로그인 주체 (사람 + 로그인 방식 + 디바이스)
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  avatarUrl String?
+  id String @id @default(cuid())
+
+  email String @unique
+  displayName String?
+  avatarUrl   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // PERSONAL workspace 소유자 (결제/삭제 기준)
+  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
   authAccounts AuthAccount[] // 1:N 관계
+  memberships  WorkspaceUser[]
   settings     UserSettings? // 1:1 관계
-  subscription Subscription? // 1:1 관계
-  folders       Folder[]
-  clips         Clip[]
-  tags          Tag[]
   clipLikes     ClipLike[]
   clipViews     ClipView[]
+
+}
+
+// 워크스페이스는 개인/팀의 데이터 소유 단위
+model Workspace {
+  id   String @id @default(cuid())
+  name String
+  type WorkspaceType
+  // TEAM 워크스페이스는 ownerUserId를 사용하지 않는다.
+  ownerUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerUser User? @relation("WorkspaceOwner",fields: [ownerUserId],references: [id],onDelete: SetNull)
+  users        WorkspaceUser[]
+  subscription Subscription?
+  folders      Folder[]
+  clips        Clip[]
+  tags         Tag[]
+
+}
+
+
+
+// 워크스페이스 멤버십 및 권한
+// TEAM 워크스페이스는 생성 시 OWNER 멤버십이 반드시 필요하다.
+model WorkspaceUser {
+  id String @id @default(cuid())
+
+  workspaceId String
+  userId      String
+  role        WorkspaceRole
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
 }
 
 // 추후 로그인 확장을 위해 별도 모델로 분리
@@ -60,6 +111,7 @@ model AuthAccount {
   id              String       @id @default(cuid())
   provider        AuthProvider
   providerUserId  String
+  email           String?
 
   userId String
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -78,14 +130,15 @@ model UserSettings {
 
 model Subscription {
   id        String             @id @default(cuid())
-  plan      SubscriptionPlan  @default(FREE)
+  // 구독 row가 없으면 무료로 간주한다.
+  plan      SubscriptionPlan
   status    SubscriptionStatus @default(ACTIVE)
 
   startedAt DateTime @default(now())
   expiresAt DateTime?
 
-  userId String @unique
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 
@@ -99,20 +152,19 @@ enum ClipType {
 model Folder {
   id    String @id @default(cuid()) // 폴더 고유 ID
   name  String                     // 폴더 이름
-  order Int    @default(0)          // 폴더 정렬 순서 (드래그용)
+  order Float  @default(0)          // 폴더 정렬 순서 (드래그용)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // 폴더 소유자 (유저 삭제 시 폴더도 삭제)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // 폴더 소유자 (워크스페이스 삭제 시 폴더도 삭제)
 
   clips Clip[] // 폴더에 포함된 클립들
 
   createdAt DateTime @default(now())    // 생성 시각
   updatedAt DateTime @updatedAt         // 수정 시각
 
-  @@index([userId]) // 유저별 폴더 조회 성능 최적화
+  @@index([workspaceId]) // 워크스페이스별 폴더 조회 성능 최적화
 }
-
 
 
 model Clip {
@@ -123,8 +175,8 @@ model Clip {
   colorHex    String? // 컬러 클립일 때만 사용 (#FFFFFF)
   imageUrl    String? // 이미지 클립일 때만 사용 (R2 URL)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // 클립 소유자
 
   folderId String
@@ -138,7 +190,7 @@ model Clip {
   createdAt DateTime @default(now()) // 클립 생성 시각
   updatedAt DateTime @updatedAt      // 클립 수정 시각
 
-  @@index([userId])   // 유저 기준 클립 조회
+  @@index([workspaceId])  // 워크스페이스 기준 클립 조회
   @@index([folderId]) // 폴더 기준 클립 조회
 }
 
@@ -147,13 +199,14 @@ model Tag {
   id   String @id @default(cuid()) // 태그 고유 ID
   name String                      // 태그 이름
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // 태그 소유자 (유저별 태그)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // 태그 소유자 (워크스페이스별 태그)
 
   clips ClipTag[] // 태그가 연결된 클립들
 
-  @@unique([userId, name]) // 유저 내 태그 이름 중복 방지
+  @@unique([workspaceId, name]) // 워크스페이스 내 태그 이름 중복 방지
+  @@index([workspaceId])        // 워크스페이스별 태그 조회 성능 최적화
 }
 
 model ClipTag {

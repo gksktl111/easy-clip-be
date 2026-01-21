@@ -1,0 +1,3 @@
+### 내 프로필 조회
+GET http://localhost:3000/users/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWtucjdsOHowMDA2Z2Q2bWFwNWxhNHpnIiwiaWF0IjoxNzY4OTg0MTA4LCJleHAiOjE3Njg5ODU5MDh9.t2txLHhEp-p_U8danX2rWL7_Z3bbSQxMy-xZblxqn8A

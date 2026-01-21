@@ -1,7 +1,6 @@
 export class UserDto {
   id: string;
-  email: string;
-  name: string | null;
+  displayName: string | null;
   avatarUrl: string | null;
 
   createdAt: Date;
