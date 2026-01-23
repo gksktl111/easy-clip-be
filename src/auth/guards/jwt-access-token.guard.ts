@@ -7,10 +7,14 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { JwtPayload } from '../auth';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class JwtAccessGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private config: ConfigService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -22,7 +26,7 @@ export class JwtAccessGuard implements CanActivate {
 
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
-        secret: process.env.JWT_ACCESS_SECRET,
+        secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
         audience: 'api',
         issuer: 'easy-clip',
       });

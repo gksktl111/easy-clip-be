@@ -12,6 +12,7 @@ import type { AuthAccount, User } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthPlatform, JwtPayload, OAuthUser } from './auth';
 import { createHash } from 'crypto';
+import { ConfigService } from '@nestjs/config';
 
 type OAuthSignInResult = {
   access_token: string;
@@ -28,6 +29,7 @@ export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
+    private config: ConfigService,
   ) {}
 
   // OAuth 진입점
@@ -285,7 +287,7 @@ export class AuthService {
 
   private signAccessToken(payload: JwtPayload) {
     return this.jwtService.sign(payload, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
       expiresIn: '15m',
       audience: 'api',
       issuer: 'easy-clip',
@@ -294,7 +296,7 @@ export class AuthService {
 
   private signRefreshToken(payload: JwtPayload) {
     return this.jwtService.sign(payload, {
-      secret: process.env.JWT_REFRESH_SECRET,
+      secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
       expiresIn: '14d',
       audience: 'refresh',
       issuer: 'easy-clip',
@@ -323,7 +325,7 @@ export class AuthService {
       const verified = await this.jwtService.verifyAsync<{ exp: number }>(
         refreshToken,
         {
-          secret: process.env.JWT_REFRESH_SECRET,
+          secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
           audience: 'refresh',
           issuer: 'easy-clip',
         },

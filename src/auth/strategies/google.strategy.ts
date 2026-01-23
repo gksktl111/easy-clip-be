@@ -5,14 +5,15 @@ import { Request } from 'express';
 import type { AuthenticateOptions } from 'passport';
 import { Profile, Strategy } from 'passport-google-oauth20';
 import { OAuthUser } from '../auth';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
-  constructor() {
+  constructor(private readonly config: ConfigService) {
     super({
-      clientID: process.env.GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-      callbackURL: process.env.GOOGLE_REDIRECT_URI ?? '',
+      clientID: config.getOrThrow<string>('GOOGLE_CLIENT_ID'),
+      clientSecret: config.getOrThrow<string>('GOOGLE_CLIENT_SECRET'),
+      callbackURL: config.getOrThrow<string>('GOOGLE_REDIRECT_URI'),
       scope: ['profile', 'email'],
       passReqToCallback: true,
     });
