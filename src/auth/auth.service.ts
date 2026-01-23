@@ -315,9 +315,7 @@ export class AuthService {
     const refreshToken = this.signRefreshToken(payload);
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
-    const decoded = this.jwtService.decode(refreshToken) as {
-      exp?: number;
-    } | null;
+    const decoded = this.jwtService.decode(refreshToken);
 
     if (!decoded?.exp) {
       throw new InternalServerErrorException(
