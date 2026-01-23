@@ -148,7 +148,7 @@ export class AuthService {
     oauthUser: OAuthUser,
   ): Promise<void> {
     if (!oauthUser.email) {
-      throw new BadRequestException('로그인이 필요합니다.');
+      throw new BadRequestException('OAuth 이메일 정보를 가져올 수 없습니다.');
     }
 
     const user = await this.prisma.user.findUnique({

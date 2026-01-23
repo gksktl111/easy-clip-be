@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 import { AuthProvider } from '@prisma/client';
 import { Request } from 'express';
 import type { AuthenticateOptions } from 'passport';
@@ -8,11 +9,11 @@ import { OAuthUser } from '../auth';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
-  constructor() {
+  constructor(private readonly config: ConfigService) {
     super({
-      clientID: process.env.GITHUB_CLIENT_ID ?? '',
-      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? '',
-      callbackURL: process.env.GITHUB_REDIRECT_URI ?? '',
+      clientID: config.getOrThrow<string>('GITHUB_CLIENT_ID'),
+      clientSecret: config.getOrThrow<string>('GITHUB_CLIENT_SECRET'),
+      callbackURL: config.getOrThrow<string>('GITHUB_REDIRECT_URI'),
       scope: ['user:email'],
       passReqToCallback: true,
     });
@@ -20,7 +21,6 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
 
   authenticate(req: Request, options?: AuthenticateOptions): void {
     const platform = (req.query.platform as 'WEB' | 'APP') ?? 'WEB';
-
     const mode = (req.query.mode as 'login' | 'link') ?? 'login';
 
     const state = Buffer.from(JSON.stringify({ platform, mode })).toString(
@@ -49,6 +49,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
         const parsed = JSON.parse(
           Buffer.from(rawState, 'base64').toString(),
         ) as { platform?: 'WEB' | 'APP'; mode?: 'login' | 'link' };
+
         platform = parsed.platform ?? platform;
         mode = parsed.mode ?? mode;
       } catch {
@@ -56,7 +57,6 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
       }
     }
 
-    // 명시적으로 OAuthUser 타입 반환
     return {
       provider: AuthProvider.GITHUB,
       providerUserId: profile.id,
@@ -64,7 +64,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
       displayName: profile.displayName ?? profile.username ?? null,
       avatarUrl: profile.photos?.[0]?.value,
       mode,
-      platform, // ✅ Google과 완전히 동일
+      platform,
     };
   }
 }
