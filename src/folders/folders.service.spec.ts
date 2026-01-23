@@ -5,7 +5,6 @@ import { NotFoundException } from '@nestjs/common';
 
 describe('FoldersService', () => {
   let service: FoldersService;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     folder: {
@@ -28,7 +27,6 @@ describe('FoldersService', () => {
     }).compile();
 
     service = module.get<FoldersService>(FoldersService);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -203,7 +201,7 @@ describe('FoldersService', () => {
 
       expect(mockPrismaService.folder.update).toHaveBeenCalledWith({
         where: { id: folderId },
-        data: { deletedAt: expect.any(Date) },
+        data: { deletedAt: expect.any(Date) as Date },
       });
     });
   });

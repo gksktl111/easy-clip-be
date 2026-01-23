@@ -8,7 +8,6 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 
 describe('FoldersController (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     folder: {
@@ -29,8 +28,6 @@ describe('FoldersController (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
   });
 
   afterEach(async () => {
@@ -59,8 +56,8 @@ describe('FoldersController (e2e)', () => {
         .send(createDto)
         .expect(201)
         .expect((res) => {
-          expect(res.body.name).toBe('Test Folder');
-          expect(res.body.order).toBe(0);
+          expect(res.body).toHaveProperty('name', 'Test Folder');
+          expect(res.body).toHaveProperty('order', 0);
         });
     });
   });
@@ -95,7 +92,8 @@ describe('FoldersController (e2e)', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveLength(2);
-          expect(res.body[0].name).toBe('Folder 1');
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          expect(res.body[0]).toHaveProperty('name', 'Folder 1');
         });
     });
   });
@@ -118,7 +116,7 @@ describe('FoldersController (e2e)', () => {
         .get('/folders/folder1')
         .expect(200)
         .expect((res) => {
-          expect(res.body.name).toBe('Test Folder');
+          expect(res.body).toHaveProperty('name', 'Test Folder');
         });
     });
 
@@ -153,7 +151,7 @@ describe('FoldersController (e2e)', () => {
         .send(updateDto)
         .expect(200)
         .expect((res) => {
-          expect(res.body.name).toBe('Updated Folder');
+          expect(res.body).toHaveProperty('name', 'Updated Folder');
         });
     });
   });

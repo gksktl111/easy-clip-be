@@ -73,20 +73,10 @@ export class FoldersService {
   ): Promise<void> {
     const { folderId, targetFolderId, position } = reorderFolderDto;
 
-    const folderToMove = await this.findOne(folderId, userId);
-
-    if (!folderToMove) {
-      throw new NotFoundException(`Folder with ID ${folderId} not found`);
-    }
+    await this.findOne(folderId, userId);
 
     if (targetFolderId) {
-      const targetFolder = await this.findOne(targetFolderId, userId);
-
-      if (!targetFolder) {
-        throw new NotFoundException(
-          `Target folder with ID ${targetFolderId} not found`,
-        );
-      }
+      await this.findOne(targetFolderId, userId);
     }
 
     const allFolders = await this.findAll(userId);
@@ -131,11 +121,12 @@ export class FoldersService {
       data: { order: newOrder },
     });
 
-    const epsilon = 0.0001;
+    const MINIMUM_ORDER_DIFFERENCE = 0.0001;
     const needsReordering = allFolders.some((folder, index) => {
       if (index === allFolders.length - 1) return false;
       return (
-        Math.abs(folder.order - allFolders[index + 1].order) < epsilon ||
+        Math.abs(folder.order - allFolders[index + 1].order) <
+          MINIMUM_ORDER_DIFFERENCE ||
         folder.order >= allFolders[index + 1].order
       );
     });
