@@ -6,7 +6,8 @@ import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GithubStrategy } from './strategies/github.strategy';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { JwtAccessGuard } from './guards/jwt-access-token.guard';
+import { JwtRefreshGuard } from './guards/jwt-refresh-token.guard';
 
 @Module({
   imports: [
@@ -16,12 +17,18 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET_KEY,
-      // 토큰 유효기간 설정 (예: 30분)
-      signOptions: { expiresIn: '30m' },
+      // 토큰 유효기간 설정 (예: 15분)
+      signOptions: { expiresIn: '15m' },
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy, GithubStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    GoogleStrategy,
+    GithubStrategy,
+    JwtAccessGuard,
+    JwtRefreshGuard,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

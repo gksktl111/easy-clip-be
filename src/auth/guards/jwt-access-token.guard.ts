@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 
 @Injectable()
-export class JwtAuthGuard implements CanActivate {
+export class JwtAccessGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -16,7 +16,7 @@ export class JwtAuthGuard implements CanActivate {
     // Authorization 헤더에서 Bearer 토큰을 추출한다.
     const token = this.extractTokenFromHeader(request);
     if (!token) {
-      throw new UnauthorizedException('토큰이 없습니다.');
+      throw new UnauthorizedException('Access token이 없습니다.');
     }
     try {
       // 토큰을 검증하고 payload를 요청 객체에 주입한다.
@@ -24,7 +24,7 @@ export class JwtAuthGuard implements CanActivate {
 
       request['user'] = payload;
     } catch {
-      throw new UnauthorizedException('유효하지 않은 토큰입니다.');
+      throw new UnauthorizedException('유효하지 않은 access token입니다.');
     }
     return true;
   }

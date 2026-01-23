@@ -44,6 +44,11 @@ enum WorkspaceRole {
   MEMBER // 일반 멤버
 }
 
+enum Platform {
+  WEB
+  APP
+}
+
 // 데이터 소유자(계정 컨테이너)
 model User {
   id String @id @default(cuid())
@@ -58,7 +63,7 @@ model User {
   settings     UserSettings? // 1:1 관계
   clipLikes     ClipLike[]
   clipViews     ClipView[]
-
+  refreshTokens RefreshToken[]
 }
 
 
@@ -79,7 +84,30 @@ model AuthAccount {
   userId String
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  refreshTokens RefreshToken[]
+
   @@unique([provider, providerUserId])
+}
+
+model RefreshToken {
+  id            String   @id @default(cuid())
+  tokenHash     String
+
+  platform      Platform
+
+  userId        String
+  authAccountId String
+
+  expiresAt     DateTime
+  revokedAt     DateTime?
+
+  createdAt     DateTime @default(now())
+
+  user          User        @relation(fields: [userId], references: [id])
+  authAccount   AuthAccount @relation(fields: [authAccountId], references: [id])
+
+  @@unique([authAccountId, platform])
+  @@index([userId])
 }
 
 
