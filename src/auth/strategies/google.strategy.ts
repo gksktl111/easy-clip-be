@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { AuthProvider } from '@prisma/client';
 import { Request } from 'express';
+import type { AuthenticateOptions } from 'passport';
 import { Profile, Strategy } from 'passport-google-oauth20';
+import { OAuthUser } from '../auth';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
@@ -16,7 +18,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     });
   }
 
-  authenticate(req: Request, options?: any) {
+  authenticate(req: Request, options?: AuthenticateOptions): void {
     const platform = (req.query.platform as 'WEB' | 'APP') ?? 'WEB';
 
     const mode = (req.query.mode as 'login' | 'link') ?? 'login';
@@ -32,12 +34,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     });
   }
 
-  async validate(
+  validate(
     req: Request,
     accessToken: string,
     refreshToken: string,
     profile: Profile,
-  ) {
+  ): OAuthUser {
     // ⭐ state 복원
     const rawState = req.query.state as string | undefined;
 
@@ -46,7 +48,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
     if (rawState) {
       try {
-        const parsed = JSON.parse(Buffer.from(rawState, 'base64').toString());
+        const parsed = JSON.parse(
+          Buffer.from(rawState, 'base64').toString(),
+        ) as { platform?: 'WEB' | 'APP'; mode?: 'login' | 'link' };
         platform = parsed.platform ?? platform;
         mode = parsed.mode ?? mode;
       } catch {
@@ -54,6 +58,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       }
     }
 
+    // 명시적으로 OAuthUser 타입 반환
     return {
       provider: AuthProvider.GOOGLE,
       providerUserId: profile.id,
