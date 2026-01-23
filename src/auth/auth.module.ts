@@ -14,11 +14,9 @@ import { JwtRefreshGuard } from './guards/jwt-refresh-token.guard';
     PrismaModule,
     // Passport 기반 OAuth 가드를 사용하기 위한 설정이다.
     PassportModule.register({ session: false }),
+    // JwtService 제공만 받는다 (정책 없음)
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET_KEY,
-      // 토큰 유효기간 설정 (예: 15분)
-      signOptions: { expiresIn: '15m' },
     }),
   ],
   controllers: [AuthController],

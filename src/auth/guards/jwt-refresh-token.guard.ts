@@ -22,10 +22,12 @@ export class JwtRefreshGuard implements CanActivate {
     try {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_REFRESH_SECRET,
+        audience: 'refresh',
+        issuer: 'easy-clip',
       });
 
       request['user'] = payload;
-      request['tokenType'] = 'refresh';
+      request['refreshToken'] = token; // ⭐ 중요
     } catch {
       throw new UnauthorizedException('유효하지 않은 refresh token입니다.');
     }

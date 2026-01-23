@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString } from 'class-validator';
 
-export class SwitchAccountDto {
+export class SwitchUserDto {
   @IsString()
   @IsNotEmpty()
   authAccountId: string;

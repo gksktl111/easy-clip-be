@@ -16,7 +16,9 @@
 ############################################################
 
 @baseUrl = http://localhost:3000
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWtxbTg5cWcwMDA0Z2Q2b3o3NWh2ZXNrIiwiYWNjb3VudElkIjoiY21rcW04OXFnMDAwNWdkNm93MHFvYXUxNSIsImlhdCI6MTc2OTE1NzcwMiwiZXhwIjoxNzY5MTU5NTAyfQ.xR7S4JqB22HYd5xuaTjiDg3Vclm6VX_QCAn5_bwvr0Y
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWtxcTdsNmYwMDAwZ2R5MXh6MHY0amdiIiwiYWNjb3VudElkIjoiY21rcXE3bDZmMDAwMWdkeTFudHY5dndzZyIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzY5MTYzNDAxLCJleHAiOjE3NjkxNjQzMDEsImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.Xwf4G_vm72BWb3DvPHcATi90Sam8wfOXo732xSuchX8
+@refreshToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWtxcHNyamswMDAwZ2RkYTc1Znpob24xIiwiYWNjb3VudElkIjoiY21rcXBzcmprMDAwMWdkZGF2YnNnNWdyaiIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzY5MTYyNzQ2LCJleHAiOjE3NzAzNzIzNDYsImF1ZCI6InJlZnJlc2giLCJpc3MiOiJlYXN5LWNsaXAifQ.qcV4UMPQpQc0EPaMwVf8ROTVEON-MBp9Lk2f-pJREtA
+
 @authAccountId = REPLACE_WITH_AUTH_ACCOUNT_ID
 
 
@@ -26,11 +28,17 @@
 # - 최초 로그인 시 User + AuthAccount 생성
 ############################################################
 
-### Google OAuth 로그인
-GET {{baseUrl}}/auth/google
+### Google OAuth 로그인 (WEB)
+GET {{baseUrl}}/auth/google?platform=WEB
 
-### GitHub OAuth 로그인
-GET {{baseUrl}}/auth/github
+### Google OAuth 로그인 (APP)
+GET {{baseUrl}}/auth/google?platform=APP
+
+### GitHub OAuth 로그인 (WEB)
+GET {{baseUrl}}/auth/github?platform=WEB
+
+### GitHub OAuth 로그인 (APP)
+GET {{baseUrl}}/auth/github?platform=APP
 
 # 브라우저에서 OAuth 로그인 완료 후
 # /auth/:provider/callback 으로 자동 이동
@@ -113,3 +121,35 @@ Authorization: Bearer {{accessToken}}
 
 # displayName / avatarUrl 이
 # 전환된 AuthAccount 기준으로 바뀌어야 정상
+
+############################################################
+# 6. Access Token 재발급 (Refresh Token 사용)
+# - Refresh Token 필수
+# - 만료된 access token 이후에도 사용 가능
+############################################################
+
+# ⚠️ Authorization 헤더에는 "refresh token"을 넣어야 한다
+# access token ❌
+# refresh token ⭕
+
+POST {{baseUrl}}/auth/refresh
+Authorization: Bearer {{refreshToken}}
+
+# 응답 예시
+# {
+#   "access_token": "NEW_ACCESS_TOKEN"
+# }
+#
+# → 반환된 access_token 값을 다시 @accessToken 변수에 복사
+
+############################################################
+# 8. 로그아웃 (현재 플랫폼 세션)
+############################################################
+
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}
+
+# 응답
+# {
+#   "success": true
+# }

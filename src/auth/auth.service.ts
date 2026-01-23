@@ -5,14 +5,17 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { AuthAccount, User } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { OAuthUser } from './auth';
+import { AuthPlatform, JwtPayload, OAuthUser } from './auth';
+import { createHash } from 'crypto';
 
 type OAuthSignInResult = {
   access_token: string;
+  refresh_token: string;
   user: {
     id: string;
     displayName: string | null;
@@ -56,7 +59,7 @@ export class AuthService {
         );
       }
 
-      return this.issueAuthToken(account.user, account);
+      return this.issueAuthToken(account.user, account, oauthUser.platform);
     }
 
     // mode === 'login'
@@ -89,7 +92,11 @@ export class AuthService {
 
     // 2️⃣ 이미 연동된 계정 → 로그인
     if (existingAccount) {
-      return this.issueAuthToken(existingAccount.user, existingAccount);
+      return this.issueAuthToken(
+        existingAccount.user,
+        existingAccount,
+        oauthUser.platform,
+      );
     }
 
     // 3️⃣ email 기준 기존 User 존재 여부 확인 (AuthAccount 기준)
@@ -130,11 +137,11 @@ export class AuthService {
 
     const newAccount = newUser.authAccounts[0];
 
-    return this.issueAuthToken(newUser, newAccount);
+    return this.issueAuthToken(newUser, newAccount, oauthUser.platform);
   }
 
   /**
-   * OAuth 계정 추가 연동 (JWT 인증된 상태 전용)
+   * OAuth 계정 추가 (JWT 인증된 상태 전용)
    */
   private async linkWithOAuth(
     userId: string,
@@ -185,6 +192,7 @@ export class AuthService {
   async switchUser(
     currentUserId: string,
     targetAuthAccountId: string,
+    platform: AuthPlatform,
   ): Promise<OAuthSignInResult> {
     const targetAccount = await this.prisma.authAccount.findUnique({
       where: { id: targetAuthAccountId },
@@ -199,26 +207,150 @@ export class AuthService {
       throw new ForbiddenException('연동되지 않은 계정입니다.');
     }
 
-    return this.issueAuthToken(targetAccount.user, targetAccount);
+    return this.issueAuthToken(targetAccount.user, targetAccount, platform);
   }
 
   /**
-   * JWT 발급
-   * - userId + accountId 모두 포함
+   * 토큰 재발급
+   * 현재는 access token만 재발급 추후에 jwt 슬라이드에 refresh token 재발급 기능 추가 가능
    */
+  async refreshAccessToken(
+    payload: JwtPayload,
+    refreshToken: string,
+  ): Promise<{ access_token: string }> {
+    const { sub: userId, accountId, platform } = payload;
+
+    const session = await this.prisma.refreshToken.findUnique({
+      where: {
+        authAccountId_platform: {
+          authAccountId: accountId,
+          platform,
+        },
+      },
+    });
+
+    if (!session) {
+      throw new UnauthorizedException('리프레쉬 세션이 존재하지 않습니다.');
+    }
+
+    if (session.revokedAt) {
+      throw new UnauthorizedException('폐기된 리프레쉬 토큰입니다.');
+    }
+
+    if (session.expiresAt < new Date()) {
+      throw new UnauthorizedException('리프레쉬 토큰이 만료되었습니다.');
+    }
+
+    const incomingHash = createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+
+    if (incomingHash !== session.tokenHash) {
+      throw new UnauthorizedException('리프레쉬 토큰이 일치하지 않습니다.');
+    }
+
+    // ✅ access token만 재발급
+    const accessToken = this.signAccessToken({
+      sub: userId,
+      accountId,
+      platform,
+    });
+
+    return {
+      access_token: accessToken,
+    };
+  }
+  /**
+   * 로그아웃
+   */
+  async logout(
+    authAccountId: string,
+    platform: AuthPlatform,
+  ): Promise<{ success: true }> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        authAccountId,
+        platform,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    return { success: true };
+  }
+
+  private signAccessToken(payload: JwtPayload) {
+    return this.jwtService.sign(payload, {
+      secret: process.env.JWT_ACCESS_SECRET,
+      expiresIn: '15m',
+      audience: 'api',
+      issuer: 'easy-clip',
+    });
+  }
+
+  private signRefreshToken(payload: JwtPayload) {
+    return this.jwtService.sign(payload, {
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: '14d',
+      audience: 'refresh',
+      issuer: 'easy-clip',
+    });
+  }
+
   private async issueAuthToken(
     user: User,
     account: AuthAccount,
+    platform: 'WEB' | 'APP',
   ): Promise<OAuthSignInResult> {
     const payload = {
       sub: user.id,
       accountId: account.id,
+      platform,
     };
 
-    const accessToken = await this.jwtService.signAsync(payload);
+    const accessToken = this.signAccessToken(payload);
+
+    const refreshToken = this.signRefreshToken(payload);
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+
+    const decoded = this.jwtService.decode(refreshToken) as {
+      exp?: number;
+    } | null;
+
+    if (!decoded?.exp) {
+      throw new InternalServerErrorException(
+        '유효하지 않은 리프레쉬 토큰입니다.',
+      );
+    }
+
+    const expiresAt = new Date(decoded.exp * 1000);
+
+    await this.prisma.refreshToken.upsert({
+      where: {
+        authAccountId_platform: {
+          authAccountId: account.id,
+          platform,
+        },
+      },
+      update: {
+        tokenHash,
+        revokedAt: null,
+        expiresAt,
+      },
+      create: {
+        userId: user.id,
+        authAccountId: account.id,
+        platform,
+        tokenHash,
+        expiresAt,
+      },
+    });
 
     return {
       access_token: accessToken,
+      refresh_token: refreshToken,
       user: {
         id: user.id,
         displayName: account.displayName ?? null,

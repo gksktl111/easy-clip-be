@@ -8,12 +8,27 @@ import { Profile, Strategy } from 'passport-google-oauth20';
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor() {
     super({
-      // 환경변수 기반으로 Google OAuth 클라이언트를 설정한다.
       clientID: process.env.GOOGLE_CLIENT_ID ?? '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
       callbackURL: process.env.GOOGLE_REDIRECT_URI ?? '',
       scope: ['profile', 'email'],
-      passReqToCallback: true, // ⭐ 핵심
+      passReqToCallback: true,
+    });
+  }
+
+  authenticate(req: Request, options?: any) {
+    const platform = (req.query.platform as 'WEB' | 'APP') ?? 'WEB';
+
+    const mode = (req.query.mode as 'login' | 'link') ?? 'login';
+
+    // ⭐ OAuth state에 실을 데이터
+    const state = Buffer.from(JSON.stringify({ platform, mode })).toString(
+      'base64',
+    );
+
+    super.authenticate(req, {
+      ...options,
+      state,
     });
   }
 
@@ -23,10 +38,22 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     refreshToken: string,
     profile: Profile,
   ) {
-    // mode는 'login' 또는 'link'로 사용될 수 있으며, 필요에 따라 처리할 수 있다.
-    const mode = (req.query.mode as 'login' | 'link') ?? 'login';
+    // ⭐ state 복원
+    const rawState = req.query.state as string | undefined;
 
-    // Google 프로필을 애플리케이션 표준 형태로 정규화한다.
+    let platform: 'WEB' | 'APP' = 'WEB';
+    let mode: 'login' | 'link' = 'login';
+
+    if (rawState) {
+      try {
+        const parsed = JSON.parse(Buffer.from(rawState, 'base64').toString());
+        platform = parsed.platform ?? platform;
+        mode = parsed.mode ?? mode;
+      } catch {
+        // state 파싱 실패 시 기본값 유지
+      }
+    }
+
     return {
       provider: AuthProvider.GOOGLE,
       providerUserId: profile.id,
@@ -34,6 +61,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       displayName: profile.displayName,
       avatarUrl: profile.photos?.[0]?.value,
       mode,
+      platform, // ✅ 여기서 Service로 전달됨
     };
   }
 }
