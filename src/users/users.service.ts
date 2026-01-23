@@ -1,38 +1,35 @@
-import { Injectable } from '@nestjs/common';
-
-export type User = any;
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  private readonly users = [
-    {
-      userId: 1,
-      username: 'john',
-      password: 'changeme',
-    },
-    {
-      userId: 2,
-      username: 'maria',
-      password: 'guess',
-    },
-  ];
+  constructor(private prisma: PrismaService) {}
 
-  async createUser(
-    username: string,
-    pass: string,
-    email: string,
-  ): Promise<User> {
-    const newUser = {
-      userId: this.users.length + 1,
-      username,
-      password: pass,
-      email,
+  async getMe(userId: string, accountId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { authAccounts: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    const account = user.authAccounts.find((a) => a.id === accountId);
+
+    if (!account) {
+      throw new NotFoundException('계정 정보를 찾을 수 없습니다.');
+    }
+
+    return {
+      id: user.id,
+      displayName: account.displayName ?? null,
+      avatarUrl: account.profileImageUrl ?? null,
+      authAccounts: user.authAccounts.map((a) => ({
+        id: a.id,
+        provider: a.provider,
+        email: a.email,
+      })),
     };
-    this.users.push(newUser);
-    return newUser;
-  }
-
-  async findOne(username: string): Promise<User | undefined> {
-    return this.users.find((user) => user.username === username);
   }
 }

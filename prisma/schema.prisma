@@ -44,13 +44,9 @@ enum WorkspaceRole {
   MEMBER // 일반 멤버
 }
 
-// 로그인 주체 (사람 + 로그인 방식 + 디바이스)
+// 데이터 소유자(계정 컨테이너)
 model User {
   id String @id @default(cuid())
-
-  email String @unique
-  displayName String?
-  avatarUrl   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -64,6 +60,28 @@ model User {
   clipViews     ClipView[]
 
 }
+
+
+// 로그인 수단 + 표시 정체성
+// 추후 로그인 확장을 위해 별도 모델로 분리
+// 한 사용자는 여러 소셜 로그인 계정을 가질 수 있음
+// (예: 구글과 깃허브 계정 모두로 로그인 가능)
+model AuthAccount {
+  id              String       @id @default(cuid())
+  
+  provider        AuthProvider
+  providerUserId  String
+
+  email           String
+  displayName     String?
+  profileImageUrl String?
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+}
+
 
 // 워크스페이스는 개인/팀의 데이터 소유 단위
 model Workspace {
@@ -85,9 +103,7 @@ model Workspace {
 
 }
 
-
-
-// 워크스페이스 멤버십 및 권한
+// 워크스페이스 멤버십 및 권한 관리용 (인명부)
 // TEAM 워크스페이스는 생성 시 OWNER 멤버십이 반드시 필요하다.
 model WorkspaceUser {
   id String @id @default(cuid())
@@ -102,21 +118,6 @@ model WorkspaceUser {
   @@unique([workspaceId, userId])
   @@index([workspaceId])
   @@index([userId])
-}
-
-// 추후 로그인 확장을 위해 별도 모델로 분리
-// 한 사용자는 여러 소셜 로그인 계정을 가질 수 있음
-// (예: 구글과 깃허브 계정 모두로 로그인 가능)
-model AuthAccount {
-  id              String       @id @default(cuid())
-  provider        AuthProvider
-  providerUserId  String
-  email           String?
-
-  userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerUserId])
 }
 
 model UserSettings {
