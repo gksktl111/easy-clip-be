@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { AuthProvider } from '@prisma/client';
 import { Request } from 'express';
+import type { AuthenticateOptions } from 'passport';
 import { Profile, Strategy } from 'passport-github2';
+import { OAuthUser } from '../auth';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
@@ -16,7 +18,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     });
   }
 
-  authenticate(req: Request, options?: any) {
+  authenticate(req: Request, options?: AuthenticateOptions): void {
     const platform = (req.query.platform as 'WEB' | 'APP') ?? 'WEB';
 
     const mode = (req.query.mode as 'login' | 'link') ?? 'login';
@@ -31,12 +33,12 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     });
   }
 
-  async validate(
+  validate(
     req: Request,
     accessToken: string,
     refreshToken: string,
     profile: Profile,
-  ) {
+  ): OAuthUser {
     const rawState = req.query.state as string | undefined;
 
     let platform: 'WEB' | 'APP' = 'WEB';
@@ -44,7 +46,9 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
 
     if (rawState) {
       try {
-        const parsed = JSON.parse(Buffer.from(rawState, 'base64').toString());
+        const parsed = JSON.parse(
+          Buffer.from(rawState, 'base64').toString(),
+        ) as { platform?: 'WEB' | 'APP'; mode?: 'login' | 'link' };
         platform = parsed.platform ?? platform;
         mode = parsed.mode ?? mode;
       } catch {
@@ -52,6 +56,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
       }
     }
 
+    // 명시적으로 OAuthUser 타입 반환
     return {
       provider: AuthProvider.GITHUB,
       providerUserId: profile.id,

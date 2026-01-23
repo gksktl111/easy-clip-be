@@ -41,7 +41,7 @@ export class AuthService {
       await this.linkWithOAuth(oauthUser.currentUserId, oauthUser);
 
       // link 후에는 "기존 계정 유지"
-      const account = await this.prisma.authAccount.findUnique({
+      const account = (await this.prisma.authAccount.findUnique({
         where: {
           provider_providerUserId: {
             provider: oauthUser.provider,
@@ -49,7 +49,7 @@ export class AuthService {
           },
         },
         include: { user: true },
-      });
+      })) as (AuthAccount & { user: User }) | null;
 
       if (!account) {
         // 이론상 발생하면 안 되는 상태
@@ -80,7 +80,7 @@ export class AuthService {
     }
 
     // 1️⃣ provider + providerUserId 기준 AuthAccount 조회
-    const existingAccount = await this.prisma.authAccount.findUnique({
+    const existingAccount = (await this.prisma.authAccount.findUnique({
       where: {
         provider_providerUserId: {
           provider: oauthUser.provider,
@@ -88,7 +88,7 @@ export class AuthService {
         },
       },
       include: { user: true },
-    });
+    })) as (AuthAccount & { user: User }) | null;
 
     // 2️⃣ 이미 연동된 계정 → 로그인
     if (existingAccount) {
@@ -118,7 +118,7 @@ export class AuthService {
     }
 
     // 4️⃣ 신규 User + AuthAccount 생성
-    const newUser = await this.prisma.user.create({
+    const newUser = (await this.prisma.user.create({
       data: {
         authAccounts: {
           create: {
@@ -133,7 +133,7 @@ export class AuthService {
       include: {
         authAccounts: true,
       },
-    });
+    })) as User & { authAccounts: AuthAccount[] };
 
     const newAccount = newUser.authAccounts[0];
 
@@ -147,8 +147,6 @@ export class AuthService {
     userId: string,
     oauthUser: OAuthUser,
   ): Promise<void> {
-    console.log(userId, oauthUser);
-
     if (!oauthUser.email) {
       throw new BadRequestException('로그인이 필요합니다.');
     }
@@ -194,10 +192,10 @@ export class AuthService {
     targetAuthAccountId: string,
     platform: AuthPlatform,
   ): Promise<OAuthSignInResult> {
-    const targetAccount = await this.prisma.authAccount.findUnique({
+    const targetAccount = (await this.prisma.authAccount.findUnique({
       where: { id: targetAuthAccountId },
       include: { user: true },
-    });
+    })) as (AuthAccount & { user: User }) | null;
 
     if (!targetAccount) {
       throw new NotFoundException('전환할 계정을 찾을 수 없습니다.');
@@ -220,14 +218,18 @@ export class AuthService {
   ): Promise<{ access_token: string }> {
     const { sub: userId, accountId, platform } = payload;
 
-    const session = await this.prisma.refreshToken.findUnique({
+    const session = (await this.prisma.refreshToken.findUnique({
       where: {
         authAccountId_platform: {
           authAccountId: accountId,
           platform,
         },
       },
-    });
+    })) as {
+      tokenHash: string;
+      revokedAt: Date | null;
+      expiresAt: Date;
+    } | null;
 
     if (!session) {
       throw new UnauthorizedException('리프레쉬 세션이 존재하지 않습니다.');
@@ -315,17 +317,23 @@ export class AuthService {
     const refreshToken = this.signRefreshToken(payload);
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
-    const decoded = this.jwtService.decode(refreshToken) as {
-      exp?: number;
-    } | null;
-
-    if (!decoded?.exp) {
+    // verifyAsync를 사용하여 타입 안전하게 토큰 검증
+    let expiresAt: Date;
+    try {
+      const verified = await this.jwtService.verifyAsync<{ exp: number }>(
+        refreshToken,
+        {
+          secret: process.env.JWT_REFRESH_SECRET,
+          audience: 'refresh',
+          issuer: 'easy-clip',
+        },
+      );
+      expiresAt = new Date(verified.exp * 1000);
+    } catch {
       throw new InternalServerErrorException(
         '유효하지 않은 리프레쉬 토큰입니다.',
       );
     }
-
-    const expiresAt = new Date(decoded.exp * 1000);
 
     await this.prisma.refreshToken.upsert({
       where: {
