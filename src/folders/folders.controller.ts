@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Request,
   UseGuards,
@@ -10,6 +11,7 @@ import {
 import { JwtAccessGuard } from 'src/auth/guards/jwt-access-token.guard';
 import { JwtPayload } from 'src/auth/auth';
 import { CreateFolderDto } from './dtos/create-folder.dto';
+import { UpdateFolderDto } from './dtos/update-folder.dto';
 import { FoldersService } from './folders.service';
 
 @Controller('folders')
@@ -35,5 +37,15 @@ export class FoldersController {
     @Body() dto: CreateFolderDto,
   ) {
     return this.foldersService.createFolder(req.user.sub, dto);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAccessGuard)
+  updateFolder(
+    @Request() req: { user: JwtPayload },
+    @Param('id') id: string,
+    @Body() dto: UpdateFolderDto,
+  ) {
+    return this.foldersService.updateFolder(req.user.sub, id, dto);
   }
 }

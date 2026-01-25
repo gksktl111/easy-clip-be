@@ -6,6 +6,7 @@ import {
 import { WorkspaceRole, WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateFolderDto } from './dtos/create-folder.dto';
+import { UpdateFolderDto } from './dtos/update-folder.dto';
 
 @Injectable()
 export class FoldersService {
@@ -41,6 +42,21 @@ export class FoldersService {
     }
 
     return folder;
+  }
+
+  async updateFolder(userId: string, folderId: string, dto: UpdateFolderDto) {
+    const folder = await this.getFolderById(userId, folderId);
+
+    if (!dto.name) {
+      return folder;
+    }
+
+    return this.prisma.folder.update({
+      where: { id: folder.id },
+      data: {
+        name: dto.name,
+      },
+    });
   }
 
   async createFolder(userId: string, dto: CreateFolderDto) {
