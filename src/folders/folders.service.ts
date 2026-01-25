@@ -7,11 +7,24 @@ import { CreateFolderDto } from './dtos/create-folder.dto';
 export class FoldersService {
   constructor(private prisma: PrismaService) {}
 
+  async getFolders(userId: string) {
+    const workspaceId = await this.findPersonalWorkspaceId(userId);
+
+    if (!workspaceId) {
+      return [];
+    }
+
+    return this.prisma.folder.findMany({
+      where: { workspaceId, deletedAt: null },
+      orderBy: { order: 'asc' },
+    });
+  }
+
   async createFolder(userId: string, dto: CreateFolderDto) {
     const workspaceId = await this.getOrCreatePersonalWorkspaceId(userId);
 
     const lastFolder = await this.prisma.folder.findFirst({
-      where: { workspaceId },
+      where: { workspaceId, deletedAt: null },
       orderBy: { order: 'desc' },
       select: { order: true },
     });
@@ -27,7 +40,9 @@ export class FoldersService {
     });
   }
 
-  private async getOrCreatePersonalWorkspaceId(userId: string): Promise<string> {
+  private async findPersonalWorkspaceId(
+    userId: string,
+  ): Promise<string | null> {
     const workspace = await this.prisma.workspace.findFirst({
       where: {
         ownerUserId: userId,
@@ -36,8 +51,14 @@ export class FoldersService {
       select: { id: true },
     });
 
-    if (workspace) {
-      return workspace.id;
+    return workspace?.id ?? null;
+  }
+
+  private async getOrCreatePersonalWorkspaceId(userId: string): Promise<string> {
+    const workspaceId = await this.findPersonalWorkspaceId(userId);
+
+    if (workspaceId) {
+      return workspaceId;
     }
 
     const created = await this.prisma.workspace.create({
