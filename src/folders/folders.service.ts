@@ -14,6 +14,7 @@ import { UpdateFolderDto } from './dtos/update-folder.dto';
 export class FoldersService {
   constructor(private prisma: PrismaService) {}
 
+  // 개인 워크스페이스 기준 폴더 목록을 조회한다.
   async getFolders(userId: string) {
     const workspaceId = await this.findPersonalWorkspaceId(userId);
 
@@ -27,6 +28,7 @@ export class FoldersService {
     });
   }
 
+  // 개인 워크스페이스 소유 폴더를 단건 조회한다.
   async getFolderById(userId: string, folderId: string) {
     const folder = await this.prisma.folder.findFirst({
       where: {
@@ -46,6 +48,7 @@ export class FoldersService {
     return folder;
   }
 
+  // 폴더 이름을 수정한다.
   async updateFolder(userId: string, folderId: string, dto: UpdateFolderDto) {
     const folder = await this.getFolderById(userId, folderId);
 
@@ -61,6 +64,7 @@ export class FoldersService {
     });
   }
 
+  // 기준 폴더를 기반으로 대상 폴더의 순서를 재계산한다.
   async reorderFolder(userId: string, dto: ReorderFolderDto) {
     const { targetId, afterId, beforeId } = dto;
 
@@ -161,6 +165,7 @@ export class FoldersService {
     });
   }
 
+  // 폴더를 소프트 삭제한다.
   async deleteFolder(userId: string, folderId: string) {
     const folder = await this.getFolderById(userId, folderId);
 
@@ -170,6 +175,7 @@ export class FoldersService {
     });
   }
 
+  // 폴더를 생성하고 마지막 순서 다음 값으로 배치한다.
   async createFolder(userId: string, dto: CreateFolderDto) {
     const workspaceId = await this.getOrCreatePersonalWorkspaceId(userId);
 
