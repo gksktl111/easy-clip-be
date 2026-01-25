@@ -161,6 +161,15 @@ export class FoldersService {
     });
   }
 
+  async deleteFolder(userId: string, folderId: string) {
+    const folder = await this.getFolderById(userId, folderId);
+
+    return this.prisma.folder.update({
+      where: { id: folder.id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   async createFolder(userId: string, dto: CreateFolderDto) {
     const workspaceId = await this.getOrCreatePersonalWorkspaceId(userId);
 
