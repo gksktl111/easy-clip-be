@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -57,5 +58,11 @@ export class FoldersController {
     @Body() dto: UpdateFolderDto,
   ) {
     return this.foldersService.updateFolder(req.user.sub, id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAccessGuard)
+  deleteFolder(@Request() req: { user: JwtPayload }, @Param('id') id: string) {
+    return this.foldersService.deleteFolder(req.user.sub, id);
   }
 }
