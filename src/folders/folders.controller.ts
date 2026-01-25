@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAccessGuard } from 'src/auth/guards/jwt-access-token.guard';
 import { JwtPayload } from 'src/auth/auth';
 import { CreateFolderDto } from './dtos/create-folder.dto';
@@ -12,6 +20,12 @@ export class FoldersController {
   @UseGuards(JwtAccessGuard)
   getFolders(@Request() req: { user: JwtPayload }) {
     return this.foldersService.getFolders(req.user.sub);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAccessGuard)
+  getFolder(@Request() req: { user: JwtPayload }, @Param('id') id: string) {
+    return this.foldersService.getFolderById(req.user.sub, id);
   }
 
   @Post()
