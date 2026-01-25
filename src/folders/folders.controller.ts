@@ -11,6 +11,7 @@ import {
 import { JwtAccessGuard } from 'src/auth/guards/jwt-access-token.guard';
 import { JwtPayload } from 'src/auth/auth';
 import { CreateFolderDto } from './dtos/create-folder.dto';
+import { ReorderFolderDto } from './dtos/reorder-folder.dto';
 import { UpdateFolderDto } from './dtos/update-folder.dto';
 import { FoldersService } from './folders.service';
 
@@ -37,6 +38,15 @@ export class FoldersController {
     @Body() dto: CreateFolderDto,
   ) {
     return this.foldersService.createFolder(req.user.sub, dto);
+  }
+
+  @Patch('reorder')
+  @UseGuards(JwtAccessGuard)
+  reorderFolder(
+    @Request() req: { user: JwtPayload },
+    @Body() dto: ReorderFolderDto,
+  ) {
+    return this.foldersService.reorderFolder(req.user.sub, dto);
   }
 
   @Patch(':id')
