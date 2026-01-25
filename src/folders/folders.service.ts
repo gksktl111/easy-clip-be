@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -6,6 +7,7 @@ import {
 import { WorkspaceRole, WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateFolderDto } from './dtos/create-folder.dto';
+import { ReorderFolderDto } from './dtos/reorder-folder.dto';
 import { UpdateFolderDto } from './dtos/update-folder.dto';
 
 @Injectable()
@@ -56,6 +58,106 @@ export class FoldersService {
       data: {
         name: dto.name,
       },
+    });
+  }
+
+  async reorderFolder(userId: string, dto: ReorderFolderDto) {
+    const { targetId, afterId, beforeId } = dto;
+
+    if ((!afterId && !beforeId) || (afterId && beforeId)) {
+      throw new BadRequestException(
+        'afterId 또는 beforeId 중 하나만 전달해야 합니다.',
+      );
+    }
+
+    if (targetId === afterId || targetId === beforeId) {
+      throw new BadRequestException('이동 대상과 기준 폴더가 같습니다.');
+    }
+
+    const target = await this.prisma.folder.findFirst({
+      where: {
+        id: targetId,
+        deletedAt: null,
+        workspace: {
+          ownerUserId: userId,
+          type: WorkspaceType.PERSONAL,
+        },
+      },
+      select: {
+        id: true,
+        order: true,
+        workspaceId: true,
+      },
+    });
+
+    if (!target) {
+      throw new NotFoundException('이동할 폴더를 찾을 수 없습니다.');
+    }
+
+    const referenceId = afterId ?? beforeId;
+
+    if (!referenceId) {
+      throw new BadRequestException('기준 폴더가 필요합니다.');
+    }
+    const reference = await this.prisma.folder.findFirst({
+      where: {
+        id: referenceId,
+        deletedAt: null,
+        workspaceId: target.workspaceId,
+      },
+      select: {
+        id: true,
+        order: true,
+      },
+    });
+
+    if (!reference) {
+      throw new NotFoundException('기준 폴더를 찾을 수 없습니다.');
+    }
+
+    let newOrder: number;
+
+    if (beforeId) {
+      const previous = await this.prisma.folder.findFirst({
+        where: {
+          workspaceId: target.workspaceId,
+          deletedAt: null,
+          order: { lt: reference.order },
+          id: { not: target.id },
+        },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      });
+
+      newOrder = previous
+        ? (previous.order + reference.order) / 2
+        : reference.order - 1;
+    } else {
+      const next = await this.prisma.folder.findFirst({
+        where: {
+          workspaceId: target.workspaceId,
+          deletedAt: null,
+          order: { gt: reference.order },
+          id: { not: target.id },
+        },
+        orderBy: { order: 'asc' },
+        select: { order: true },
+      });
+
+      newOrder = next
+        ? (reference.order + next.order) / 2
+        : reference.order + 1;
+    }
+
+    if (newOrder === target.order) {
+      return this.prisma.folder.findUnique({
+        where: { id: target.id },
+      });
+    }
+
+    return this.prisma.folder.update({
+      where: { id: target.id },
+      data: { order: newOrder },
     });
   }
 
