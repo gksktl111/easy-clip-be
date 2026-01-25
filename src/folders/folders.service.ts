@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { WorkspaceRole, WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateFolderDto } from './dtos/create-folder.dto';
@@ -18,6 +22,25 @@ export class FoldersService {
       where: { workspaceId, deletedAt: null },
       orderBy: { order: 'asc' },
     });
+  }
+
+  async getFolderById(userId: string, folderId: string) {
+    const folder = await this.prisma.folder.findFirst({
+      where: {
+        id: folderId,
+        deletedAt: null,
+        workspace: {
+          ownerUserId: userId,
+          type: WorkspaceType.PERSONAL,
+        },
+      },
+    });
+
+    if (!folder) {
+      throw new NotFoundException('폴더를 찾을 수 없습니다.');
+    }
+
+    return folder;
   }
 
   async createFolder(userId: string, dto: CreateFolderDto) {
@@ -54,7 +77,9 @@ export class FoldersService {
     return workspace?.id ?? null;
   }
 
-  private async getOrCreatePersonalWorkspaceId(userId: string): Promise<string> {
+  private async getOrCreatePersonalWorkspaceId(
+    userId: string,
+  ): Promise<string> {
     const workspaceId = await this.findPersonalWorkspaceId(userId);
 
     if (workspaceId) {
