@@ -129,6 +129,7 @@ model Workspace {
   clips        Clip[]
   tags         Tag[]
 
+  @@unique([ownerUserId, type])
 }
 
 // 워크스페이스 멤버십 및 권한 관리용 (인명부)

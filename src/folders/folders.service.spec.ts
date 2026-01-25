@@ -9,8 +9,8 @@ describe('FoldersService', () => {
   // Prisma는 DB와 분리된 단위 테스트를 위해 목 처리한다.
   const prisma = {
     workspace: {
-      findFirst: jest.fn(),
-      create: jest.fn(),
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
     },
     folder: {
       findFirst: jest.fn(),
@@ -31,16 +31,25 @@ describe('FoldersService', () => {
   });
 
   it('개인 워크스페이스가 없으면 빈 목록을 반환한다', async () => {
-    prisma.workspace.findFirst.mockResolvedValue(null);
+    prisma.workspace.findUnique.mockResolvedValue(null);
 
     const result = await service.getFolders('user-id');
 
     expect(result).toEqual([]);
+    expect(prisma.workspace.findUnique).toHaveBeenCalledWith({
+      where: {
+        ownerUserId_type: {
+          ownerUserId: 'user-id',
+          type: WorkspaceType.PERSONAL,
+        },
+      },
+      select: { id: true },
+    });
     expect(prisma.folder.findMany).not.toHaveBeenCalled();
   });
 
   it('개인 워크스페이스의 폴더를 정렬해서 반환한다', async () => {
-    prisma.workspace.findFirst.mockResolvedValue({ id: 'workspace-id' });
+    prisma.workspace.findUnique.mockResolvedValue({ id: 'workspace-id' });
     prisma.folder.findMany.mockResolvedValue([{ id: 'folder-1' }]);
 
     const result = await service.getFolders('user-id');
@@ -75,34 +84,22 @@ describe('FoldersService', () => {
     expect(result).toEqual({ id: 'folder-id', name: 'New' });
   });
 
-  it('기존 워크스페이스를 사용해 폴더를 생성한다', async () => {
-    prisma.workspace.findFirst.mockResolvedValue({ id: 'workspace-id' });
+  it('워크스페이스를 upsert로 확보하고 폴더를 생성한다', async () => {
+    prisma.workspace.upsert.mockResolvedValue({ id: 'workspace-id' });
     prisma.folder.findFirst.mockResolvedValue({ order: 3 });
     prisma.folder.create.mockResolvedValue({ id: 'folder-id' });
 
     const result = await service.createFolder('user-id', { name: 'Inbox' });
 
-    expect(prisma.workspace.create).not.toHaveBeenCalled();
-    expect(prisma.folder.create).toHaveBeenCalledWith({
-      data: {
-        name: 'Inbox',
-        order: 4,
-        workspaceId: 'workspace-id',
+    expect(prisma.workspace.upsert).toHaveBeenCalledWith({
+      where: {
+        ownerUserId_type: {
+          ownerUserId: 'user-id',
+          type: WorkspaceType.PERSONAL,
+        },
       },
-    });
-    expect(result).toEqual({ id: 'folder-id' });
-  });
-
-  it('워크스페이스가 없으면 개인 워크스페이스를 생성한다', async () => {
-    prisma.workspace.findFirst.mockResolvedValue(null);
-    prisma.workspace.create.mockResolvedValue({ id: 'workspace-id' });
-    prisma.folder.findFirst.mockResolvedValue(null);
-    prisma.folder.create.mockResolvedValue({ id: 'folder-id' });
-
-    await service.createFolder('user-id', { name: 'Inbox' });
-
-    expect(prisma.workspace.create).toHaveBeenCalledWith({
-      data: {
+      update: {},
+      create: {
         name: 'Personal Workspace',
         type: WorkspaceType.PERSONAL,
         ownerUserId: 'user-id',
@@ -115,6 +112,23 @@ describe('FoldersService', () => {
       },
       select: { id: true },
     });
+    expect(prisma.folder.create).toHaveBeenCalledWith({
+      data: {
+        name: 'Inbox',
+        order: 4,
+        workspaceId: 'workspace-id',
+      },
+    });
+    expect(result).toEqual({ id: 'folder-id' });
+  });
+
+  it('폴더가 없으면 order 1로 생성한다', async () => {
+    prisma.workspace.upsert.mockResolvedValue({ id: 'workspace-id' });
+    prisma.folder.findFirst.mockResolvedValue(null);
+    prisma.folder.create.mockResolvedValue({ id: 'folder-id' });
+
+    await service.createFolder('user-id', { name: 'Inbox' });
+
     expect(prisma.folder.create).toHaveBeenCalledWith({
       data: {
         name: 'Inbox',

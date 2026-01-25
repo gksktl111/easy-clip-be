@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { WorkspaceRole, WorkspaceType } from '@prisma/client';
@@ -199,10 +198,12 @@ export class FoldersService {
   private async findPersonalWorkspaceId(
     userId: string,
   ): Promise<string | null> {
-    const workspace = await this.prisma.workspace.findFirst({
+    const workspace = await this.prisma.workspace.findUnique({
       where: {
-        ownerUserId: userId,
-        type: WorkspaceType.PERSONAL,
+        ownerUserId_type: {
+          ownerUserId: userId,
+          type: WorkspaceType.PERSONAL,
+        },
       },
       select: { id: true },
     });
@@ -213,14 +214,15 @@ export class FoldersService {
   private async getOrCreatePersonalWorkspaceId(
     userId: string,
   ): Promise<string> {
-    const workspaceId = await this.findPersonalWorkspaceId(userId);
-
-    if (workspaceId) {
-      return workspaceId;
-    }
-
-    const created = await this.prisma.workspace.create({
-      data: {
+    const workspace = await this.prisma.workspace.upsert({
+      where: {
+        ownerUserId_type: {
+          ownerUserId: userId,
+          type: WorkspaceType.PERSONAL,
+        },
+      },
+      update: {},
+      create: {
         name: 'Personal Workspace',
         type: WorkspaceType.PERSONAL,
         ownerUserId: userId,
@@ -234,12 +236,6 @@ export class FoldersService {
       select: { id: true },
     });
 
-    if (!created) {
-      throw new InternalServerErrorException(
-        '개인 워크스페이스를 생성할 수 없습니다.',
-      );
-    }
-
-    return created.id;
+    return workspace.id;
   }
 }
