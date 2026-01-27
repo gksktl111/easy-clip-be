@@ -159,7 +159,10 @@ describe('FoldersService', () => {
 
   it('워크스페이스를 upsert로 확보하고 폴더를 생성한다', async () => {
     prisma.workspace.upsert.mockResolvedValue({ id: 'workspace-id' });
-    prisma.folder.findFirst.mockResolvedValue({ order: 3 });
+    prisma.folder.findFirst.mockResolvedValue({
+      id: 'last-folder-id',
+      order: 3,
+    });
     prisma.folder.create.mockResolvedValue({ id: 'folder-id' });
 
     const result = await service.createFolder('user-id', { name: 'Inbox' });
