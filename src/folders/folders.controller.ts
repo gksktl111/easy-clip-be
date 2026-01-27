@@ -6,12 +6,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAccessGuard } from 'src/auth/guards/jwt-access-token.guard';
 import { JwtPayload } from 'src/auth/auth';
 import { CreateFolderDto } from './dtos/create-folder.dto';
+import { GetFolderClipsQueryDto } from './dtos/get-folder-clips-query.dto';
 import { ReorderFolderDto } from './dtos/reorder-folder.dto';
 import { UpdateFolderDto } from './dtos/update-folder.dto';
 import { FoldersService } from './folders.service';
@@ -25,6 +27,17 @@ export class FoldersController {
   @UseGuards(JwtAccessGuard)
   getFolders(@Request() req: { user: JwtPayload }) {
     return this.foldersService.getFolders(req.user.sub);
+  }
+
+  // 폴더에 속한 클립 목록을 커서 기반으로 조회한다.
+  @Get(':id/clips')
+  @UseGuards(JwtAccessGuard)
+  getFolderClips(
+    @Request() req: { user: JwtPayload },
+    @Param('id') id: string,
+    @Query() query: GetFolderClipsQueryDto,
+  ) {
+    return this.foldersService.getFolderClips(req.user.sub, id, query);
   }
 
   // 폴더 단건 조회
