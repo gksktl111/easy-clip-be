@@ -6,6 +6,7 @@ import {
 import { WorkspaceRole, WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateFolderDto } from './dtos/create-folder.dto';
+import { GetFolderClipsQueryDto } from './dtos/get-folder-clips-query.dto';
 import { ReorderFolderDto } from './dtos/reorder-folder.dto';
 import { UpdateFolderDto } from './dtos/update-folder.dto';
 
@@ -45,6 +46,56 @@ export class FoldersService {
     }
 
     return folder;
+  }
+
+  // 폴더 소유권을 검증한 뒤, 커서 기반으로 클립을 무한스크롤 형태로 조회한다.
+  async getFolderClips(
+    userId: string,
+    folderId: string,
+    query: GetFolderClipsQueryDto,
+  ) {
+    const folder = await this.getFolderById(userId, folderId);
+    const limit = query.limit ?? 20;
+
+    if (query.cursor) {
+      const cursorClip = await this.prisma.clip.findFirst({
+        where: {
+          id: query.cursor,
+          folderId: folder.id,
+          workspaceId: folder.workspaceId,
+        },
+        select: { id: true },
+      });
+
+      if (!cursorClip) {
+        throw new NotFoundException('커서에 해당하는 클립을 찾을 수 없습니다.');
+      }
+    }
+
+    const clips = await this.prisma.clip.findMany({
+      where: {
+        folderId: folder.id,
+        workspaceId: folder.workspaceId,
+      },
+      ...(query.cursor
+        ? {
+            cursor: { id: query.cursor },
+            skip: 1,
+          }
+        : {}),
+      take: limit + 1,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+    });
+
+    const hasMore = clips.length > limit;
+    const items = hasMore ? clips.slice(0, limit) : clips;
+    const nextCursor =
+      hasMore && items.length > 0 ? items[items.length - 1].id : null;
+
+    return {
+      items,
+      nextCursor,
+    };
   }
 
   // 폴더 이름을 수정한다.

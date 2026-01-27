@@ -1,23 +1,53 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { WorkspaceRole, WorkspaceType } from '@prisma/client';
+import { Prisma, WorkspaceRole, WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FoldersService } from './folders.service';
 
 describe('FoldersService', () => {
   let service: FoldersService;
+  type FolderResult = {
+    id: string;
+    name?: string;
+    order?: number;
+    workspaceId?: string;
+    deletedAt?: Date | null;
+  };
+  type ClipResult = {
+    id: string;
+    folderId?: string;
+    workspaceId?: string;
+    updatedAt?: Date;
+    createdAt?: Date;
+  };
   // Prisma는 DB와 분리된 단위 테스트를 위해 목 처리한다.
   const prisma = {
     workspace: {
-      findUnique: jest.fn(),
-      upsert: jest.fn(),
+      findUnique: jest.fn<
+        Promise<{ id: string } | null>,
+        [Prisma.WorkspaceFindUniqueArgs]
+      >(),
+      upsert: jest.fn<Promise<{ id: string }>, [Prisma.WorkspaceUpsertArgs]>(),
     },
     folder: {
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
+      findFirst: jest.fn<
+        Promise<FolderResult | null>,
+        [Prisma.FolderFindFirstArgs]
+      >(),
+      findMany: jest.fn<Promise<FolderResult[]>, [Prisma.FolderFindManyArgs]>(),
+      findUnique: jest.fn<
+        Promise<FolderResult | null>,
+        [Prisma.FolderFindUniqueArgs]
+      >(),
+      create: jest.fn<Promise<FolderResult>, [Prisma.FolderCreateArgs]>(),
+      update: jest.fn<Promise<FolderResult>, [Prisma.FolderUpdateArgs]>(),
+    },
+    clip: {
+      findFirst: jest.fn<
+        Promise<ClipResult | null>,
+        [Prisma.ClipFindFirstArgs]
+      >(),
+      findMany: jest.fn<Promise<ClipResult[]>, [Prisma.ClipFindManyArgs]>(),
     },
   };
 
@@ -67,6 +97,49 @@ describe('FoldersService', () => {
     await expect(service.getFolderById('user-id', 'folder-id')).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('폴더 클립을 커서 없이 조회하고 nextCursor를 반환한다', async () => {
+    prisma.folder.findFirst.mockResolvedValue({
+      id: 'folder-id',
+      workspaceId: 'workspace-id',
+    });
+    prisma.clip.findMany.mockResolvedValue([
+      { id: 'clip-3' },
+      { id: 'clip-2' },
+      { id: 'clip-1' },
+    ]);
+
+    const result = await service.getFolderClips('user-id', 'folder-id', {
+      limit: 2,
+    });
+
+    expect(prisma.clip.findMany).toHaveBeenCalledWith({
+      where: {
+        folderId: 'folder-id',
+        workspaceId: 'workspace-id',
+      },
+      take: 3,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+    });
+    expect(result).toEqual({
+      items: [{ id: 'clip-3' }, { id: 'clip-2' }],
+      nextCursor: 'clip-2',
+    });
+  });
+
+  it('커서가 같은 폴더에 없으면 예외를 던진다', async () => {
+    prisma.folder.findFirst.mockResolvedValue({
+      id: 'folder-id',
+      workspaceId: 'workspace-id',
+    });
+    prisma.clip.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getFolderClips('user-id', 'folder-id', {
+        cursor: 'missing-clip-id',
+      }),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('이름이 주어지면 폴더명을 수정한다', async () => {
@@ -177,10 +250,10 @@ describe('FoldersService', () => {
 
     const result = await service.deleteFolder('user-id', 'folder-id');
 
-    expect(prisma.folder.update).toHaveBeenCalledWith({
-      where: { id: 'folder-id' },
-      data: { deletedAt: expect.any(Date) },
-    });
+    expect(prisma.folder.update).toHaveBeenCalledTimes(1);
+    const updateArgs = prisma.folder.update.mock.calls[0][0];
+    expect(updateArgs.where).toEqual({ id: 'folder-id' });
+    expect(updateArgs.data.deletedAt).toBeInstanceOf(Date);
     expect(result.id).toBe('folder-id');
   });
 });
