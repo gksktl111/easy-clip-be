@@ -1,0 +1,61 @@
+@baseUrl = http://localhost:3000
+# 액세스 토큰을 입력하세요
+@accessToken = <ACCESS_TOKEN>
+
+# 테스트에 사용할 폴더 ID를 입력하세요
+@folderId = <FOLDER_ID>
+# 이미지 파일 경로를 입력하세요
+@imagePath = <IMAGE_PATH>
+
+### 텍스트/컬러 클립 생성 (multipart)
+# @name createTextClipMultipart
+POST {{baseUrl}}/clips
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=clipBoundary
+
+--clipBoundary
+Content-Disposition: form-data; name="folderId"
+
+{{folderId}}
+--clipBoundary
+Content-Disposition: form-data; name="text"
+
+#fff
+--clipBoundary--
+
+### 이미지 클립 생성 (multipart, file 우선)
+# @name createImageClipMultipart
+POST {{baseUrl}}/clips
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=clipBoundary
+
+--clipBoundary
+Content-Disposition: form-data; name="folderId"
+
+{{folderId}}
+--clipBoundary
+Content-Disposition: form-data; name="file"; filename="upload.png"
+Content-Type: image/png
+
+< {{imagePath}}
+--clipBoundary--
+
+### 클립 단건 조회
+@clipId = {{createTextClipMultipart.response.body.$.id}}
+GET {{baseUrl}}/clips/{{clipId}}
+Authorization: Bearer {{accessToken}}
+
+### 클립 수정 (text 변경, multipart)
+PATCH {{baseUrl}}/clips/{{clipId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=clipBoundary
+
+--clipBoundary
+Content-Disposition: form-data; name="text"
+
+수정된 클립
+--clipBoundary--
+
+### 클립 삭제 (소프트 삭제)
+DELETE {{baseUrl}}/clips/{{clipId}}
+Authorization: Bearer {{accessToken}}

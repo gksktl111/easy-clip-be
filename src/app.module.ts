@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ConfigModule } from '@nestjs/config';
 import { FoldersModule } from './folders/folders.module';
+import { ClipsModule } from './clips/clips.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { FoldersModule } from './folders/folders.module';
     AuthModule,
     UsersModule,
     FoldersModule,
+    ClipsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
