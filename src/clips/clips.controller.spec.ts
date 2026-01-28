@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtPayload } from 'src/auth/auth';
-import { JwtAccessGuard } from 'src/auth/guards/jwt-access-token.guard';
+import { AuthContext } from 'src/auth/application/auth-context';
+import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
 import { ClipsController } from './clips.controller';
 import { ClipsService } from './clips.service';
 
@@ -20,10 +20,10 @@ describe('ClipsController', () => {
 
   const req = {
     user: {
-      sub: 'user-id',
+      userId: 'user-id',
       accountId: 'account-id',
       platform: 'WEB',
-    } as JwtPayload,
+    } as AuthContext,
   };
 
   beforeEach(async () => {

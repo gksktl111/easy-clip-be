@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtAccessGuard } from 'src/auth/guards/jwt-access-token.guard';
+import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
 import { FoldersController } from './folders.controller';
 import { FoldersService } from './folders.service';
-import { JwtPayload } from 'src/auth/auth';
+import { AuthContext } from 'src/auth/application/auth-context';
 
 describe('FoldersController', () => {
   let controller: FoldersController;
@@ -21,10 +21,10 @@ describe('FoldersController', () => {
 
   const req = {
     user: {
-      sub: 'user-id',
+      userId: 'user-id',
       accountId: 'account-id',
       platform: 'WEB',
-    } as JwtPayload,
+    } as AuthContext,
   };
 
   beforeEach(async () => {

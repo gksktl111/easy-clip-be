@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/auth/guards/jwt-access-token.guard';
+import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
 import { ClipsController } from './clips.controller';
 import { ClipsService } from './clips.service';
 
