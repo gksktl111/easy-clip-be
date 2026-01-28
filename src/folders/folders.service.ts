@@ -61,6 +61,7 @@ export class FoldersService {
       const cursorClip = await this.prisma.clip.findFirst({
         where: {
           id: query.cursor,
+          deletedAt: null,
           folderId: folder.id,
           workspaceId: folder.workspaceId,
         },
@@ -76,6 +77,7 @@ export class FoldersService {
       where: {
         folderId: folder.id,
         workspaceId: folder.workspaceId,
+        deletedAt: null,
       },
       ...(query.cursor
         ? {

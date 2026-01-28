@@ -19,6 +19,7 @@ describe('FoldersService', () => {
     workspaceId?: string;
     updatedAt?: Date;
     createdAt?: Date;
+    deletedAt?: Date | null;
   };
   // Prisma는 DB와 분리된 단위 테스트를 위해 목 처리한다.
   const prisma = {
@@ -118,6 +119,7 @@ describe('FoldersService', () => {
       where: {
         folderId: 'folder-id',
         workspaceId: 'workspace-id',
+        deletedAt: null,
       },
       take: 3,
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
