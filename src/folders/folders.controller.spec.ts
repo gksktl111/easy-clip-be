@@ -1,20 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
-import { FoldersController } from './folders.controller';
-import { FoldersService } from './folders.service';
 import { AuthContext } from 'src/auth/application/auth-context';
+import { FoldersController } from './presentation/folders.controller';
+import { GetFoldersUseCase } from './application/usecases/get-folders.usecase';
+import { GetFolderUseCase } from './application/usecases/get-folder.usecase';
+import { GetFolderClipsUseCase } from './application/usecases/get-folder-clips.usecase';
+import { CreateFolderUseCase } from './application/usecases/create-folder.usecase';
+import { ReorderFolderUseCase } from './application/usecases/reorder-folder.usecase';
+import { UpdateFolderUseCase } from './application/usecases/update-folder.usecase';
+import { DeleteFolderUseCase } from './application/usecases/delete-folder.usecase';
 
 describe('FoldersController', () => {
   let controller: FoldersController;
-  // 요청-서비스 연결만 검증하며 가드는 테스트하지 않는다.
-  const foldersService = {
-    getFolders: jest.fn(),
-    getFolderById: jest.fn(),
-    createFolder: jest.fn(),
-    reorderFolder: jest.fn(),
-    updateFolder: jest.fn(),
-    deleteFolder: jest.fn(),
-  };
+
+  const getFoldersUseCase = { execute: jest.fn() };
+  const getFolderUseCase = { execute: jest.fn() };
+  const getFolderClipsUseCase = { execute: jest.fn() };
+  const createFolderUseCase = { execute: jest.fn() };
+  const reorderFolderUseCase = { execute: jest.fn() };
+  const updateFolderUseCase = { execute: jest.fn() };
+  const deleteFolderUseCase = { execute: jest.fn() };
+
   const authGuard = {
     canActivate: jest.fn(() => true),
   };
@@ -30,11 +36,18 @@ describe('FoldersController', () => {
   beforeEach(async () => {
     const moduleBuilder = Test.createTestingModule({
       controllers: [FoldersController],
-      providers: [{ provide: FoldersService, useValue: foldersService }],
+      providers: [
+        { provide: GetFoldersUseCase, useValue: getFoldersUseCase },
+        { provide: GetFolderUseCase, useValue: getFolderUseCase },
+        { provide: GetFolderClipsUseCase, useValue: getFolderClipsUseCase },
+        { provide: CreateFolderUseCase, useValue: createFolderUseCase },
+        { provide: ReorderFolderUseCase, useValue: reorderFolderUseCase },
+        { provide: UpdateFolderUseCase, useValue: updateFolderUseCase },
+        { provide: DeleteFolderUseCase, useValue: deleteFolderUseCase },
+      ],
     });
 
     const module: TestingModule = await moduleBuilder
-      // 인증 가드는 단위 테스트에서 항상 통과시키도록 대체한다.
       .overrideGuard(JwtAccessGuard)
       .useValue(authGuard)
       .compile();
@@ -43,66 +56,63 @@ describe('FoldersController', () => {
     jest.clearAllMocks();
   });
 
-  it('getFolders가 서비스에 위임한다', async () => {
+  it('getFolders가 유스케이스에 위임한다', async () => {
     const folders = [{ id: 'folder-1' }];
-    foldersService.getFolders.mockResolvedValue(folders);
+    getFoldersUseCase.execute.mockResolvedValue(folders);
 
     const result = await controller.getFolders(req);
 
-    expect(foldersService.getFolders).toHaveBeenCalledWith('user-id');
+    expect(getFoldersUseCase.execute).toHaveBeenCalledWith('user-id');
     expect(result).toBe(folders);
   });
 
-  it('getFolder가 서비스에 위임한다', async () => {
+  it('getFolder가 유스케이스에 위임한다', async () => {
     const folder = { id: 'folder-1' };
-    foldersService.getFolderById.mockResolvedValue(folder);
+    getFolderUseCase.execute.mockResolvedValue(folder);
 
     const result = await controller.getFolder(req, 'folder-1');
 
-    expect(foldersService.getFolderById).toHaveBeenCalledWith(
-      'user-id',
-      'folder-1',
-    );
+    expect(getFolderUseCase.execute).toHaveBeenCalledWith('user-id', 'folder-1');
     expect(result).toBe(folder);
   });
 
-  it('createFolder가 서비스에 위임한다', async () => {
+  it('createFolder가 유스케이스에 위임한다', async () => {
     const folder = { id: 'folder-1', name: 'Inbox' };
-    foldersService.createFolder.mockResolvedValue(folder);
+    createFolderUseCase.execute.mockResolvedValue(folder);
 
     const result = await controller.createFolder(req, { name: 'Inbox' });
 
-    expect(foldersService.createFolder).toHaveBeenCalledWith('user-id', {
+    expect(createFolderUseCase.execute).toHaveBeenCalledWith('user-id', {
       name: 'Inbox',
     });
     expect(result).toBe(folder);
   });
 
-  it('reorderFolder가 서비스에 위임한다', async () => {
+  it('reorderFolder가 유스케이스에 위임한다', async () => {
     const reordered = { id: 'folder-1', order: 10 };
-    foldersService.reorderFolder.mockResolvedValue(reordered);
+    reorderFolderUseCase.execute.mockResolvedValue(reordered);
 
     const result = await controller.reorderFolder(req, {
       targetId: 'folder-1',
       afterId: 'folder-2',
     });
 
-    expect(foldersService.reorderFolder).toHaveBeenCalledWith('user-id', {
+    expect(reorderFolderUseCase.execute).toHaveBeenCalledWith('user-id', {
       targetId: 'folder-1',
       afterId: 'folder-2',
     });
     expect(result).toBe(reordered);
   });
 
-  it('updateFolder가 서비스에 위임한다', async () => {
+  it('updateFolder가 유스케이스에 위임한다', async () => {
     const updated = { id: 'folder-1', name: 'Renamed' };
-    foldersService.updateFolder.mockResolvedValue(updated);
+    updateFolderUseCase.execute.mockResolvedValue(updated);
 
     const result = await controller.updateFolder(req, 'folder-1', {
       name: 'Renamed',
     });
 
-    expect(foldersService.updateFolder).toHaveBeenCalledWith(
+    expect(updateFolderUseCase.execute).toHaveBeenCalledWith(
       'user-id',
       'folder-1',
       {
@@ -112,13 +122,13 @@ describe('FoldersController', () => {
     expect(result).toBe(updated);
   });
 
-  it('deleteFolder가 서비스에 위임한다', async () => {
+  it('deleteFolder가 유스케이스에 위임한다', async () => {
     const deleted = { id: 'folder-1', deletedAt: new Date() };
-    foldersService.deleteFolder.mockResolvedValue(deleted);
+    deleteFolderUseCase.execute.mockResolvedValue(deleted);
 
     const result = await controller.deleteFolder(req, 'folder-1');
 
-    expect(foldersService.deleteFolder).toHaveBeenCalledWith(
+    expect(deleteFolderUseCase.execute).toHaveBeenCalledWith(
       'user-id',
       'folder-1',
     );
