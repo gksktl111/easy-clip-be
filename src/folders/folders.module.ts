@@ -6,24 +6,17 @@ import {
   FoldersRepository,
 } from './domain/folders.repository';
 import { PrismaFoldersRepository } from './infrastructure/prisma-folders.repository';
-import { GetFoldersUseCase } from './application/usecases/get-folders.usecase';
-import { GetFolderUseCase } from './application/usecases/get-folder.usecase';
+import { GetForderUseCase } from './application/usecases/get-forder.usecase';
 import { GetFolderClipsUseCase } from './application/usecases/get-folder-clips.usecase';
-import { CreateFolderUseCase } from './application/usecases/create-folder.usecase';
 import { ReorderFolderUseCase } from './application/usecases/reorder-folder.usecase';
-import { UpdateFolderUseCase } from './application/usecases/update-folder.usecase';
 import { DeleteFolderUseCase } from './application/usecases/delete-folder.usecase';
+import { SaveFolderUseCase } from './application/usecases/save-folder.usecase';
 
 const folderUseCases: Provider[] = [
   { provide: FOLDERS_REPOSITORY, useClass: PrismaFoldersRepository },
   {
-    provide: GetFoldersUseCase,
-    useFactory: (repo: FoldersRepository) => new GetFoldersUseCase(repo),
-    inject: [FOLDERS_REPOSITORY],
-  },
-  {
-    provide: GetFolderUseCase,
-    useFactory: (repo: FoldersRepository) => new GetFolderUseCase(repo),
+    provide: GetForderUseCase,
+    useFactory: (repo: FoldersRepository) => new GetForderUseCase(repo),
     inject: [FOLDERS_REPOSITORY],
   },
   {
@@ -32,18 +25,13 @@ const folderUseCases: Provider[] = [
     inject: [FOLDERS_REPOSITORY],
   },
   {
-    provide: CreateFolderUseCase,
-    useFactory: (repo: FoldersRepository) => new CreateFolderUseCase(repo),
+    provide: SaveFolderUseCase,
+    useFactory: (repo: FoldersRepository) => new SaveFolderUseCase(repo),
     inject: [FOLDERS_REPOSITORY],
   },
   {
     provide: ReorderFolderUseCase,
     useFactory: (repo: FoldersRepository) => new ReorderFolderUseCase(repo),
-    inject: [FOLDERS_REPOSITORY],
-  },
-  {
-    provide: UpdateFolderUseCase,
-    useFactory: (repo: FoldersRepository) => new UpdateFolderUseCase(repo),
     inject: [FOLDERS_REPOSITORY],
   },
   {

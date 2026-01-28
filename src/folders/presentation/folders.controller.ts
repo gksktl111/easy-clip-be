@@ -19,24 +19,20 @@ import { CreateFolderDto } from './dtos/create-folder.dto';
 import { GetFolderClipsQueryDto } from './dtos/get-folder-clips-query.dto';
 import { ReorderFolderDto } from './dtos/reorder-folder.dto';
 import { UpdateFolderDto } from './dtos/update-folder.dto';
-import { GetFoldersUseCase } from '../application/usecases/get-folders.usecase';
-import { GetFolderUseCase } from '../application/usecases/get-folder.usecase';
-import { GetFolderClipsUseCase } from '../application/usecases/get-folder-clips.usecase';
-import { CreateFolderUseCase } from '../application/usecases/create-folder.usecase';
+import { GetForderUseCase } from '../application/usecases/get-forder.usecase';
 import { ReorderFolderUseCase } from '../application/usecases/reorder-folder.usecase';
-import { UpdateFolderUseCase } from '../application/usecases/update-folder.usecase';
 import { DeleteFolderUseCase } from '../application/usecases/delete-folder.usecase';
+import { SaveFolderUseCase } from '../application/usecases/save-folder.usecase';
 import { FoldersError } from '../application/folders.error';
+import { GetFolderClipsUseCase } from '../application/usecases/get-folder-clips.usecase';
 
 @Controller('folders')
 export class FoldersController {
   constructor(
-    private readonly getFoldersUseCase: GetFoldersUseCase,
-    private readonly getFolderUseCase: GetFolderUseCase,
+    private readonly getForderUseCase: GetForderUseCase,
     private readonly getFolderClipsUseCase: GetFolderClipsUseCase,
-    private readonly createFolderUseCase: CreateFolderUseCase,
+    private readonly saveFolderUseCase: SaveFolderUseCase,
     private readonly reorderFolderUseCase: ReorderFolderUseCase,
-    private readonly updateFolderUseCase: UpdateFolderUseCase,
     private readonly deleteFolderUseCase: DeleteFolderUseCase,
   ) {}
 
@@ -44,7 +40,9 @@ export class FoldersController {
   @Get()
   @UseGuards(JwtAccessGuard)
   getFolders(@Request() req: { user: AuthContext }) {
-    return this.run(() => this.getFoldersUseCase.execute(req.user.userId));
+    return this.run(() =>
+      this.getForderUseCase.execute(req.user.userId, { mode: 'list' }),
+    );
   }
 
   // 폴더에 속한 클립 목록을 커서 기반으로 조회한다.
@@ -64,7 +62,12 @@ export class FoldersController {
   @Get(':id')
   @UseGuards(JwtAccessGuard)
   getFolder(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.run(() => this.getFolderUseCase.execute(req.user.userId, id));
+    return this.run(() =>
+      this.getForderUseCase.execute(req.user.userId, {
+        mode: 'single',
+        folderId: id,
+      }),
+    );
   }
 
   // 폴더 생성
@@ -74,7 +77,12 @@ export class FoldersController {
     @Request() req: { user: AuthContext },
     @Body() dto: CreateFolderDto,
   ) {
-    return this.run(() => this.createFolderUseCase.execute(req.user.userId, dto));
+    return this.run(() =>
+      this.saveFolderUseCase.execute(req.user.userId, {
+        mode: 'create',
+        ...dto,
+      }),
+    );
   }
 
   // 폴더 순서 변경
@@ -84,7 +92,9 @@ export class FoldersController {
     @Request() req: { user: AuthContext },
     @Body() dto: ReorderFolderDto,
   ) {
-    return this.run(() => this.reorderFolderUseCase.execute(req.user.userId, dto));
+    return this.run(() =>
+      this.reorderFolderUseCase.execute(req.user.userId, dto),
+    );
   }
 
   // 폴더 이름 수정
@@ -96,7 +106,11 @@ export class FoldersController {
     @Body() dto: UpdateFolderDto,
   ) {
     return this.run(() =>
-      this.updateFolderUseCase.execute(req.user.userId, id, dto),
+      this.saveFolderUseCase.execute(req.user.userId, {
+        mode: 'update',
+        folderId: id,
+        ...dto,
+      }),
     );
   }
 
@@ -104,7 +118,9 @@ export class FoldersController {
   @Delete(':id')
   @UseGuards(JwtAccessGuard)
   deleteFolder(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.run(() => this.deleteFolderUseCase.execute(req.user.userId, id));
+    return this.run(() =>
+      this.deleteFolderUseCase.execute(req.user.userId, id),
+    );
   }
 
   private async run<T>(action: () => Promise<T>): Promise<T> {

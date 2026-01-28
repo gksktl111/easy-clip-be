@@ -40,6 +40,7 @@
 - Framework: Jest with `ts-jest` transform; unit tests live in `src/`.
 - E2E: Jest config in `test/jest-e2e.json`; use `*.e2e-spec.ts` naming.
 - Coverage: optional via `pnpm test:cov` (outputs to `coverage/`).
+- 테스트 범위: 유스케이스에 대한 테스트만 작성한다. 컨트롤러 테스트는 작성하지 않는다.
 
 
 ## Commit & Pull Request Guidelines
