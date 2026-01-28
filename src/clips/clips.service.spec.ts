@@ -297,4 +297,12 @@ describe('ClipsService', () => {
     expect(updateArgs.data.deletedAt).toBeInstanceOf(Date);
     expect(result.id).toBe('clip-id');
   });
+
+  it('단건 클립 조회시 클립이 없으면 NotFoundException을 던진다', async () => {
+    prisma.clip.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getClipById('user-id', 'missing-clip-id'),
+    ).rejects.toThrow(NotFoundException);
+  });
 });
