@@ -95,7 +95,13 @@ git checkout dev
 git fetch -p
 ```
 
-3. Delete all local branches marked as `[gone]`
+3. Update local `dev` with remote
+
+```bash
+git pull origin dev
+```
+
+4. Delete all local branches marked as `[gone]`
 
 ```bash
 git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -D
