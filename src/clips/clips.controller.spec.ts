@@ -2,18 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthContext } from 'src/auth/application/auth-context';
 import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
 import { ClipsController } from './presentation/clips.controller';
-import { CreateClipUseCase } from './application/usecases/create-clip.usecase';
 import { GetClipUseCase } from './application/usecases/get-clip.usecase';
-import { UpdateClipUseCase } from './application/usecases/update-clip.usecase';
 import { DeleteClipUseCase } from './application/usecases/delete-clip.usecase';
+import { SaveClipUseCase } from './application/usecases/save-clip.usecase';
 
 // 컨트롤러는 요청을 유스케이스로 정확히 위임하는지만 검증한다.
 describe('ClipsController', () => {
   let controller: ClipsController;
 
-  const createClipUseCase = { execute: jest.fn() };
+  const saveClipUseCase = { execute: jest.fn() };
   const getClipUseCase = { execute: jest.fn() };
-  const updateClipUseCase = { execute: jest.fn() };
   const deleteClipUseCase = { execute: jest.fn() };
 
   const authGuard = {
@@ -32,9 +30,8 @@ describe('ClipsController', () => {
     const moduleBuilder = Test.createTestingModule({
       controllers: [ClipsController],
       providers: [
-        { provide: CreateClipUseCase, useValue: createClipUseCase },
+        { provide: SaveClipUseCase, useValue: saveClipUseCase },
         { provide: GetClipUseCase, useValue: getClipUseCase },
-        { provide: UpdateClipUseCase, useValue: updateClipUseCase },
         { provide: DeleteClipUseCase, useValue: deleteClipUseCase },
       ],
     });
@@ -50,16 +47,17 @@ describe('ClipsController', () => {
 
   it('createClip이 유스케이스에 위임한다', async () => {
     const clip = { id: 'clip-id' };
-    createClipUseCase.execute.mockResolvedValue(clip);
+    saveClipUseCase.execute.mockResolvedValue(clip);
 
     const result = await controller.createClip(req, {
       folderId: 'folder-id',
       text: 'hello',
     });
 
-    expect(createClipUseCase.execute).toHaveBeenCalledWith(
+    expect(saveClipUseCase.execute).toHaveBeenCalledWith(
       'user-id',
       {
+        mode: 'create',
         folderId: 'folder-id',
         text: 'hello',
       },
@@ -80,16 +78,17 @@ describe('ClipsController', () => {
 
   it('updateClip이 유스케이스에 위임한다', async () => {
     const clip = { id: 'clip-id', textContent: 'updated' };
-    updateClipUseCase.execute.mockResolvedValue(clip);
+    saveClipUseCase.execute.mockResolvedValue(clip);
 
     const result = await controller.updateClip(req, 'clip-id', {
       text: 'updated',
     });
 
-    expect(updateClipUseCase.execute).toHaveBeenCalledWith(
+    expect(saveClipUseCase.execute).toHaveBeenCalledWith(
       'user-id',
-      'clip-id',
       {
+        mode: 'update',
+        clipId: 'clip-id',
         text: 'updated',
       },
       undefined,

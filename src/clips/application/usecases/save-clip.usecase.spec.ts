@@ -1,4 +1,4 @@
-import { CreateClipUseCase } from './create-clip.usecase';
+import { SaveClipUseCase } from './save-clip.usecase';
 import { ClipsRepository } from '../../domain/clips.repository';
 
 const createRepository = (): jest.Mocked<ClipsRepository> => ({
@@ -9,8 +9,8 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   softDeleteClip: jest.fn(),
 });
 
-describe('CreateClipUseCase', () => {
-  it('text로 클립을 생성하면 TEXT로 저장한다', async () => {
+describe('SaveClipUseCase', () => {
+  it('create 모드에서 text로 클립을 생성하면 TEXT로 저장한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({
       id: 'folder-id',
@@ -30,8 +30,9 @@ describe('CreateClipUseCase', () => {
       deletedAt: null,
     });
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new SaveClipUseCase(repo);
     const result = await usecase.execute('user-id', {
+      mode: 'create',
       folderId: 'folder-id',
       text: 'hello',
     });
@@ -52,21 +53,22 @@ describe('CreateClipUseCase', () => {
     expect(result.id).toBe('clip-id');
   });
 
-  it('폴더를 찾을 수 없으면 생성에 실패한다', async () => {
+  it('create 모드에서 폴더가 없으면 NOT_FOUND 오류를 반환한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue(null);
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new SaveClipUseCase(repo);
 
     await expect(
       usecase.execute('user-id', {
+        mode: 'create',
         folderId: 'missing-folder-id',
         text: 'hello',
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('색상 문자열을 보내면 COLOR로 저장한다', async () => {
+  it('create 모드에서 색상 문자열을 보내면 COLOR로 저장한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({
       id: 'folder-id',
@@ -86,8 +88,9 @@ describe('CreateClipUseCase', () => {
       deletedAt: null,
     });
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new SaveClipUseCase(repo);
     const result = await usecase.execute('user-id', {
+      mode: 'create',
       folderId: 'folder-id',
       text: '#fff',
     });
@@ -104,7 +107,7 @@ describe('CreateClipUseCase', () => {
     expect(result.type).toBe('COLOR');
   });
 
-  it('file이 있으면 IMAGE로 저장하고 text는 무시한다', async () => {
+  it('create 모드에서 file이 있으면 IMAGE로 저장하고 text는 무시한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({
       id: 'folder-id',
@@ -129,10 +132,11 @@ describe('CreateClipUseCase', () => {
       originalname: 'image.png',
     } as Express.Multer.File;
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new SaveClipUseCase(repo);
     const result = await usecase.execute(
       'user-id',
       {
+        mode: 'create',
         folderId: 'folder-id',
         text: '#fff',
       },
@@ -151,7 +155,7 @@ describe('CreateClipUseCase', () => {
     expect(result.type).toBe('IMAGE');
   });
 
-  it('file이 있지만 image/*가 아니면 실패한다', async () => {
+  it('create 모드에서 file이 있지만 image/*가 아니면 실패한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({
       id: 'folder-id',
@@ -163,12 +167,13 @@ describe('CreateClipUseCase', () => {
       originalname: 'a.pdf',
     } as Express.Multer.File;
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new SaveClipUseCase(repo);
 
     await expect(
       usecase.execute(
         'user-id',
         {
+          mode: 'create',
           folderId: 'folder-id',
         },
         file,
@@ -176,19 +181,111 @@ describe('CreateClipUseCase', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
-  it('text와 file이 모두 없으면 실패한다', async () => {
+  it('create 모드에서 text와 file이 모두 없으면 실패한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({
       id: 'folder-id',
       workspaceId: 'workspace-id',
     });
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new SaveClipUseCase(repo);
 
     await expect(
       usecase.execute('user-id', {
+        mode: 'create',
         folderId: 'folder-id',
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('update 모드에서 text가 오면 타입을 재판별해 저장한다', async () => {
+    const repo = createRepository();
+    repo.findClipByIdForUser.mockResolvedValue({
+      id: 'clip-id',
+      type: 'TEXT',
+      folderId: 'folder-id',
+      workspaceId: 'workspace-id',
+      title: 'old-text',
+      textContent: 'old-text',
+      colorHex: null,
+      imageUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+    repo.updateClip.mockResolvedValue({
+      id: 'clip-id',
+      type: 'COLOR',
+      folderId: 'folder-id',
+      workspaceId: 'workspace-id',
+      title: '#FFFFFF',
+      textContent: null,
+      colorHex: '#FFFFFF',
+      imageUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+
+    const usecase = new SaveClipUseCase(repo);
+    const result = await usecase.execute('user-id', {
+      mode: 'update',
+      clipId: 'clip-id',
+      text: '#fff',
+    });
+
+    expect(repo.updateClip).toHaveBeenCalledWith('clip-id', {
+      type: 'COLOR',
+      title: '#FFFFFF',
+      folderId: 'folder-id',
+      workspaceId: 'workspace-id',
+      textContent: null,
+      colorHex: '#FFFFFF',
+      imageUrl: null,
+    });
+    expect(result.type).toBe('COLOR');
+  });
+
+  it('update 모드에서 폴더가 없으면 NOT_FOUND 오류를 반환한다', async () => {
+    const repo = createRepository();
+    repo.findClipByIdForUser.mockResolvedValue({
+      id: 'clip-id',
+      type: 'TEXT',
+      folderId: 'folder-id',
+      workspaceId: 'workspace-id',
+      title: 'old-text',
+      textContent: 'old-text',
+      colorHex: null,
+      imageUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+    repo.findPersonalFolderById.mockResolvedValue(null);
+
+    const usecase = new SaveClipUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        mode: 'update',
+        clipId: 'clip-id',
+        folderId: 'missing-folder',
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('update 모드에서 클립이 없으면 NOT_FOUND 오류를 반환한다', async () => {
+    const repo = createRepository();
+    repo.findClipByIdForUser.mockResolvedValue(null);
+
+    const usecase = new SaveClipUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        mode: 'update',
+        clipId: 'missing-clip-id',
+        text: 'hi',
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

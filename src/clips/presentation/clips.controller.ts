@@ -19,18 +19,16 @@ import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.gu
 import { AuthContext } from 'src/auth/application/auth-context';
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
-import { CreateClipUseCase } from '../application/usecases/create-clip.usecase';
 import { GetClipUseCase } from '../application/usecases/get-clip.usecase';
-import { UpdateClipUseCase } from '../application/usecases/update-clip.usecase';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
+import { SaveClipUseCase } from '../application/usecases/save-clip.usecase';
 import { ClipsError } from '../application/clips.error';
 
 @Controller('clips')
 export class ClipsController {
   constructor(
-    private readonly createClipUseCase: CreateClipUseCase,
+    private readonly saveClipUseCase: SaveClipUseCase,
     private readonly getClipUseCase: GetClipUseCase,
-    private readonly updateClipUseCase: UpdateClipUseCase,
     private readonly deleteClipUseCase: DeleteClipUseCase,
   ) {}
 
@@ -44,7 +42,14 @@ export class ClipsController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.run(() =>
-      this.createClipUseCase.execute(req.user.userId, dto, file),
+      this.saveClipUseCase.execute(
+        req.user.userId,
+        {
+          mode: 'create',
+          ...dto,
+        },
+        file,
+      ),
     );
   }
 
@@ -66,7 +71,15 @@ export class ClipsController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.run(() =>
-      this.updateClipUseCase.execute(req.user.userId, id, dto, file),
+      this.saveClipUseCase.execute(
+        req.user.userId,
+        {
+          mode: 'update',
+          clipId: id,
+          ...dto,
+        },
+        file,
+      ),
     );
   }
 
