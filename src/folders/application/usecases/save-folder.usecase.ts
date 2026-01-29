@@ -20,9 +20,8 @@ export class SaveFolderUseCase {
       const workspaceId =
         await this.foldersRepository.getOrCreatePersonalWorkspaceId(userId);
 
-      const lastOrder = await this.foldersRepository.findLastFolderOrder(
-        workspaceId,
-      );
+      const lastOrder =
+        await this.foldersRepository.findLastFolderOrder(workspaceId);
       const nextOrder = lastOrder ? lastOrder + 1 : 1;
 
       return this.foldersRepository.createFolder({

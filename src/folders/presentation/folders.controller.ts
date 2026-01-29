@@ -19,7 +19,7 @@ import { CreateFolderDto } from './dtos/create-folder.dto';
 import { GetFolderClipsQueryDto } from './dtos/get-folder-clips-query.dto';
 import { ReorderFolderDto } from './dtos/reorder-folder.dto';
 import { UpdateFolderDto } from './dtos/update-folder.dto';
-import { GetForderUseCase } from '../application/usecases/get-forder.usecase';
+import { GetFolderUseCase } from '../application/usecases/get-folder.usecase';
 import { ReorderFolderUseCase } from '../application/usecases/reorder-folder.usecase';
 import { DeleteFolderUseCase } from '../application/usecases/delete-folder.usecase';
 import { SaveFolderUseCase } from '../application/usecases/save-folder.usecase';
@@ -29,7 +29,7 @@ import { GetFolderClipsUseCase } from '../application/usecases/get-folder-clips.
 @Controller('folders')
 export class FoldersController {
   constructor(
-    private readonly getForderUseCase: GetForderUseCase,
+    private readonly getFolderUseCase: GetFolderUseCase,
     private readonly getFolderClipsUseCase: GetFolderClipsUseCase,
     private readonly saveFolderUseCase: SaveFolderUseCase,
     private readonly reorderFolderUseCase: ReorderFolderUseCase,
@@ -41,7 +41,7 @@ export class FoldersController {
   @UseGuards(JwtAccessGuard)
   getFolders(@Request() req: { user: AuthContext }) {
     return this.run(() =>
-      this.getForderUseCase.execute(req.user.userId, { mode: 'list' }),
+      this.getFolderUseCase.execute(req.user.userId, { mode: 'list' }),
     );
   }
 
@@ -63,7 +63,7 @@ export class FoldersController {
   @UseGuards(JwtAccessGuard)
   getFolder(@Request() req: { user: AuthContext }, @Param('id') id: string) {
     return this.run(() =>
-      this.getForderUseCase.execute(req.user.userId, {
+      this.getFolderUseCase.execute(req.user.userId, {
         mode: 'single',
         folderId: id,
       }),

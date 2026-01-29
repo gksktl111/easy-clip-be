@@ -9,11 +9,7 @@ export type GetFolderClipsQuery = {
 export class GetFolderClipsUseCase {
   constructor(private readonly foldersRepository: FoldersRepository) {}
 
-  async execute(
-    userId: string,
-    folderId: string,
-    query: GetFolderClipsQuery,
-  ) {
+  async execute(userId: string, folderId: string, query: GetFolderClipsQuery) {
     const folder = await this.foldersRepository.findPersonalFolderById(
       userId,
       folderId,

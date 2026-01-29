@@ -1,10 +1,7 @@
 import { Module, Provider } from '@nestjs/common';
 import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
 import { ClipsController } from './presentation/clips.controller';
-import {
-  CLIPS_REPOSITORY,
-  ClipsRepository,
-} from './domain/clips.repository';
+import { CLIPS_REPOSITORY, ClipsRepository } from './domain/clips.repository';
 import { PrismaClipsRepository } from './infrastructure/prisma-clips.repository';
 import { GetClipUseCase } from './application/usecases/get-clip.usecase';
 import { DeleteClipUseCase } from './application/usecases/delete-clip.usecase';

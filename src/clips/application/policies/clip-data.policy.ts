@@ -16,7 +16,10 @@ export function resolveClipData(
 ): ClipData {
   if (file) {
     if (!file.mimetype.startsWith('image/')) {
-      throw new ClipsError('BAD_REQUEST', '이미지 파일만 업로드할 수 있습니다.');
+      throw new ClipsError(
+        'BAD_REQUEST',
+        '이미지 파일만 업로드할 수 있습니다.',
+      );
     }
 
     return {

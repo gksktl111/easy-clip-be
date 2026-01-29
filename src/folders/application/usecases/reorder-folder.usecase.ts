@@ -54,11 +54,12 @@ export class ReorderFolderUseCase {
     let newOrder: number;
 
     if (beforeId) {
-      const previousOrder = await this.foldersRepository.findPreviousFolderOrder({
-        workspaceId: target.workspaceId,
-        referenceOrder: reference.order,
-        excludeId: target.id,
-      });
+      const previousOrder =
+        await this.foldersRepository.findPreviousFolderOrder({
+          workspaceId: target.workspaceId,
+          referenceOrder: reference.order,
+          excludeId: target.id,
+        });
 
       newOrder = previousOrder
         ? (previousOrder + reference.order) / 2
@@ -76,9 +77,7 @@ export class ReorderFolderUseCase {
     }
 
     if (newOrder === target.order) {
-      return (
-        (await this.foldersRepository.findFolderById(target.id)) ?? target
-      );
+      return (await this.foldersRepository.findFolderById(target.id)) ?? target;
     }
 
     return this.foldersRepository.updateFolderOrder(target.id, newOrder);

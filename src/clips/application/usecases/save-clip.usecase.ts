@@ -54,7 +54,7 @@ export class SaveClipUseCase {
     input: SaveClipInput,
     clip: Awaited<ReturnType<ClipsRepository['findClipByIdForUser']>>,
   ) {
-    const folderId = input.mode === 'create' ? input.folderId : input.folderId;
+    const folderId = input.folderId;
 
     if (folderId) {
       const folder = await this.clipsRepository.findPersonalFolderById(
