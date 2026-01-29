@@ -6,9 +6,15 @@ import {
   ClipsRepository,
   CreateClipParams,
   FindClipsParams,
+  FindRecentClipsParams,
   UpdateClipParams,
 } from '../domain/clips.repository';
-import { Clip, ClipListItem, PersonalFolder } from '../domain/clip.types';
+import {
+  Clip,
+  ClipListItem,
+  PersonalFolder,
+  RecentClipItem,
+} from '../domain/clip.types';
 
 @Injectable()
 export class PrismaClipsRepository implements ClipsRepository {
@@ -89,12 +95,88 @@ export class PrismaClipsRepository implements ClipsRepository {
     }));
   }
 
+  async findRecentClips(
+    params: FindRecentClipsParams,
+  ): Promise<RecentClipItem[]> {
+    const { userId, cursor, limit } = params;
+    const clipWhere = this.buildWhere({
+      userId,
+      type: params.type,
+      q: params.q,
+      searchTarget: params.searchTarget,
+      likedOnly: undefined,
+    });
+
+    const views = await this.prisma.clipView.findMany({
+      where: {
+        userId,
+        clip: clipWhere,
+      },
+      ...(cursor
+        ? {
+            cursor: { id: cursor },
+            skip: 1,
+          }
+        : {}),
+      take: limit + 1,
+      orderBy: [{ viewedAt: 'desc' }, { id: 'desc' }],
+      include: {
+        clip: {
+          include: {
+            tags: {
+              select: {
+                tag: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            likes: {
+              where: { userId },
+              select: { id: true },
+            },
+          },
+        },
+      },
+    });
+
+    return views.map(({ id, clip }) => ({
+      viewId: id,
+      ...clip,
+      tags: clip.tags.map((tag) => tag.tag),
+      likedByMe: clip.likes.length > 0,
+    }));
+  }
+
   async hasTitleMatches(
     params: Omit<FindClipsParams, 'cursor' | 'limit'> & { q: string },
   ): Promise<boolean> {
     const where = this.buildWhere({ ...params, searchTarget: 'title' });
     const match = await this.prisma.clip.findFirst({
       where,
+      select: { id: true },
+    });
+
+    return Boolean(match);
+  }
+
+  async hasRecentTitleMatches(
+    params: Omit<FindRecentClipsParams, 'cursor' | 'limit'> & { q: string },
+  ): Promise<boolean> {
+    const clipWhere = this.buildWhere({
+      userId: params.userId,
+      type: params.type,
+      q: params.q,
+      searchTarget: 'title',
+      likedOnly: undefined,
+    });
+    const match = await this.prisma.clipView.findFirst({
+      where: {
+        userId: params.userId,
+        clip: clipWhere,
+      },
       select: { id: true },
     });
 
@@ -112,6 +194,31 @@ export class PrismaClipsRepository implements ClipsRepository {
       where: {
         ...where,
         id: params.clipId,
+      },
+      select: { id: true },
+    });
+
+    return Boolean(match);
+  }
+
+  async isRecentCursorMatchingQuery(
+    params: Omit<FindRecentClipsParams, 'cursor' | 'limit'> & {
+      viewId: string;
+      searchTarget: ClipSearchTarget;
+    },
+  ): Promise<boolean> {
+    const clipWhere = this.buildWhere({
+      userId: params.userId,
+      type: params.type,
+      q: params.q,
+      searchTarget: params.searchTarget,
+      likedOnly: undefined,
+    });
+    const match = await this.prisma.clipView.findFirst({
+      where: {
+        id: params.viewId,
+        userId: params.userId,
+        clip: clipWhere,
       },
       select: { id: true },
     });

@@ -44,13 +44,13 @@ Authorization: Bearer {{accessToken}}
 ### 폴더 A 클립 목록 조회 (첫 페이지)
 # 폴더에 클립이 존재해야 응답이 채워집니다.
 # @name getFolderAClipsFirst
-GET {{baseUrl}}/clips?folderId={{folderAId}}&limit=20
+GET {{baseUrl}}/clips?folderId={{folderAId}}&cursor=&type=ALL
 Authorization: Bearer {{accessToken}}
 
 ### 폴더 A 클립 목록 조회 (다음 페이지)
 # nextCursor가 null이면 다음 페이지가 없다는 의미입니다.
 @folderAClipsNextCursor = {{getFolderAClipsFirst.response.body.$.nextCursor}}
-GET {{baseUrl}}/clips?folderId={{folderAId}}&limit=20&cursor={{folderAClipsNextCursor}}
+GET {{baseUrl}}/clips?folderId={{folderAId}}&cursor={{folderAClipsNextCursor}}&type=ALL
 Authorization: Bearer {{accessToken}}
 
 ### 폴더 A 수정

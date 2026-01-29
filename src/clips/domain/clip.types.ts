@@ -24,6 +24,10 @@ export type ClipListItem = Clip & {
   tags: Tag[];
 };
 
+export type RecentClipItem = ClipListItem & {
+  viewId: string;
+};
+
 export type PersonalFolder = {
   id: string;
   workspaceId: string;

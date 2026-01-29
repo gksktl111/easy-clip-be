@@ -24,7 +24,7 @@ import { UpdateClipDto } from './dtos/update-clip.dto';
 import { GetClipUseCase } from '../application/usecases/get-clip.usecase';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
 import { SaveClipUseCase } from '../application/usecases/save-clip.usecase';
-import { ListClipsUseCase } from '../application/usecases/list-clips.usecase';
+import { ListClipsControllerFacade } from '../application/usecases/list-clips.controller-facade';
 import { ClipsError } from '../application/clips.error';
 
 @Controller('clips')
@@ -33,7 +33,7 @@ export class ClipsController {
     private readonly saveClipUseCase: SaveClipUseCase,
     private readonly getClipUseCase: GetClipUseCase,
     private readonly deleteClipUseCase: DeleteClipUseCase,
-    private readonly listClipsUseCase: ListClipsUseCase,
+    private readonly listClipsFacade: ListClipsControllerFacade,
   ) {}
 
   // multipart 입력에서 file 우선 규칙으로 타입을 판별해 클립을 생성한다.
@@ -72,7 +72,11 @@ export class ClipsController {
     @Query() query: ListClipsQueryDto,
   ) {
     return this.run(() =>
-      this.listClipsUseCase.execute(req.user.userId, query),
+      this.listClipsFacade.execute(req.user.userId, {
+        ...query,
+        favorite: query.favorite === 'true',
+        recent: query.recent === 'true',
+      }),
     );
   }
 

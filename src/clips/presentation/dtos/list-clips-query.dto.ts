@@ -1,25 +1,23 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
 export class ListClipsQueryDto {
   @IsOptional()
   @IsString()
   folderId?: string;
 
-  @IsOptional()
   @IsString()
-  cursor?: string;
+  cursor: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
-  limit?: number;
+  @IsIn(['true'])
+  favorite?: 'true';
 
   @IsOptional()
+  @IsIn(['true'])
+  recent?: 'true';
+
   @IsIn(['TEXT', 'COLOR', 'IMAGE', 'ALL'])
-  type?: 'TEXT' | 'COLOR' | 'IMAGE' | 'ALL';
+  type: 'TEXT' | 'COLOR' | 'IMAGE' | 'ALL';
 
   @IsOptional()
   @IsString()
