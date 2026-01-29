@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { SaveFolderUseCase } from './save-folder.usecase';
 import { FoldersRepository } from '../../domain/folders.repository';
 

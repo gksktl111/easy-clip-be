@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { DeleteFolderUseCase } from './delete-folder.usecase';
 import { FoldersRepository } from '../../domain/folders.repository';
 
@@ -26,9 +27,9 @@ describe('DeleteFolderUseCase', () => {
 
     const usecase = new DeleteFolderUseCase(repo);
 
-    await expect(
-      usecase.execute('user-id', 'folder-id'),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(usecase.execute('user-id', 'folder-id')).rejects.toMatchObject(
+      { code: 'NOT_FOUND' },
+    );
   });
 
   it('폴더를 삭제한다', async () => {

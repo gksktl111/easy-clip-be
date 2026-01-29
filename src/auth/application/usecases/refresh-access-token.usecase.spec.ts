@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { createHash } from 'crypto';
 import { RefreshAccessTokenUseCase } from './refresh-access-token.usecase';
 import { AuthRepository } from '../../domain/auth.repository';

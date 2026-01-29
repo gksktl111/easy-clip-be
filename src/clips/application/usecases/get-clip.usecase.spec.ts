@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { GetClipUseCase } from './get-clip.usecase';
 import { ClipsRepository } from '../../domain/clips.repository';
 
@@ -41,10 +42,7 @@ describe('GetClipUseCase', () => {
     const usecase = new GetClipUseCase(repo);
     const result = await usecase.execute('user-id', 'clip-id');
 
-    expect(repo.findClipByIdForUser).toHaveBeenCalledWith(
-      'user-id',
-      'clip-id',
-    );
+    expect(repo.findClipByIdForUser).toHaveBeenCalledWith('user-id', 'clip-id');
     expect(result).toBe(clip);
   });
 });

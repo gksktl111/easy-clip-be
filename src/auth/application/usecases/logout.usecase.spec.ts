@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { LogoutUseCase } from './logout.usecase';
 import { AuthRepository } from '../../domain/auth.repository';
 

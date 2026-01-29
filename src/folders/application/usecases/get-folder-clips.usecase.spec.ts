@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { GetFolderClipsUseCase } from './get-folder-clips.usecase';
 import { FoldersRepository } from '../../domain/folders.repository';
 

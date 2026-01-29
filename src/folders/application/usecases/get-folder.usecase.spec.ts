@@ -1,4 +1,5 @@
-import { GetForderUseCase } from './get-forder.usecase';
+/* eslint-disable @typescript-eslint/unbound-method */
+import { GetFolderUseCase } from './get-folder.usecase';
 import { FoldersRepository } from '../../domain/folders.repository';
 
 const createRepository = (): jest.Mocked<FoldersRepository> => ({
@@ -19,12 +20,12 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   findNextFolderOrder: jest.fn(),
 });
 
-describe('GetForderUseCase', () => {
+describe('GetFolderUseCase', () => {
   it('single 모드에서 폴더가 없으면 에러를 던진다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue(null);
 
-    const usecase = new GetForderUseCase(repo);
+    const usecase = new GetFolderUseCase(repo);
 
     await expect(
       usecase.execute('user-id', { mode: 'single', folderId: 'folder-id' }),
@@ -38,7 +39,7 @@ describe('GetForderUseCase', () => {
     const folder = { id: 'folder-id' };
     repo.findPersonalFolderById.mockResolvedValue(folder as never);
 
-    const usecase = new GetForderUseCase(repo);
+    const usecase = new GetFolderUseCase(repo);
     const result = await usecase.execute('user-id', {
       mode: 'single',
       folderId: 'folder-id',
@@ -55,7 +56,7 @@ describe('GetForderUseCase', () => {
     const repo = createRepository();
     repo.findPersonalWorkspaceId.mockResolvedValue(null);
 
-    const usecase = new GetForderUseCase(repo);
+    const usecase = new GetFolderUseCase(repo);
     const result = await usecase.execute('user-id', { mode: 'list' });
 
     expect(result).toEqual([]);
@@ -68,7 +69,7 @@ describe('GetForderUseCase', () => {
     repo.findPersonalWorkspaceId.mockResolvedValue('workspace-1');
     repo.findFoldersByWorkspaceId.mockResolvedValue(folders as never);
 
-    const usecase = new GetForderUseCase(repo);
+    const usecase = new GetFolderUseCase(repo);
     const result = await usecase.execute('user-id', { mode: 'list' });
 
     expect(repo.findFoldersByWorkspaceId).toHaveBeenCalledWith('workspace-1');

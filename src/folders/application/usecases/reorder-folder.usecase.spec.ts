@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { ReorderFolderUseCase } from './reorder-folder.usecase';
 import { FoldersRepository } from '../../domain/folders.repository';
 

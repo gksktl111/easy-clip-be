@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { DeleteClipUseCase } from './delete-clip.usecase';
 import { ClipsRepository } from '../../domain/clips.repository';
 
