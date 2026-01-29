@@ -1,48 +1,33 @@
 @baseUrl = http://localhost:3000
 # 액세스 토큰을 입력하세요
-@accessToken = <ACCESS_TOKEN>
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWt3OXh1YzAwMDAwZ2RmaGNpeGZ0YmVvIiwiYWNjb3VudElkIjoiY21rdzl4dWMwMDAwMWdkZmg2Z2R0bzc0cyIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzY5Njc2OTQ5LCJleHAiOjE3Njk2Nzc4NDksImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.2-sOtRCqsri6-QsYhj_JazXhm3fuK2mfmfn3lehxpBw
 
 # 테스트에 사용할 폴더 ID를 입력하세요
-@folderId = <FOLDER_ID>
-# 이미지 파일 경로를 입력하세요
-@imagePath = <IMAGE_PATH>
+@folderId = cmkxudd3c0007gdh8co5fhtcp
+
 
 ### 텍스트/컬러 클립 생성 (multipart)
-# @name createTextClipMultipart
-POST {{baseUrl}}/clips
-Authorization: Bearer {{accessToken}}
-Content-Type: multipart/form-data; boundary=clipBoundary
+# 포스트맨으로 하쇼
 
---clipBoundary
-Content-Disposition: form-data; name="folderId"
-
-{{folderId}}
---clipBoundary
-Content-Disposition: form-data; name="text"
-
-#fff
---clipBoundary--
 
 ### 이미지 클립 생성 (multipart, file 우선)
-# @name createImageClipMultipart
-POST {{baseUrl}}/clips
-Authorization: Bearer {{accessToken}}
-Content-Type: multipart/form-data; boundary=clipBoundary
-
---clipBoundary
-Content-Disposition: form-data; name="folderId"
-
-{{folderId}}
---clipBoundary
-Content-Disposition: form-data; name="file"; filename="upload.png"
-Content-Type: image/png
-
-< {{imagePath}}
---clipBoundary--
+# 포스트맨으로 하쇼
 
 ### 클립 단건 조회
-@clipId = {{createTextClipMultipart.response.body.$.id}}
+@clipId = 
 GET {{baseUrl}}/clips/{{clipId}}
+Authorization: Bearer {{accessToken}}
+
+### 클립 목록 조회
+GET {{baseUrl}}/clips?limit=20
+Authorization: Bearer {{accessToken}}
+
+### 클립 목록 조회 (타입 필터)
+GET {{baseUrl}}/clips?type=IMAGE&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 클립 목록 조회 (검색)
+GET {{baseUrl}}/clips?q=이&limit=20
 Authorization: Bearer {{accessToken}}
 
 ### 클립 수정 (text 변경, multipart)

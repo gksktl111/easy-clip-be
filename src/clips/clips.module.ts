@@ -6,6 +6,7 @@ import { PrismaClipsRepository } from './infrastructure/prisma-clips.repository'
 import { GetClipUseCase } from './application/usecases/get-clip.usecase';
 import { DeleteClipUseCase } from './application/usecases/delete-clip.usecase';
 import { SaveClipUseCase } from './application/usecases/save-clip.usecase';
+import { ListClipsUseCase } from './application/usecases/list-clips.usecase';
 
 const clipUseCases: Provider[] = [
   { provide: CLIPS_REPOSITORY, useClass: PrismaClipsRepository },
@@ -17,6 +18,11 @@ const clipUseCases: Provider[] = [
   {
     provide: GetClipUseCase,
     useFactory: (repo: ClipsRepository) => new GetClipUseCase(repo),
+    inject: [CLIPS_REPOSITORY],
+  },
+  {
+    provide: ListClipsUseCase,
+    useFactory: (repo: ClipsRepository) => new ListClipsUseCase(repo),
     inject: [CLIPS_REPOSITORY],
   },
   {

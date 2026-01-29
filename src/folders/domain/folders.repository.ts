@@ -1,4 +1,4 @@
-import { Clip, Folder } from './folder.types';
+import { Folder } from './folder.types';
 
 export const FOLDERS_REPOSITORY = Symbol('FOLDERS_REPOSITORY');
 
@@ -6,13 +6,6 @@ export type FolderOrderParams = {
   workspaceId: string;
   referenceOrder: number;
   excludeId: string;
-};
-
-export type FindClipsParams = {
-  folderId: string;
-  workspaceId: string;
-  cursor?: string | null;
-  limit: number;
 };
 
 export type CreateFolderParams = {
@@ -34,12 +27,6 @@ export interface FoldersRepository {
     folderId: string,
     workspaceId: string,
   ): Promise<Folder | null>;
-  findClipByIdInFolder(
-    folderId: string,
-    workspaceId: string,
-    clipId: string,
-  ): Promise<Clip | null>;
-  findClipsByFolder(params: FindClipsParams): Promise<Clip[]>;
   findLastFolderOrder(workspaceId: string): Promise<number | null>;
   createFolder(params: CreateFolderParams): Promise<Folder>;
   updateFolderName(folderId: string, name: string): Promise<Folder>;

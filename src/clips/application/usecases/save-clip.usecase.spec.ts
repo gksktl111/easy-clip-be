@@ -5,6 +5,10 @@ import { ClipsRepository } from '../../domain/clips.repository';
 const createRepository = (): jest.Mocked<ClipsRepository> => ({
   findPersonalFolderById: jest.fn(),
   findClipByIdForUser: jest.fn(),
+  findClips: jest.fn(),
+  hasTitleMatches: jest.fn(),
+  isClipMatchingQuery: jest.fn(),
+  isClipLikedByUser: jest.fn(),
   createClip: jest.fn(),
   updateClip: jest.fn(),
   softDeleteClip: jest.fn(),

@@ -9,14 +9,12 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
 import { AuthContext } from 'src/auth/application/auth-context';
 import { CreateFolderDto } from './dtos/create-folder.dto';
-import { GetFolderClipsQueryDto } from './dtos/get-folder-clips-query.dto';
 import { ReorderFolderDto } from './dtos/reorder-folder.dto';
 import { UpdateFolderDto } from './dtos/update-folder.dto';
 import { GetFolderUseCase } from '../application/usecases/get-folder.usecase';
@@ -24,13 +22,11 @@ import { ReorderFolderUseCase } from '../application/usecases/reorder-folder.use
 import { DeleteFolderUseCase } from '../application/usecases/delete-folder.usecase';
 import { SaveFolderUseCase } from '../application/usecases/save-folder.usecase';
 import { FoldersError } from '../application/folders.error';
-import { GetFolderClipsUseCase } from '../application/usecases/get-folder-clips.usecase';
 
 @Controller('folders')
 export class FoldersController {
   constructor(
     private readonly getFolderUseCase: GetFolderUseCase,
-    private readonly getFolderClipsUseCase: GetFolderClipsUseCase,
     private readonly saveFolderUseCase: SaveFolderUseCase,
     private readonly reorderFolderUseCase: ReorderFolderUseCase,
     private readonly deleteFolderUseCase: DeleteFolderUseCase,
@@ -42,19 +38,6 @@ export class FoldersController {
   getFolders(@Request() req: { user: AuthContext }) {
     return this.run(() =>
       this.getFolderUseCase.execute(req.user.userId, { mode: 'list' }),
-    );
-  }
-
-  // 폴더에 속한 클립 목록을 커서 기반으로 조회한다.
-  @Get(':id/clips')
-  @UseGuards(JwtAccessGuard)
-  getFolderClips(
-    @Request() req: { user: AuthContext },
-    @Param('id') id: string,
-    @Query() query: GetFolderClipsQueryDto,
-  ) {
-    return this.run(() =>
-      this.getFolderClipsUseCase.execute(req.user.userId, id, query),
     );
   }
 
