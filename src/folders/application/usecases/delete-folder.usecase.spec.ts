@@ -9,8 +9,6 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   findPersonalFolderById: jest.fn(),
   findFolderById: jest.fn(),
   findFolderByIdInWorkspace: jest.fn(),
-  findClipByIdInFolder: jest.fn(),
-  findClipsByFolder: jest.fn(),
   findLastFolderOrder: jest.fn(),
   createFolder: jest.fn(),
   updateFolderName: jest.fn(),

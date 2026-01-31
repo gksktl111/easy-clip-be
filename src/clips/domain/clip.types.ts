@@ -14,6 +14,20 @@ export type Clip = {
   deletedAt: Date | null;
 };
 
+export type Tag = {
+  id: string;
+  name: string;
+};
+
+export type ClipListItem = Clip & {
+  likedByMe: boolean;
+  tags: Tag[];
+};
+
+export type RecentClipItem = ClipListItem & {
+  viewId: string;
+};
+
 export type PersonalFolder = {
   id: string;
   workspaceId: string;
