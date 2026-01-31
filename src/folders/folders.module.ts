@@ -7,7 +7,6 @@ import {
 } from './domain/folders.repository';
 import { PrismaFoldersRepository } from './infrastructure/prisma-folders.repository';
 import { GetFolderUseCase } from './application/usecases/get-folder.usecase';
-import { GetFolderClipsUseCase } from './application/usecases/get-folder-clips.usecase';
 import { ReorderFolderUseCase } from './application/usecases/reorder-folder.usecase';
 import { DeleteFolderUseCase } from './application/usecases/delete-folder.usecase';
 import { SaveFolderUseCase } from './application/usecases/save-folder.usecase';
@@ -17,11 +16,6 @@ const folderUseCases: Provider[] = [
   {
     provide: GetFolderUseCase,
     useFactory: (repo: FoldersRepository) => new GetFolderUseCase(repo),
-    inject: [FOLDERS_REPOSITORY],
-  },
-  {
-    provide: GetFolderClipsUseCase,
-    useFactory: (repo: FoldersRepository) => new GetFolderClipsUseCase(repo),
     inject: [FOLDERS_REPOSITORY],
   },
   {

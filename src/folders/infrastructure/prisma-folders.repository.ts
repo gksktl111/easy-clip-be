@@ -3,11 +3,10 @@ import { WorkspaceRole, WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   CreateFolderParams,
-  FindClipsParams,
   FolderOrderParams,
   FoldersRepository,
 } from '../domain/folders.repository';
-import { Clip, Folder } from '../domain/folder.types';
+import { Folder } from '../domain/folder.types';
 
 @Injectable()
 export class PrismaFoldersRepository implements FoldersRepository {
@@ -92,41 +91,6 @@ export class PrismaFoldersRepository implements FoldersRepository {
         deletedAt: null,
         workspaceId,
       },
-    });
-  }
-
-  async findClipByIdInFolder(
-    folderId: string,
-    workspaceId: string,
-    clipId: string,
-  ): Promise<Clip | null> {
-    return this.prisma.clip.findFirst({
-      where: {
-        id: clipId,
-        deletedAt: null,
-        folderId,
-        workspaceId,
-      },
-    });
-  }
-
-  async findClipsByFolder(params: FindClipsParams): Promise<Clip[]> {
-    const { folderId, workspaceId, cursor, limit } = params;
-
-    return this.prisma.clip.findMany({
-      where: {
-        folderId,
-        workspaceId,
-        deletedAt: null,
-      },
-      ...(cursor
-        ? {
-            cursor: { id: cursor },
-            skip: 1,
-          }
-        : {}),
-      take: limit + 1,
-      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
     });
   }
 
