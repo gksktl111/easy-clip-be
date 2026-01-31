@@ -21,7 +21,7 @@ export class ListClipsControllerFacade {
   ) {}
 
   async execute(userId: string, input: ListClipsFacadeInput) {
-    if (input.cursor === undefined || !input.type) {
+    if (!input.type) {
       throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
     }
 

@@ -36,6 +36,29 @@ export class ClipsController {
     private readonly listClipsFacade: ListClipsControllerFacade,
   ) {}
 
+  // 클립 목록을 커서 기반으로 조회한다.
+  @Get()
+  @UseGuards(JwtAccessGuard)
+  getClips(
+    @Request() req: { user: AuthContext },
+    @Query() query: ListClipsQueryDto,
+  ) {
+    return this.run(() =>
+      this.listClipsFacade.execute(req.user.userId, {
+        ...query,
+        favorite: query.favorite === 'true',
+        recent: query.recent === 'true',
+      }),
+    );
+  }
+
+  // 삭제되지 않은 내 클립을 단건으로 조회한다.
+  @Get(':id')
+  @UseGuards(JwtAccessGuard)
+  getClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
+    return this.run(() => this.getClipUseCase.execute(req.user.userId, id));
+  }
+
   // multipart 입력에서 file 우선 규칙으로 타입을 판별해 클립을 생성한다.
   @Post()
   @UseGuards(JwtAccessGuard)
@@ -54,29 +77,6 @@ export class ClipsController {
         },
         file,
       ),
-    );
-  }
-
-  // 삭제되지 않은 내 클립을 단건으로 조회한다.
-  @Get(':id')
-  @UseGuards(JwtAccessGuard)
-  getClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.run(() => this.getClipUseCase.execute(req.user.userId, id));
-  }
-
-  // 클립 목록을 커서 기반으로 조회한다.
-  @Get()
-  @UseGuards(JwtAccessGuard)
-  getClips(
-    @Request() req: { user: AuthContext },
-    @Query() query: ListClipsQueryDto,
-  ) {
-    return this.run(() =>
-      this.listClipsFacade.execute(req.user.userId, {
-        ...query,
-        favorite: query.favorite === 'true',
-        recent: query.recent === 'true',
-      }),
     );
   }
 

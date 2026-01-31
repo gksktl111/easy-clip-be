@@ -104,7 +104,7 @@ export class PrismaClipsRepository implements ClipsRepository {
       type: params.type,
       q: params.q,
       searchTarget: params.searchTarget,
-      likedOnly: undefined,
+      likedOnly: params.likedOnly,
     });
 
     const views = await this.prisma.clipView.findMany({
@@ -206,7 +206,7 @@ export class PrismaClipsRepository implements ClipsRepository {
       viewId: string;
       searchTarget: ClipSearchTarget;
     },
-  ): Promise<boolean> {
+  ): Promise<{ liked: boolean } | null> {
     const clipWhere = this.buildWhere({
       userId: params.userId,
       type: params.type,
@@ -220,10 +220,23 @@ export class PrismaClipsRepository implements ClipsRepository {
         userId: params.userId,
         clip: clipWhere,
       },
-      select: { id: true },
+      select: {
+        clip: {
+          select: {
+            likes: {
+              where: { userId: params.userId },
+              select: { id: true },
+            },
+          },
+        },
+      },
     });
 
-    return Boolean(match);
+    if (!match) {
+      return null;
+    }
+
+    return { liked: match.clip.likes.length > 0 };
   }
 
   async isClipLikedByUser(userId: string, clipId: string): Promise<boolean> {
@@ -295,7 +308,7 @@ export class PrismaClipsRepository implements ClipsRepository {
               type: WorkspaceType.PERSONAL,
             },
           }),
-      ...(type && type !== 'ALL' ? { type } : {}),
+      ...(type ? { type } : {}),
       ...(q && searchTarget === 'title'
         ? {
             title: {

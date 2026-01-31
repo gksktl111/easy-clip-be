@@ -5,8 +5,10 @@ export class ListClipsQueryDto {
   @IsString()
   folderId?: string;
 
+  // 초기 요청 null 허용
+  @IsOptional()
   @IsString()
-  cursor: string;
+  cursor?: string;
 
   @IsOptional()
   @IsIn(['true'])

@@ -1,3 +1,4 @@
+import { ClipType } from '../../domain/clip.types';
 import {
   ClipSearchTarget,
   ClipTypeFilter,
@@ -13,7 +14,7 @@ import {
 
 export type ListFolderClipsInput = {
   folderId: string;
-  cursor: string;
+  cursor?: string;
   type: ClipTypeFilter;
   q?: string;
 };
@@ -77,7 +78,7 @@ export class ListFolderClipsUseCase {
     userId: string;
     folderId?: string;
     workspaceId?: string;
-    type?: ClipTypeFilter;
+    type?: ClipType;
     q?: string;
     likedOnly?: boolean;
   }): Promise<ClipSearchTarget | undefined> {
@@ -111,7 +112,7 @@ export class ListFolderClipsUseCase {
     cursor: string | undefined;
     folderId: string;
     workspaceId: string;
-    type?: ClipTypeFilter;
+    type?: ClipType;
     q?: string;
     searchTarget?: ClipSearchTarget;
   }) {
@@ -176,7 +177,7 @@ export class ListFolderClipsUseCase {
     workspaceId: string;
     cursor: string | undefined;
     cursorLiked: boolean | null;
-    type?: ClipTypeFilter;
+    type?: ClipType;
     q?: string;
     searchTarget?: ClipSearchTarget;
   }) {

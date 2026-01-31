@@ -29,7 +29,7 @@ export type FindClipsParams = {
   workspaceId?: string;
   cursor?: string;
   limit: number;
-  type?: ClipTypeFilter;
+  type?: ClipType;
   q?: string;
   searchTarget?: ClipSearchTarget;
   likedOnly?: boolean;
@@ -39,9 +39,10 @@ export type FindRecentClipsParams = {
   userId: string;
   cursor?: string;
   limit: number;
-  type?: ClipTypeFilter;
+  type?: ClipType;
   q?: string;
   searchTarget?: ClipSearchTarget;
+  likedOnly?: boolean;
 };
 
 export interface ClipsRepository {
@@ -71,7 +72,7 @@ export interface ClipsRepository {
       viewId: string;
       searchTarget: ClipSearchTarget;
     },
-  ): Promise<boolean>;
+  ): Promise<{ liked: boolean } | null>;
   isClipLikedByUser(userId: string, clipId: string): Promise<boolean>;
   createClip(params: CreateClipParams): Promise<Clip>;
   updateClip(clipId: string, params: UpdateClipParams): Promise<Clip>;

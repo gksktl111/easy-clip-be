@@ -2,6 +2,8 @@ import { ClipTypeFilter } from '../../domain/clips.repository';
 
 export const LIST_CLIPS_LIMIT = 20;
 
+type NormalizedClipType = Exclude<ClipTypeFilter, 'ALL'>;
+
 export const normalizeCursor = (raw?: string) => {
   const trimmed = raw?.trim();
 
@@ -12,7 +14,9 @@ export const normalizeCursor = (raw?: string) => {
   return trimmed;
 };
 
-export const normalizeType = (type?: ClipTypeFilter) => {
+export const normalizeType = (
+  type?: ClipTypeFilter,
+): NormalizedClipType | undefined => {
   if (!type || type === 'ALL') {
     return undefined;
   }

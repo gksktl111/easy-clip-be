@@ -1,3 +1,4 @@
+import { ClipType } from '../../domain/clip.types';
 import {
   ClipSearchTarget,
   ClipTypeFilter,
@@ -12,7 +13,7 @@ import {
 } from './list-clips.common';
 
 export type ListFavoriteClipsInput = {
-  cursor: string;
+  cursor?: string;
   type: ClipTypeFilter;
   q?: string;
 };
@@ -63,7 +64,7 @@ export class ListFavoriteClipsUseCase {
     likedOnly,
   }: {
     userId: string;
-    type?: ClipTypeFilter;
+    type?: ClipType;
     q?: string;
     likedOnly?: boolean;
   }): Promise<ClipSearchTarget | undefined> {
@@ -91,7 +92,7 @@ export class ListFavoriteClipsUseCase {
   }: {
     userId: string;
     cursor: string;
-    type?: ClipTypeFilter;
+    type?: ClipType;
     q?: string;
     searchTarget?: ClipSearchTarget;
   }) {
