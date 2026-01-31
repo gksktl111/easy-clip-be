@@ -6,8 +6,15 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-import { JwtPayload } from '../auth';
 import { ConfigService } from '@nestjs/config';
+import { AuthContext } from 'src/auth/application/auth-context';
+import { AuthPlatform } from 'src/auth/domain/auth.types';
+
+type JwtClaims = {
+  sub: string;
+  accountId: string;
+  platform: AuthPlatform;
+};
 
 @Injectable()
 export class JwtRefreshGuard implements CanActivate {
@@ -25,13 +32,19 @@ export class JwtRefreshGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+      const payload = await this.jwtService.verifyAsync<JwtClaims>(token, {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
         audience: 'refresh',
         issuer: 'easy-clip',
       });
 
-      request['user'] = payload;
+      const authContext: AuthContext = {
+        userId: payload.sub,
+        accountId: payload.accountId,
+        platform: payload.platform,
+      };
+
+      request['user'] = authContext;
       request['refreshToken'] = token; // ⭐ 중요
     } catch {
       throw new UnauthorizedException('유효하지 않은 refresh token입니다.');
