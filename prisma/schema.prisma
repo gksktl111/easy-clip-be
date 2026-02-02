@@ -129,6 +129,7 @@ model Workspace {
   clips        Clip[]
   tags         Tag[]
 
+  @@unique([ownerUserId, type])
 }
 
 // 워크스페이스 멤버십 및 권한 관리용 (인명부)
@@ -200,6 +201,7 @@ model Folder {
 model Clip {
   id   String   @id @default(cuid()) // 클립 고유 ID
   type ClipType                      // 클립 타입 (TEXT / COLOR / IMAGE)
+  title String   @default("")        // 리스트/카드에서 표시할 대표 제목
 
   textContent String? // 텍스트 클립일 때만 사용
   colorHex    String? // 컬러 클립일 때만 사용 (#FFFFFF)
@@ -219,9 +221,11 @@ model Clip {
 
   createdAt DateTime @default(now()) // 클립 생성 시각
   updatedAt DateTime @updatedAt      // 클립 수정 시각
+  deletedAt DateTime?                // 소프트 삭제 시각
 
   @@index([workspaceId])  // 워크스페이스 기준 클립 조회
   @@index([folderId]) // 폴더 기준 클립 조회
+  @@index([workspaceId, deletedAt]) // 휴지통/활성 클립 조회 최적화
 }
 
 // 노션 데이터베이스 같은 태그 모델 (하나의 태그 생성이 이를 같은 폴더내의 다른 클립에도 적용이 가능)

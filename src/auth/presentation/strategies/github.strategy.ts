@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
-import { AuthProvider } from '@prisma/client';
+import { AuthProvider, OAuthUser } from '../../domain/auth.types';
 import { Request } from 'express';
 import type { AuthenticateOptions } from 'passport';
 import { Profile, Strategy } from 'passport-github2';
-import { OAuthUser } from '../auth';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
