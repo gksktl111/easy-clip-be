@@ -1,6 +1,13 @@
-import { AuthProvider } from '@prisma/client';
+// src/auth/domain/auth.types.ts
+export const AuthProvider = {
+  GOOGLE: 'GOOGLE',
+  GITHUB: 'GITHUB',
+} as const;
+
+export type AuthProvider = (typeof AuthProvider)[keyof typeof AuthProvider];
 
 export type OAuthMode = 'login' | 'link';
+
 export type AuthPlatform = 'WEB' | 'APP';
 
 export type OAuthUser = {
@@ -11,11 +18,5 @@ export type OAuthUser = {
   avatarUrl?: string | null;
   mode: OAuthMode;
   platform: AuthPlatform;
-  currentUserId?: string; // link일 때만
-};
-
-export type JwtPayload = {
-  sub: string;
-  accountId: string;
-  platform: AuthPlatform;
+  currentUserId?: string;
 };
