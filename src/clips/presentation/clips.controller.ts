@@ -25,6 +25,8 @@ import { GetClipUseCase } from '../application/usecases/get-clip.usecase';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
 import { SaveClipUseCase } from '../application/usecases/save-clip.usecase';
 import { ListClipsControllerFacade } from '../application/usecases/list-clips.controller-facade';
+import { LikeClipUseCase } from '../application/usecases/like-clip.usecase';
+import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
 import { ClipsError } from '../application/clips.error';
 
 @Controller('clips')
@@ -34,6 +36,8 @@ export class ClipsController {
     private readonly getClipUseCase: GetClipUseCase,
     private readonly deleteClipUseCase: DeleteClipUseCase,
     private readonly listClipsFacade: ListClipsControllerFacade,
+    private readonly likeClipUseCase: LikeClipUseCase,
+    private readonly unlikeClipUseCase: UnlikeClipUseCase,
   ) {}
 
   // 클립 목록을 커서 기반으로 조회한다.
@@ -108,6 +112,20 @@ export class ClipsController {
   @UseGuards(JwtAccessGuard)
   deleteClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
     return this.run(() => this.deleteClipUseCase.execute(req.user.userId, id));
+  }
+
+  // 클립에 좋아요를 등록한다.
+  @Post(':id/likes')
+  @UseGuards(JwtAccessGuard)
+  likeClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
+    return this.run(() => this.likeClipUseCase.execute(req.user.userId, id));
+  }
+
+  // 클립 좋아요를 취소한다.
+  @Delete(':id/likes')
+  @UseGuards(JwtAccessGuard)
+  unlikeClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
+    return this.run(() => this.unlikeClipUseCase.execute(req.user.userId, id));
   }
 
   private async run<T>(action: () => Promise<T>): Promise<T> {

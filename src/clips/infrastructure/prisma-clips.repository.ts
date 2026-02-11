@@ -91,7 +91,7 @@ export class PrismaClipsRepository implements ClipsRepository {
     return clips.map(({ tags, likes, ...clip }) => ({
       ...clip,
       tags: tags.map((tag) => tag.tag),
-      likedByMe: likes.length > 0,
+      likeByMe: likes.length > 0,
     }));
   }
 
@@ -146,7 +146,7 @@ export class PrismaClipsRepository implements ClipsRepository {
       viewId: id,
       ...clip,
       tags: clip.tags.map((tag) => tag.tag),
-      likedByMe: clip.likes.length > 0,
+      likeByMe: clip.likes.length > 0,
     }));
   }
 
@@ -251,6 +251,25 @@ export class PrismaClipsRepository implements ClipsRepository {
     });
 
     return Boolean(like);
+  }
+
+  async createClipLike(userId: string, clipId: string): Promise<void> {
+    await this.prisma.clipLike.createMany({
+      data: {
+        userId,
+        clipId,
+      },
+      skipDuplicates: true,
+    });
+  }
+
+  async deleteClipLike(userId: string, clipId: string): Promise<void> {
+    await this.prisma.clipLike.deleteMany({
+      where: {
+        userId,
+        clipId,
+      },
+    });
   }
 
   async createClip(params: CreateClipParams): Promise<Clip> {

@@ -20,12 +20,16 @@ export type Tag = {
 };
 
 export type ClipListItem = Clip & {
-  likedByMe: boolean;
+  likeByMe: boolean;
   tags: Tag[];
 };
 
 export type RecentClipItem = ClipListItem & {
   viewId: string;
+};
+
+export type ClipDetail = Clip & {
+  likeByMe: boolean;
 };
 
 export type PersonalFolder = {
