@@ -74,6 +74,8 @@ export interface ClipsRepository {
     },
   ): Promise<{ liked: boolean } | null>;
   isClipLikedByUser(userId: string, clipId: string): Promise<boolean>;
+  createClipLike(userId: string, clipId: string): Promise<void>;
+  deleteClipLike(userId: string, clipId: string): Promise<void>;
   createClip(params: CreateClipParams): Promise<Clip>;
   updateClip(clipId: string, params: UpdateClipParams): Promise<Clip>;
   softDeleteClip(clipId: string): Promise<Clip>;

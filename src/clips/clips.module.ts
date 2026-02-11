@@ -10,6 +10,8 @@ import { ListFavoriteClipsUseCase } from './application/usecases/list-favorite-c
 import { ListFolderClipsUseCase } from './application/usecases/list-folder-clips.usecase';
 import { ListRecentClipsUseCase } from './application/usecases/list-recent-clips.usecase';
 import { ListClipsControllerFacade } from './application/usecases/list-clips.controller-facade';
+import { LikeClipUseCase } from './application/usecases/like-clip.usecase';
+import { UnlikeClipUseCase } from './application/usecases/unlike-clip.usecase';
 
 const clipUseCases: Provider[] = [
   { provide: CLIPS_REPOSITORY, useClass: PrismaClipsRepository },
@@ -54,6 +56,16 @@ const clipUseCases: Provider[] = [
   {
     provide: DeleteClipUseCase,
     useFactory: (repo: ClipsRepository) => new DeleteClipUseCase(repo),
+    inject: [CLIPS_REPOSITORY],
+  },
+  {
+    provide: LikeClipUseCase,
+    useFactory: (repo: ClipsRepository) => new LikeClipUseCase(repo),
+    inject: [CLIPS_REPOSITORY],
+  },
+  {
+    provide: UnlikeClipUseCase,
+    useFactory: (repo: ClipsRepository) => new UnlikeClipUseCase(repo),
     inject: [CLIPS_REPOSITORY],
   },
 ];
