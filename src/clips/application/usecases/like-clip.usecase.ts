@@ -1,7 +1,7 @@
 import { ClipsRepository } from '../../domain/clips.repository';
 import { ClipsError } from '../clips.error';
 
-export class GetClipUseCase {
+export class LikeClipUseCase {
   constructor(private readonly clipsRepository: ClipsRepository) {}
 
   async execute(userId: string, clipId: string) {
@@ -11,14 +11,8 @@ export class GetClipUseCase {
       throw new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.');
     }
 
-    const likeByMe = await this.clipsRepository.isClipLikedByUser(
-      userId,
-      clipId,
-    );
+    await this.clipsRepository.createClipLike(userId, clipId);
 
-    return {
-      ...clip,
-      likeByMe,
-    };
+    return { likeByMe: true };
   }
 }

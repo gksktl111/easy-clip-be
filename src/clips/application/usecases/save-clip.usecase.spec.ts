@@ -12,6 +12,8 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   isClipMatchingQuery: jest.fn(),
   isRecentCursorMatchingQuery: jest.fn(),
   isClipLikedByUser: jest.fn(),
+  createClipLike: jest.fn(),
+  deleteClipLike: jest.fn(),
   createClip: jest.fn(),
   updateClip: jest.fn(),
   softDeleteClip: jest.fn(),
