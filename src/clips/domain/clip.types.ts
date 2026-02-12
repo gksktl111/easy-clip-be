@@ -28,6 +28,11 @@ export type RecentClipItem = ClipListItem & {
   viewId: string;
 };
 
+export type RecentViewedClip = {
+  clipId: string;
+  viewedAt: Date;
+};
+
 export type ClipDetail = Clip & {
   likeByMe: boolean;
 };

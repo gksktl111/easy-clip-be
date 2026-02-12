@@ -14,6 +14,7 @@ import {
   ClipListItem,
   PersonalFolder,
   RecentClipItem,
+  RecentViewedClip,
 } from '../domain/clip.types';
 
 @Injectable()
@@ -150,6 +151,87 @@ export class PrismaClipsRepository implements ClipsRepository {
     }));
   }
 
+  async findRecentViewedClipIds(
+    userId: string,
+    limit: number,
+  ): Promise<RecentViewedClip[]> {
+    const groupedViews = await this.prisma.clipView.groupBy({
+      by: ['clipId'],
+      where: {
+        userId,
+        clip: {
+          deletedAt: null,
+          workspace: {
+            ownerUserId: userId,
+            type: WorkspaceType.PERSONAL,
+          },
+        },
+      },
+      _max: {
+        viewedAt: true,
+      },
+      orderBy: [{ _max: { viewedAt: 'desc' } }, { clipId: 'desc' }],
+      take: limit,
+    });
+
+    return groupedViews.flatMap((view) => {
+      if (!view._max.viewedAt) {
+        return [];
+      }
+
+      return [
+        {
+          clipId: view.clipId,
+          viewedAt: view._max.viewedAt,
+        },
+      ];
+    });
+  }
+
+  async findClipsByIdsForUser(
+    userId: string,
+    clipIds: string[],
+  ): Promise<ClipListItem[]> {
+    if (clipIds.length === 0) {
+      return [];
+    }
+
+    const clips = await this.prisma.clip.findMany({
+      where: {
+        id: {
+          in: clipIds,
+        },
+        deletedAt: null,
+        workspace: {
+          ownerUserId: userId,
+          type: WorkspaceType.PERSONAL,
+        },
+      },
+      include: {
+        tags: {
+          select: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        likes: {
+          where: { userId },
+          select: { id: true },
+        },
+      },
+    });
+
+    return clips.map(({ tags, likes, ...clip }) => ({
+      ...clip,
+      tags: tags.map((tag) => tag.tag),
+      likeByMe: likes.length > 0,
+    }));
+  }
+
   async hasTitleMatches(
     params: Omit<FindClipsParams, 'cursor' | 'limit'> & { q: string },
   ): Promise<boolean> {
@@ -237,6 +319,26 @@ export class PrismaClipsRepository implements ClipsRepository {
     }
 
     return { liked: match.clip.likes.length > 0 };
+  }
+
+  async createClipView(userId: string, clipId: string): Promise<void> {
+    // 최근 조회 탭 용도이므로 userId-clipId 당 1건만 유지하고 최신 시각으로 갱신한다.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.clipView.deleteMany({
+        where: {
+          userId,
+          clipId,
+        },
+      });
+
+      await tx.clipView.create({
+        data: {
+          userId,
+          clipId,
+          viewedAt: new Date(),
+        },
+      });
+    });
   }
 
   async isClipLikedByUser(userId: string, clipId: string): Promise<boolean> {

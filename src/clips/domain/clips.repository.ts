@@ -4,6 +4,7 @@ import {
   ClipType,
   PersonalFolder,
   RecentClipItem,
+  RecentViewedClip,
 } from './clip.types';
 
 export const CLIPS_REPOSITORY = Symbol('CLIPS_REPOSITORY');
@@ -53,6 +54,14 @@ export interface ClipsRepository {
   findClipByIdForUser(userId: string, clipId: string): Promise<Clip | null>;
   findClips(params: FindClipsParams): Promise<ClipListItem[]>;
   findRecentClips(params: FindRecentClipsParams): Promise<RecentClipItem[]>;
+  findRecentViewedClipIds(
+    userId: string,
+    limit: number,
+  ): Promise<RecentViewedClip[]>;
+  findClipsByIdsForUser(
+    userId: string,
+    clipIds: string[],
+  ): Promise<ClipListItem[]>;
   hasTitleMatches(
     params: Omit<FindClipsParams, 'cursor' | 'limit'> & {
       q: string;
@@ -73,6 +82,7 @@ export interface ClipsRepository {
       searchTarget: ClipSearchTarget;
     },
   ): Promise<{ liked: boolean } | null>;
+  createClipView(userId: string, clipId: string): Promise<void>;
   isClipLikedByUser(userId: string, clipId: string): Promise<boolean>;
   createClipLike(userId: string, clipId: string): Promise<void>;
   deleteClipLike(userId: string, clipId: string): Promise<void>;
