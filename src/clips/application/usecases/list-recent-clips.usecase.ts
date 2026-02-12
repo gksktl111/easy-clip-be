@@ -197,7 +197,9 @@ export class ListRecentClipsUseCase {
   }
 
   private stripViewId(items: RecentClipItem[]) {
-    return items.map(({ viewId, ...rest }) => {
+    return items.map((item) => {
+      const { viewId, ...rest } = item;
+      void viewId;
       return rest;
     });
   }

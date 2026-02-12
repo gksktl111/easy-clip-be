@@ -108,7 +108,10 @@ describe('ListClipsControllerFacade', () => {
   it('favorite가 true면 좋아요 클립 유스케이스를 호출한다', async () => {
     const { facade, listFolderClips, listFavoriteClips, listRecentClips } =
       createFacade();
-    listFavoriteClips.execute.mockResolvedValue({ items: [], nextCursor: null });
+    listFavoriteClips.execute.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
 
     await facade.execute('user-id', {
       cursor: undefined,
