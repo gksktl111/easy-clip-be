@@ -4,7 +4,6 @@ import {
   ClipType,
   PersonalFolder,
   RecentClipItem,
-  RecentViewedClip,
 } from './clip.types';
 
 export const CLIPS_REPOSITORY = Symbol('CLIPS_REPOSITORY');
@@ -54,10 +53,7 @@ export interface ClipsRepository {
   findClipByIdForUser(userId: string, clipId: string): Promise<Clip | null>;
   findClips(params: FindClipsParams): Promise<ClipListItem[]>;
   findRecentClips(params: FindRecentClipsParams): Promise<RecentClipItem[]>;
-  findRecentViewedClipIds(
-    userId: string,
-    limit: number,
-  ): Promise<RecentViewedClip[]>;
+  findRecentViewedClipIds(userId: string, limit: number): Promise<string[]>;
   findClipsByIdsForUser(
     userId: string,
     clipIds: string[],

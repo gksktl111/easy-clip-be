@@ -18,12 +18,12 @@ export class ListRecentViewedClipsUseCase {
 
     const clips = await this.clipsRepository.findClipsByIdsForUser(
       userId,
-      recentViews.map((view) => view.clipId),
+      recentViews,
     );
 
     const clipById = new Map(clips.map((clip) => [clip.id, clip]));
-    const orderedClips = recentViews.flatMap((view) => {
-      const clip = clipById.get(view.clipId);
+    const orderedClips = recentViews.flatMap((clipId) => {
+      const clip = clipById.get(clipId);
       return clip ? [clip] : [];
     });
 

@@ -59,10 +59,7 @@ describe('ListRecentViewedClipsUseCase', () => {
 
   it('clipId별 최신 viewedAt 순서로 클립을 반환한다', async () => {
     const repo = createRepository();
-    repo.findRecentViewedClipIds.mockResolvedValue([
-      { clipId: 'clip-2', viewedAt: new Date('2026-02-12T10:00:00.000Z') },
-      { clipId: 'clip-1', viewedAt: new Date('2026-02-12T09:00:00.000Z') },
-    ]);
+    repo.findRecentViewedClipIds.mockResolvedValue(['clip-2', 'clip-1']);
     repo.findClipsByIdsForUser.mockResolvedValue([
       createClipItem('clip-1'),
       createClipItem('clip-2'),

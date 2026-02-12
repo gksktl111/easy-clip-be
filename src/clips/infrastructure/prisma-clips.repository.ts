@@ -14,7 +14,6 @@ import {
   ClipListItem,
   PersonalFolder,
   RecentClipItem,
-  RecentViewedClip,
 } from '../domain/clip.types';
 
 @Injectable()
@@ -154,9 +153,8 @@ export class PrismaClipsRepository implements ClipsRepository {
   async findRecentViewedClipIds(
     userId: string,
     limit: number,
-  ): Promise<RecentViewedClip[]> {
-    const groupedViews = await this.prisma.clipView.groupBy({
-      by: ['clipId'],
+  ): Promise<string[]> {
+    const views = await this.prisma.clipView.findMany({
       where: {
         userId,
         clip: {
@@ -167,25 +165,14 @@ export class PrismaClipsRepository implements ClipsRepository {
           },
         },
       },
-      _max: {
-        viewedAt: true,
-      },
-      orderBy: [{ _max: { viewedAt: 'desc' } }, { clipId: 'desc' }],
+      orderBy: [{ viewedAt: 'desc' }, { clipId: 'desc' }],
       take: limit,
+      select: {
+        clipId: true,
+      },
     });
 
-    return groupedViews.flatMap((view) => {
-      if (!view._max.viewedAt) {
-        return [];
-      }
-
-      return [
-        {
-          clipId: view.clipId,
-          viewedAt: view._max.viewedAt,
-        },
-      ];
-    });
+    return views.map((view) => view.clipId);
   }
 
   async findClipsByIdsForUser(
@@ -322,22 +309,21 @@ export class PrismaClipsRepository implements ClipsRepository {
   }
 
   async createClipView(userId: string, clipId: string): Promise<void> {
-    // 최근 조회 탭 용도이므로 userId-clipId 당 1건만 유지하고 최신 시각으로 갱신한다.
-    await this.prisma.$transaction(async (tx) => {
-      await tx.clipView.deleteMany({
-        where: {
+    await this.prisma.clipView.upsert({
+      where: {
+        userId_clipId: {
           userId,
           clipId,
         },
-      });
-
-      await tx.clipView.create({
-        data: {
-          userId,
-          clipId,
-          viewedAt: new Date(),
-        },
-      });
+      },
+      create: {
+        userId,
+        clipId,
+        viewedAt: new Date(),
+      },
+      update: {
+        viewedAt: new Date(),
+      },
     });
   }
 
