@@ -11,6 +11,9 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   hasRecentTitleMatches: jest.fn(),
   isClipMatchingQuery: jest.fn(),
   isRecentCursorMatchingQuery: jest.fn(),
+  findRecentViewedClipIds: jest.fn(),
+  findClipsByIdsForUser: jest.fn(),
+  createClipView: jest.fn(),
   isClipLikedByUser: jest.fn(),
   createClipLike: jest.fn(),
   deleteClipLike: jest.fn(),
@@ -23,13 +26,11 @@ describe('ListRecentClipsUseCase', () => {
   it('조회 기록 기준으로 목록을 반환한다', async () => {
     const repo = createRepository();
     repo.findRecentClips
-      .mockResolvedValueOnce(
-        [
-          { id: 'clip-1', viewId: 'view-1' },
-          { id: 'clip-2', viewId: 'view-2' },
-          { id: 'clip-3', viewId: 'view-3' },
-        ] as never,
-      )
+      .mockResolvedValueOnce([
+        { id: 'clip-1', viewId: 'view-1' },
+        { id: 'clip-2', viewId: 'view-2' },
+        { id: 'clip-3', viewId: 'view-3' },
+      ] as never)
       .mockResolvedValueOnce([] as never);
 
     const usecase = new ListRecentClipsUseCase(repo);

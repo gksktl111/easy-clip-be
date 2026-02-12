@@ -1,6 +1,8 @@
 @baseUrl = http://localhost:3000
 # 액세스 토큰을 입력하세요
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxpM3l2eTQwMDAwZ2RkNmp5dDVseGFlIiwiYWNjb3VudElkIjoiY21saTN5dnk0MDAwMWdkZDZuc3I0NWo2eSIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzcwODIwMDM3LCJleHAiOjE3NzA4MjA5MzcsImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.XFDz8yIouwOJ6D9n4X3iHFGwtmtnyNsmcljLJdpQy28
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxpM3l2eTQwMDAwZ2RkNmp5dDVseGFlIiwiYWNjb3VudElkIjoiY21saTN5dnk0MDAwMWdkZDZuc3I0NWo2eSIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzcwOTA1MTAxLCJleHAiOjE3NzA5MDYwMDEsImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.82ZBjJX58iQrRnpPXX64M1ipmKm0x_JGezOS_ALZb5Y
+
+
 # 테스트에 사용할 폴더 ID를 입력하세요
 @folderId = cmli4552x0005gd384lp0w5am
 
@@ -12,9 +14,20 @@
 ### 이미지 클립 생성 (multipart, file 우선)
 # 포스트맨으로 하쇼
 
+
+# 테스트에 사용할 클립 ID를 입력하세요
+@clipId = cmljjm8u1000lgdq1ynyckoa2
+
 ### 클립 단건 조회
-@clipId = cmli4cmu90007gd38hipbpcli
 GET {{baseUrl}}/clips/{{clipId}}
+Authorization: Bearer {{accessToken}}
+
+### 클립 조회 이벤트 기록
+POST {{baseUrl}}/clips/{{clipId}}/views
+Authorization: Bearer {{accessToken}}
+
+### 클립 최근 조회 50개
+GET {{baseUrl}}/clips/views/recent
 Authorization: Bearer {{accessToken}}
 
 ### 클립 좋아요 등록
