@@ -35,7 +35,7 @@ describe('RecordClipViewUseCase', () => {
     expect(repo.createClipView).not.toHaveBeenCalled();
   });
 
-  it('내 클립이면 조회 이벤트를 누적 저장한다', async () => {
+  it('내 클립이면 조회 이벤트를 기록한다', async () => {
     const repo = createRepository();
     repo.findClipByIdForUser.mockResolvedValue({
       id: 'clip-id',
