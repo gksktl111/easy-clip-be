@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   InternalServerErrorException,
   NotFoundException,
   Param,
@@ -129,6 +130,7 @@ export class ClipsController {
 
   // 클립 조회 이벤트를 기록한다.
   @Post(':id/views')
+  @HttpCode(204)
   @UseGuards(JwtAccessGuard)
   recordClipView(
     @Request() req: { user: AuthContext },
