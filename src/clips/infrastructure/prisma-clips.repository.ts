@@ -150,6 +150,75 @@ export class PrismaClipsRepository implements ClipsRepository {
     }));
   }
 
+  async findRecentViewedClipIds(
+    userId: string,
+    limit: number,
+  ): Promise<string[]> {
+    const views = await this.prisma.clipView.findMany({
+      where: {
+        userId,
+        clip: {
+          deletedAt: null,
+          workspace: {
+            ownerUserId: userId,
+            type: WorkspaceType.PERSONAL,
+          },
+        },
+      },
+      orderBy: [{ viewedAt: 'desc' }, { clipId: 'desc' }],
+      take: limit,
+      select: {
+        clipId: true,
+      },
+    });
+
+    return views.map((view) => view.clipId);
+  }
+
+  async findClipsByIdsForUser(
+    userId: string,
+    clipIds: string[],
+  ): Promise<ClipListItem[]> {
+    if (clipIds.length === 0) {
+      return [];
+    }
+
+    const clips = await this.prisma.clip.findMany({
+      where: {
+        id: {
+          in: clipIds,
+        },
+        deletedAt: null,
+        workspace: {
+          ownerUserId: userId,
+          type: WorkspaceType.PERSONAL,
+        },
+      },
+      include: {
+        tags: {
+          select: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        likes: {
+          where: { userId },
+          select: { id: true },
+        },
+      },
+    });
+
+    return clips.map(({ tags, likes, ...clip }) => ({
+      ...clip,
+      tags: tags.map((tag) => tag.tag),
+      likeByMe: likes.length > 0,
+    }));
+  }
+
   async hasTitleMatches(
     params: Omit<FindClipsParams, 'cursor' | 'limit'> & { q: string },
   ): Promise<boolean> {
@@ -237,6 +306,25 @@ export class PrismaClipsRepository implements ClipsRepository {
     }
 
     return { liked: match.clip.likes.length > 0 };
+  }
+
+  async createClipView(userId: string, clipId: string): Promise<void> {
+    await this.prisma.clipView.upsert({
+      where: {
+        userId_clipId: {
+          userId,
+          clipId,
+        },
+      },
+      create: {
+        userId,
+        clipId,
+        viewedAt: new Date(),
+      },
+      update: {
+        viewedAt: new Date(),
+      },
+    });
   }
 
   async isClipLikedByUser(userId: string, clipId: string): Promise<boolean> {

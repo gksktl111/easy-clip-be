@@ -11,6 +11,9 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   hasRecentTitleMatches: jest.fn(),
   isClipMatchingQuery: jest.fn(),
   isRecentCursorMatchingQuery: jest.fn(),
+  findRecentViewedClipIds: jest.fn(),
+  findClipsByIdsForUser: jest.fn(),
+  createClipView: jest.fn(),
   isClipLikedByUser: jest.fn(),
   createClipLike: jest.fn(),
   deleteClipLike: jest.fn(),
@@ -26,9 +29,9 @@ describe('LikeClipUseCase', () => {
 
     const usecase = new LikeClipUseCase(repo);
 
-    await expect(
-      usecase.execute('user-id', 'clip-id'),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(usecase.execute('user-id', 'clip-id')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
   });
 
   it('좋아요를 등록하고 likeByMe를 반환한다', async () => {

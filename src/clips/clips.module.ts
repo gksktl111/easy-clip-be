@@ -12,6 +12,8 @@ import { ListRecentClipsUseCase } from './application/usecases/list-recent-clips
 import { ListClipsControllerFacade } from './application/usecases/list-clips.controller-facade';
 import { LikeClipUseCase } from './application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from './application/usecases/unlike-clip.usecase';
+import { RecordClipViewUseCase } from './application/usecases/record-clip-view.usecase';
+import { ListRecentViewedClipsUseCase } from './application/usecases/list-recent-viewed-clips.usecase';
 
 const clipUseCases: Provider[] = [
   { provide: CLIPS_REPOSITORY, useClass: PrismaClipsRepository },
@@ -66,6 +68,17 @@ const clipUseCases: Provider[] = [
   {
     provide: UnlikeClipUseCase,
     useFactory: (repo: ClipsRepository) => new UnlikeClipUseCase(repo),
+    inject: [CLIPS_REPOSITORY],
+  },
+  {
+    provide: RecordClipViewUseCase,
+    useFactory: (repo: ClipsRepository) => new RecordClipViewUseCase(repo),
+    inject: [CLIPS_REPOSITORY],
+  },
+  {
+    provide: ListRecentViewedClipsUseCase,
+    useFactory: (repo: ClipsRepository) =>
+      new ListRecentViewedClipsUseCase(repo),
     inject: [CLIPS_REPOSITORY],
   },
 ];

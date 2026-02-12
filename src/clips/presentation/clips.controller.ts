@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   InternalServerErrorException,
   NotFoundException,
   Param,
@@ -28,6 +29,8 @@ import { ListClipsControllerFacade } from '../application/usecases/list-clips.co
 import { LikeClipUseCase } from '../application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
 import { ClipsError } from '../application/clips.error';
+import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.usecase';
+import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
 
 @Controller('clips')
 export class ClipsController {
@@ -38,6 +41,8 @@ export class ClipsController {
     private readonly listClipsFacade: ListClipsControllerFacade,
     private readonly likeClipUseCase: LikeClipUseCase,
     private readonly unlikeClipUseCase: UnlikeClipUseCase,
+    private readonly recordClipViewUseCase: RecordClipViewUseCase,
+    private readonly listRecentViewedClipsUseCase: ListRecentViewedClipsUseCase,
   ) {}
 
   // 클립 목록을 커서 기반으로 조회한다.
@@ -53,6 +58,15 @@ export class ClipsController {
         favorite: query.favorite === 'true',
         recent: query.recent === 'true',
       }),
+    );
+  }
+
+  // 최근 조회한 클립 50개를 최신순으로 조회한다.
+  @Get('views/recent')
+  @UseGuards(JwtAccessGuard)
+  getRecentViewedClips(@Request() req: { user: AuthContext }) {
+    return this.run(() =>
+      this.listRecentViewedClipsUseCase.execute(req.user.userId),
     );
   }
 
@@ -112,6 +126,19 @@ export class ClipsController {
   @UseGuards(JwtAccessGuard)
   deleteClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
     return this.run(() => this.deleteClipUseCase.execute(req.user.userId, id));
+  }
+
+  // 클립 조회 이벤트를 기록한다.
+  @Post(':id/views')
+  @HttpCode(204)
+  @UseGuards(JwtAccessGuard)
+  recordClipView(
+    @Request() req: { user: AuthContext },
+    @Param('id') id: string,
+  ) {
+    return this.run(() =>
+      this.recordClipViewUseCase.execute(req.user.userId, id),
+    );
   }
 
   // 클립에 좋아요를 등록한다.
