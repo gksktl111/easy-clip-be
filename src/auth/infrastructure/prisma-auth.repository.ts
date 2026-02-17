@@ -81,7 +81,10 @@ export class PrismaAuthRepository implements AuthRepository {
             provider: input.provider as PrismaAuthProvider,
             providerUserId: input.providerUserId,
             email: input.email,
-            displayName: input.displayName ?? null,
+            displayName: this.resolveDisplayName(
+              input.displayName,
+              input.email,
+            ),
             profileImageUrl: input.profileImageUrl ?? null,
           },
         },
@@ -106,7 +109,7 @@ export class PrismaAuthRepository implements AuthRepository {
         provider: input.provider as PrismaAuthProvider,
         providerUserId: input.providerUserId,
         email: input.email,
-        displayName: input.displayName ?? null,
+        displayName: this.resolveDisplayName(input.displayName, input.email),
         profileImageUrl: input.profileImageUrl ?? null,
       },
     });
@@ -224,9 +227,31 @@ export class PrismaAuthRepository implements AuthRepository {
       provider: account.provider as AuthProvider,
       providerUserId: account.providerUserId,
       email: account.email,
-      displayName: account.displayName,
+      displayName: this.resolveDisplayName(
+        account.displayName ?? undefined,
+        account.email,
+      ),
       profileImageUrl: account.profileImageUrl,
     };
+  }
+
+  private resolveDisplayName(
+    displayName: string | undefined,
+    email: string,
+  ): string {
+    const normalizedDisplayName = displayName?.trim();
+
+    if (normalizedDisplayName) {
+      return normalizedDisplayName;
+    }
+
+    const emailName = email.split('@')[0]?.trim();
+
+    if (emailName) {
+      return emailName;
+    }
+
+    return '사용자';
   }
 
   private toJwtPayload(context: AuthContext) {

@@ -5,7 +5,7 @@ export type OAuthSignInResult = {
   refresh_token: string;
   user: {
     id: string;
-    displayName: string | null;
+    displayName: string;
     avatarUrl: string | null;
   };
 };
