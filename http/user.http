@@ -1,3 +1,63 @@
-### 내 프로필 조회
-GET http://localhost:3000/users/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWtxbTM4OGIwMDAyZ2Q2b3Jsd3o3Y3FlIiwiYWNjb3VudElkIjoiY21rcW0zODhiMDAwM2dkNm9uODN4Z2o3ZCIsImlhdCI6MTc2OTE1NjQ3OSwiZXhwIjoxNzY5MTU4Mjc5fQ.-Gf9wMy0MAA-YPTUY8iwL5cyb19VttHJTtUc5oOnMT8
+@baseUrl = http://localhost:3000
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxxb2JhOHYwMDAwZ2RraXgza3EzaG43IiwiYWNjb3VudElkIjoiY21scW9iYTh2MDAwMWdka2lrd2gxOTkxMSIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzcxMzM2OTk3LCJleHAiOjE3NzEzMzc4OTcsImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.fdAgsZBpHDTgUkwBSAlLeDwP3X-4lxdMq1grN81Egg0
+
+############################################################
+# User API Test (#33)
+# - GET /users/me
+# - PATCH /users/me
+# - DELETE /users/me
+# - GET /users/me/settings
+# - PATCH /users/me/settings
+############################################################
+
+### 1) 내 프로필 조회
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+
+### 2) 내 프로필 수정 (displayName, avatarUrl)
+PATCH {{baseUrl}}/users/me
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "displayName": "할롤로",
+  "avatarUrl": "https://example.com/avatar.png"
+}
+
+### 3) 내 프로필 수정 (avatarUrl 제거)
+PATCH {{baseUrl}}/users/me
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "avatarUrl": null
+}
+
+
+### 4) 내 설정 조회 (없으면 기본값 생성)
+GET {{baseUrl}}/users/me/settings
+Authorization: Bearer {{accessToken}}
+
+### 5) 내 설정 수정 (theme + language)
+PATCH {{baseUrl}}/users/me/settings
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "theme": "DARK",
+  "language": "en"
+}
+
+### 6) 내 설정 부분 수정 (theme만)
+PATCH {{baseUrl}}/users/me/settings
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "theme": "LIGHT"
+}
+
+### 7) 회원 탈퇴
+# 주의: 팀 워크스페이스 OWNER 상태면 400(BAD_REQUEST)로 차단됨
+DELETE {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
