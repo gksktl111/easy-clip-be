@@ -96,7 +96,7 @@ describe('SignInUseCase', () => {
       provider: 'GOOGLE',
       providerUserId: 'provider-user-id',
       email: 'user@example.com',
-      displayName: null,
+      displayName: 'user',
       profileImageUrl: null,
     });
     repo.issueTokens.mockResolvedValue({
@@ -113,7 +113,7 @@ describe('SignInUseCase', () => {
       refresh_token: 'refresh-token',
       user: {
         id: 'new-user-id',
-        displayName: null,
+        displayName: 'user',
         avatarUrl: null,
       },
     });

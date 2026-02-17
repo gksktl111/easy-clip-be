@@ -6,6 +6,6 @@ export type AuthAccount = {
   provider: AuthProvider;
   providerUserId: string;
   email: string;
-  displayName: string | null;
+  displayName: string;
   profileImageUrl: string | null;
 };

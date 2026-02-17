@@ -78,7 +78,7 @@ model AuthAccount {
   providerUserId  String
 
   email           String
-  displayName     String?
+  displayName     String
   profileImageUrl String?
 
   userId String

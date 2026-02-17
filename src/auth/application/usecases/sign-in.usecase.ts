@@ -1,8 +1,8 @@
 import { AuthRepository } from '../../domain/auth.repository';
-import { AuthContext } from '../auth-context';
 import { AuthError } from '../auth.error';
 import { OAuthSignInResult } from '../auth.types';
 import { OAuthUser } from '../../domain/auth.types';
+import { issueAuthResult } from '../policies/auth-result.policy';
 
 export class SignInUseCase {
   constructor(private readonly authRepository: AuthRepository) {}
@@ -21,11 +21,11 @@ export class SignInUseCase {
     );
 
     if (existingAccount) {
-      return this.issueAuthResult(
-        existingAccount.userId,
-        existingAccount,
-        oauthUser.platform,
-      );
+      return issueAuthResult(this.authRepository, {
+        userId: existingAccount.userId,
+        account: existingAccount,
+        platform: oauthUser.platform,
+      });
     }
 
     const userWithSameEmail = await this.authRepository.findUserByAuthEmail(
@@ -43,42 +43,14 @@ export class SignInUseCase {
       provider: oauthUser.provider,
       providerUserId: oauthUser.providerUserId,
       email: oauthUser.email,
-      displayName: oauthUser.displayName ?? null,
+      displayName: oauthUser.displayName ?? undefined,
       profileImageUrl: oauthUser.avatarUrl ?? null,
     });
 
-    return this.issueAuthResult(
-      newAccount.userId,
-      newAccount,
-      oauthUser.platform,
-    );
-  }
-
-  private async issueAuthResult(
-    userId: string,
-    account: {
-      id: string;
-      displayName: string | null;
-      profileImageUrl: string | null;
-    },
-    platform: AuthContext['platform'],
-  ): Promise<OAuthSignInResult> {
-    const context: AuthContext = {
-      userId,
-      accountId: account.id,
-      platform,
-    };
-
-    const tokens = await this.authRepository.issueTokens(context);
-
-    return {
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
-      user: {
-        id: userId,
-        displayName: account.displayName ?? null,
-        avatarUrl: account.profileImageUrl ?? null,
-      },
-    };
+    return issueAuthResult(this.authRepository, {
+      userId: newAccount.userId,
+      account: newAccount,
+      platform: oauthUser.platform,
+    });
   }
 }
