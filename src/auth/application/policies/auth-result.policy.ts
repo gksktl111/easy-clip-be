@@ -8,6 +8,7 @@ export async function issueAuthResult(
     userId: string;
     account: {
       id: string;
+      email: string;
       displayName: string | null;
       profileImageUrl: string | null;
     };
@@ -27,8 +28,27 @@ export async function issueAuthResult(
     refresh_token: tokens.refreshToken,
     user: {
       id: params.userId,
-      displayName: params.account.displayName,
+      displayName: resolveDisplayName(
+        params.account.displayName,
+        params.account.email,
+      ),
       avatarUrl: params.account.profileImageUrl,
     },
   };
+}
+
+function resolveDisplayName(displayName: string | null, email: string): string {
+  const normalizedDisplayName = displayName?.trim();
+
+  if (normalizedDisplayName) {
+    return normalizedDisplayName;
+  }
+
+  const emailName = email.split('@')[0]?.trim();
+
+  if (emailName) {
+    return emailName;
+  }
+
+  return '사용자';
 }
