@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { WorkspaceRole, WorkspaceType } from '@prisma/client';
+import {
+  SubscriptionPlan,
+  SubscriptionStatus,
+  WorkspaceRole,
+  WorkspaceType,
+} from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   CreateFolderParams,
@@ -27,29 +32,45 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async getOrCreatePersonalWorkspaceId(userId: string): Promise<string> {
-    const workspace = await this.prisma.workspace.upsert({
-      where: {
-        ownerUserId_type: {
-          ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
-        },
-      },
-      update: {},
-      create: {
-        name: 'Personal Workspace',
-        type: WorkspaceType.PERSONAL,
-        ownerUserId: userId,
-        users: {
-          create: {
-            userId,
-            role: WorkspaceRole.OWNER,
+    return this.prisma.$transaction(async (tx) => {
+      const workspace = await tx.workspace.upsert({
+        where: {
+          ownerUserId_type: {
+            ownerUserId: userId,
+            type: WorkspaceType.PERSONAL,
           },
         },
-      },
-      select: { id: true },
-    });
+        update: {},
+        create: {
+          name: 'Personal Workspace',
+          type: WorkspaceType.PERSONAL,
+          ownerUserId: userId,
+          users: {
+            create: {
+              userId,
+              role: WorkspaceRole.OWNER,
+            },
+          },
+        },
+        select: { id: true },
+      });
 
-    return workspace.id;
+      await tx.subscription.upsert({
+        where: {
+          workspaceId: workspace.id,
+        },
+        update: {},
+        create: {
+          workspaceId: workspace.id,
+          plan: SubscriptionPlan.FREE,
+          status: SubscriptionStatus.ACTIVE,
+          autoRenew: false,
+          currentPeriodEnd: null,
+        },
+      });
+
+      return workspace.id;
+    });
   }
 
   async findFoldersByWorkspaceId(workspaceId: string): Promise<Folder[]> {
