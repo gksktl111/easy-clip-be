@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AuthProvider as PrismaAuthProvider, Platform } from '@prisma/client';
+import {
+  AuthProvider as PrismaAuthProvider,
+  Platform,
+  SubscriptionPlan,
+  SubscriptionStatus,
+  WorkspaceRole,
+  WorkspaceType,
+} from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
@@ -74,27 +81,53 @@ export class PrismaAuthRepository implements AuthRepository {
   async createUserWithAuthAccount(
     input: CreateAuthAccountInput,
   ): Promise<AuthAccount> {
-    const user = await this.prisma.user.create({
-      data: {
-        authAccounts: {
-          create: {
-            provider: input.provider as PrismaAuthProvider,
-            providerUserId: input.providerUserId,
-            email: input.email,
-            displayName: this.resolveDisplayName(
-              input.displayName,
-              input.email,
-            ),
-            profileImageUrl: input.profileImageUrl ?? null,
+    const resolvedDisplayName = this.resolveDisplayName(
+      input.displayName,
+      input.email,
+    );
+
+    const account = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          authAccounts: {
+            create: {
+              provider: input.provider as PrismaAuthProvider,
+              providerUserId: input.providerUserId,
+              email: input.email,
+              displayName: resolvedDisplayName,
+              profileImageUrl: input.profileImageUrl ?? null,
+            },
           },
         },
-      },
-      include: {
-        authAccounts: true,
-      },
-    });
+        include: {
+          authAccounts: true,
+        },
+      });
 
-    const account = user.authAccounts[0];
+      await tx.workspace.create({
+        data: {
+          name: 'Personal Workspace',
+          type: WorkspaceType.PERSONAL,
+          ownerUserId: user.id,
+          users: {
+            create: {
+              userId: user.id,
+              role: WorkspaceRole.OWNER,
+            },
+          },
+          subscription: {
+            create: {
+              plan: SubscriptionPlan.FREE,
+              status: SubscriptionStatus.ACTIVE,
+              autoRenew: false,
+              currentPeriodEnd: null,
+            },
+          },
+        },
+      });
+
+      return user.authAccounts[0];
+    });
 
     return this.mapAuthAccount(account);
   }

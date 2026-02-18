@@ -1,0 +1,75 @@
+@baseUrl = http://localhost:3000
+# 액세스 토큰을 입력하세요
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxyb2IzZW4wMDAwZ2RheXNzaHY0ZTFxIiwiYWNjb3VudElkIjoiY21scm9iM2VuMDAwMWdkYXl2OGtmYTM1MSIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzcxMzk3NDU0LCJleHAiOjE3NzEzOTgzNTQsImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.SIdlhVjqDe0qTqpCn-7KAI9uFWh4mh3aNqMdRoeHxpo
+
+
+############################################################
+# Workspace Subscription API Test (#34)
+# - GET /workspaces/me/subscription
+# - PATCH /workspaces/me/subscription
+############################################################
+
+### 1) 내 워크스페이스 구독 상태 조회
+GET {{baseUrl}}/workspaces/me/subscription
+Authorization: Bearer {{accessToken}}
+
+### 2) PRO 업그레이드 (CHANGE_PLAN)
+PATCH {{baseUrl}}/workspaces/me/subscription
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "CHANGE_PLAN",
+  "plan": "PRO"
+}
+
+### 3) 해지 예약 (CANCEL)
+# 조건: 현재 상태가 PRO + ACTIVE 여야 함
+PATCH {{baseUrl}}/workspaces/me/subscription
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "CANCEL"
+}
+
+### 4) 해지 예약 취소/재개 (RESUME)
+# 조건: 현재 상태가 PRO + CANCELED 여야 함
+PATCH {{baseUrl}}/workspaces/me/subscription
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "RESUME"
+}
+
+### 5) FREE로 변경 (CHANGE_PLAN)
+PATCH {{baseUrl}}/workspaces/me/subscription
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "CHANGE_PLAN",
+  "plan": "FREE"
+}
+
+### 6) 잘못된 요청 예시 (BAD_REQUEST)
+# CANCEL/RESUME 요청에는 plan을 보내면 안 됨
+PATCH {{baseUrl}}/workspaces/me/subscription
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "CANCEL",
+  "plan": "PRO"
+}
+
+### 7) 충돌 요청 예시 (CONFLICT)
+# FREE 상태에서 CANCEL 요청
+PATCH {{baseUrl}}/workspaces/me/subscription
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "CANCEL"
+}
