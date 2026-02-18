@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { ConfigModule } from '@nestjs/config';
 import { FoldersModule } from './folders/folders.module';
 import { ClipsModule } from './clips/clips.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ClipsModule } from './clips/clips.module';
     UsersModule,
     FoldersModule,
     ClipsModule,
+    WorkspacesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
