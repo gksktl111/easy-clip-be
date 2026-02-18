@@ -22,15 +22,15 @@ enum Theme {
 
 // 구독 플랜
 enum SubscriptionPlan {
+  FREE
   PRO
-  TEAM
 }
 
 // 구독 상태
 enum SubscriptionStatus {
   ACTIVE
   CANCELED
-  PAST_DUE
+  EXPIRED
 }
 
 enum WorkspaceType {
@@ -160,12 +160,13 @@ model UserSettings {
 
 model Subscription {
   id        String             @id @default(cuid())
-  // 구독 row가 없으면 무료로 간주한다.
-  plan      SubscriptionPlan
+  // 개인 워크스페이스는 구독 row를 항상 가진다.
+  plan      SubscriptionPlan   @default(FREE)
   status    SubscriptionStatus @default(ACTIVE)
+  autoRenew Boolean            @default(false)
 
   startedAt DateTime @default(now())
-  expiresAt DateTime?
+  currentPeriodEnd DateTime?
 
   workspaceId String @unique
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
