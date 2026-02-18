@@ -50,7 +50,7 @@ describe('UpdateMySubscriptionUseCase', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
-  it('CHANGE_PLAN PRO는 FREE에서 PRO_RENEWING 상태로 변경한다', async () => {
+  it('CHANGE_PLAN PRO는 FREE에서 ACTIVE(autoRenew=true) 상태로 변경한다', async () => {
     const repo = createRepository();
     const updatedPeriodEnd = new Date('2099-01-01T00:00:00.000Z');
 

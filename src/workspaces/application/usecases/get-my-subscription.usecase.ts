@@ -2,9 +2,8 @@ import { WorkspacesRepository } from '../../domain/workspaces.repository';
 import {
   MySubscriptionResponse,
   WorkspaceSubscription,
-  WorkspaceSubscriptionPlan,
-  WorkspaceSubscriptionStatus,
 } from '../../domain/workspace.types';
+import { normalizeExpiredSubscription } from '../policies/subscription-expiration.policy';
 
 export class GetMySubscriptionUseCase {
   constructor(private readonly workspacesRepository: WorkspacesRepository) {}
@@ -15,34 +14,12 @@ export class GetMySubscriptionUseCase {
         userId,
       );
 
-    const normalizedSubscription =
-      await this.expireIfPastPeriodEnd(currentSubscription);
+    const normalizedSubscription = await normalizeExpiredSubscription(
+      this.workspacesRepository,
+      currentSubscription,
+    );
 
     return this.toResponse(normalizedSubscription);
-  }
-
-  private async expireIfPastPeriodEnd(subscription: WorkspaceSubscription) {
-    if (!this.isCanceledSubscriptionExpired(subscription)) {
-      return subscription;
-    }
-
-    return this.workspacesRepository.updateWorkspaceSubscription(
-      subscription.id,
-      {
-        plan: WorkspaceSubscriptionPlan.FREE,
-        status: WorkspaceSubscriptionStatus.EXPIRED,
-        autoRenew: false,
-      },
-    );
-  }
-
-  private isCanceledSubscriptionExpired(subscription: WorkspaceSubscription) {
-    return (
-      subscription.plan === WorkspaceSubscriptionPlan.PRO &&
-      subscription.status === WorkspaceSubscriptionStatus.CANCELED &&
-      subscription.currentPeriodEnd !== null &&
-      subscription.currentPeriodEnd <= new Date()
-    );
   }
 
   private toResponse(

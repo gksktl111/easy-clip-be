@@ -7,6 +7,7 @@ import {
   WorkspaceSubscriptionPlan,
   WorkspaceSubscriptionStatus,
 } from '../../domain/workspace.types';
+import { normalizeExpiredSubscription } from '../policies/subscription-expiration.policy';
 import { WorkspacesError } from '../workspaces.error';
 
 const DEFAULT_PRO_BILLING_DAYS = 30;
@@ -25,8 +26,10 @@ export class UpdateMySubscriptionUseCase {
         userId,
       );
 
-    const normalizedSubscription =
-      await this.expireIfPastPeriodEnd(currentSubscription);
+    const normalizedSubscription = await normalizeExpiredSubscription(
+      this.workspacesRepository,
+      currentSubscription,
+    );
 
     switch (input.type) {
       case WorkspaceSubscriptionAction.CHANGE_PLAN:
@@ -165,30 +168,6 @@ export class UpdateMySubscriptionUseCase {
     );
 
     return this.toResponse(updated);
-  }
-
-  private async expireIfPastPeriodEnd(subscription: WorkspaceSubscription) {
-    if (!this.isCanceledSubscriptionExpired(subscription)) {
-      return subscription;
-    }
-
-    return this.workspacesRepository.updateWorkspaceSubscription(
-      subscription.id,
-      {
-        plan: WorkspaceSubscriptionPlan.FREE,
-        status: WorkspaceSubscriptionStatus.EXPIRED,
-        autoRenew: false,
-      },
-    );
-  }
-
-  private isCanceledSubscriptionExpired(subscription: WorkspaceSubscription) {
-    return (
-      subscription.plan === WorkspaceSubscriptionPlan.PRO &&
-      subscription.status === WorkspaceSubscriptionStatus.CANCELED &&
-      subscription.currentPeriodEnd !== null &&
-      subscription.currentPeriodEnd <= new Date()
-    );
   }
 
   private resolveCurrentPeriodEnd(currentPeriodEnd: Date | null): Date {
