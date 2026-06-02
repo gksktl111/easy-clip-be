@@ -1,15 +1,16 @@
-export type WorkspacesErrorCode =
-  | 'BAD_REQUEST'
-  | 'NOT_FOUND'
-  | 'CONFLICT'
-  | 'INTERNAL';
+import {
+  ApplicationError,
+  ApplicationErrorCode,
+} from '../../common/application/application.error';
 
-export class WorkspacesError extends Error {
-  constructor(
-    public readonly code: WorkspacesErrorCode,
-    message: string,
-  ) {
-    super(message);
+export type WorkspacesErrorCode = Extract<
+  ApplicationErrorCode,
+  'BAD_REQUEST' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL'
+>;
+
+export class WorkspacesError extends ApplicationError {
+  constructor(code: WorkspacesErrorCode, message: string) {
+    super(code, message);
     this.name = 'WorkspacesError';
   }
 }

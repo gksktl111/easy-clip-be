@@ -1,11 +1,16 @@
-export type UsersErrorCode = 'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL';
+import {
+  ApplicationError,
+  ApplicationErrorCode,
+} from '../../common/application/application.error';
 
-export class UsersError extends Error {
-  constructor(
-    public readonly code: UsersErrorCode,
-    message: string,
-  ) {
-    super(message);
+export type UsersErrorCode = Extract<
+  ApplicationErrorCode,
+  'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL'
+>;
+
+export class UsersError extends ApplicationError {
+  constructor(code: UsersErrorCode, message: string) {
+    super(code, message);
     this.name = 'UsersError';
   }
 }

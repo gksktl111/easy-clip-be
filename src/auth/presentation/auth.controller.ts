@@ -1,19 +1,15 @@
 import {
-  BadRequestException,
   Body,
-  ConflictException,
   Controller,
-  ForbiddenException,
   Get,
-  InternalServerErrorException,
-  NotFoundException,
   Post,
   Request,
-  UnauthorizedException,
   UseGuards,
+  UseFilters,
 } from '@nestjs/common';
 import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
 import { Request as ExpressRequest } from 'express';
+import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
 import { SwitchUserDto } from './dtos/switch-user.dto';
 import { JwtAccessGuard } from './guards/jwt-access-token.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh-token.guard';
@@ -22,7 +18,6 @@ import { LinkAccountUseCase } from '../application/usecases/link-account.usecase
 import { SwitchUserUseCase } from '../application/usecases/switch-user.usecase';
 import { RefreshAccessTokenUseCase } from '../application/usecases/refresh-access-token.usecase';
 import { LogoutUseCase } from '../application/usecases/logout.usecase';
-import { AuthError } from '../application/auth.error';
 import { AuthContext } from '../application/auth-context';
 import { OAuthUser } from '../domain/auth.types';
 
@@ -31,6 +26,7 @@ interface OAuthRequest extends ExpressRequest {
 }
 
 @Controller('auth')
+@UseFilters(ApplicationExceptionFilter)
 export class AuthController {
   constructor(
     private readonly signInUseCase: SignInUseCase,
@@ -71,7 +67,7 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(PassportAuthGuard('google'))
   googleCallback(@Request() req: OAuthRequest) {
-    return this.run(() => this.handleOAuthCallback(req.user));
+    return this.handleOAuthCallback(req.user);
   }
 
   /* ======================================================
@@ -105,7 +101,7 @@ export class AuthController {
   @Get('github/callback')
   @UseGuards(PassportAuthGuard('github'))
   githubCallback(@Request() req: OAuthRequest) {
-    return this.run(() => this.handleOAuthCallback(req.user));
+    return this.handleOAuthCallback(req.user);
   }
 
   /* ======================================================
@@ -122,12 +118,10 @@ export class AuthController {
     @Request() req: { user: AuthContext },
     @Body() switchUserDto: SwitchUserDto,
   ) {
-    return this.run(() =>
-      this.switchUserUseCase.execute(
-        req.user.userId,
-        switchUserDto.authAccountId,
-        req.user.platform,
-      ),
+    return this.switchUserUseCase.execute(
+      req.user.userId,
+      switchUserDto.authAccountId,
+      req.user.platform,
     );
   }
 
@@ -144,9 +138,7 @@ export class AuthController {
       refreshToken: string;
     },
   ) {
-    return this.run(() =>
-      this.refreshAccessTokenUseCase.execute(req.user, req.refreshToken),
-    );
+    return this.refreshAccessTokenUseCase.execute(req.user, req.refreshToken);
   }
 
   /**
@@ -156,9 +148,7 @@ export class AuthController {
   @UseGuards(JwtAccessGuard)
   @Post('logout')
   logout(@Request() req: { user: AuthContext }) {
-    return this.run(() =>
-      this.logoutUseCase.execute(req.user.accountId, req.user.platform),
-    );
+    return this.logoutUseCase.execute(req.user.accountId, req.user.platform);
   }
 
   private handleOAuthCallback(oauthUser: OAuthUser) {
@@ -167,33 +157,5 @@ export class AuthController {
     }
 
     return this.signInUseCase.execute(oauthUser);
-  }
-
-  private async run<T>(action: () => Promise<T>): Promise<T> {
-    try {
-      return await action();
-    } catch (error) {
-      if (error instanceof AuthError) {
-        throw this.toHttpException(error);
-      }
-      throw error;
-    }
-  }
-
-  private toHttpException(error: AuthError) {
-    switch (error.code) {
-      case 'BAD_REQUEST':
-        return new BadRequestException(error.message);
-      case 'UNAUTHORIZED':
-        return new UnauthorizedException(error.message);
-      case 'FORBIDDEN':
-        return new ForbiddenException(error.message);
-      case 'NOT_FOUND':
-        return new NotFoundException(error.message);
-      case 'CONFLICT':
-        return new ConflictException(error.message);
-      default:
-        return new InternalServerErrorException(error.message);
-    }
   }
 }

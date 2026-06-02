@@ -1,11 +1,16 @@
-export type FoldersErrorCode = 'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL';
+import {
+  ApplicationError,
+  ApplicationErrorCode,
+} from '../../common/application/application.error';
 
-export class FoldersError extends Error {
-  constructor(
-    public readonly code: FoldersErrorCode,
-    message: string,
-  ) {
-    super(message);
+export type FoldersErrorCode = Extract<
+  ApplicationErrorCode,
+  'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL'
+>;
+
+export class FoldersError extends ApplicationError {
+  constructor(code: FoldersErrorCode, message: string) {
+    super(code, message);
     this.name = 'FoldersError';
   }
 }
