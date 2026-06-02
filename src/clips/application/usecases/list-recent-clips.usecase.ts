@@ -1,9 +1,11 @@
+import { Inject, Injectable } from '@nestjs/common';
 import {
+  CLIPS_REPOSITORY,
   ClipSearchTarget,
   ClipTypeFilter,
-  ClipsRepository,
 } from '../../domain/clips.repository';
 import { ClipType, RecentClipItem } from '../../domain/clip.types';
+import type { ClipsRepository } from '../../domain/clips.repository';
 import { ClipsError } from '../clips.error';
 import {
   LIST_CLIPS_LIMIT,
@@ -18,8 +20,12 @@ export type ListRecentClipsInput = {
   q?: string;
 };
 
+@Injectable()
 export class ListRecentClipsUseCase {
-  constructor(private readonly clipsRepository: ClipsRepository) {}
+  constructor(
+    @Inject(CLIPS_REPOSITORY)
+    private readonly clipsRepository: ClipsRepository,
+  ) {}
 
   async execute(userId: string, input: ListRecentClipsInput) {
     const cursor = normalizeCursor(input.cursor);

@@ -1,9 +1,11 @@
+import { Inject, Injectable } from '@nestjs/common';
 import { ClipType } from '../../domain/clip.types';
 import {
+  CLIPS_REPOSITORY,
   ClipSearchTarget,
   ClipTypeFilter,
-  ClipsRepository,
 } from '../../domain/clips.repository';
+import type { ClipsRepository } from '../../domain/clips.repository';
 import { ClipsError } from '../clips.error';
 import {
   LIST_CLIPS_LIMIT,
@@ -18,8 +20,12 @@ export type ListFavoriteClipsInput = {
   q?: string;
 };
 
+@Injectable()
 export class ListFavoriteClipsUseCase {
-  constructor(private readonly clipsRepository: ClipsRepository) {}
+  constructor(
+    @Inject(CLIPS_REPOSITORY)
+    private readonly clipsRepository: ClipsRepository,
+  ) {}
 
   async execute(userId: string, input: ListFavoriteClipsInput) {
     const cursor = normalizeCursor(input.cursor);

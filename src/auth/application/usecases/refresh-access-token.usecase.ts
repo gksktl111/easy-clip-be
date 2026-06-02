@@ -1,11 +1,17 @@
+import { Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { AuthRepository } from '../../domain/auth.repository';
+import { AUTH_REPOSITORY } from '../../domain/auth.repository';
+import type { AuthRepository } from '../../domain/auth.repository';
 import { AuthContext } from '../auth-context';
 import { AuthError } from '../auth.error';
 import { AccessTokenResult } from '../auth.types';
 
+@Injectable()
 export class RefreshAccessTokenUseCase {
-  constructor(private readonly authRepository: AuthRepository) {}
+  constructor(
+    @Inject(AUTH_REPOSITORY)
+    private readonly authRepository: AuthRepository,
+  ) {}
 
   async execute(
     context: AuthContext,

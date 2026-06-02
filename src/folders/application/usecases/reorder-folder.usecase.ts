@@ -1,4 +1,6 @@
-import { FoldersRepository } from '../../domain/folders.repository';
+import { Inject, Injectable } from '@nestjs/common';
+import { FOLDERS_REPOSITORY } from '../../domain/folders.repository';
+import type { FoldersRepository } from '../../domain/folders.repository';
 import { FoldersError } from '../folders.error';
 
 export type ReorderFolderInput = {
@@ -7,8 +9,12 @@ export type ReorderFolderInput = {
   beforeId?: string;
 };
 
+@Injectable()
 export class ReorderFolderUseCase {
-  constructor(private readonly foldersRepository: FoldersRepository) {}
+  constructor(
+    @Inject(FOLDERS_REPOSITORY)
+    private readonly foldersRepository: FoldersRepository,
+  ) {}
 
   async execute(userId: string, input: ReorderFolderInput) {
     const { targetId, afterId, beforeId } = input;

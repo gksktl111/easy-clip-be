@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import { ClipTypeFilter } from '../../domain/clips.repository';
 import { ClipsError } from '../clips.error';
 import { ListFavoriteClipsUseCase } from './list-favorite-clips.usecase';
@@ -13,6 +14,7 @@ export type ListClipsFacadeInput = {
   recent?: boolean;
 };
 
+@Injectable()
 export class ListClipsControllerFacade {
   constructor(
     private readonly listFolderClips: ListFolderClipsUseCase,

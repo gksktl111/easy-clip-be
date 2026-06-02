@@ -1,11 +1,17 @@
-import { AuthRepository } from '../../domain/auth.repository';
+import { Inject, Injectable } from '@nestjs/common';
+import { AUTH_REPOSITORY } from '../../domain/auth.repository';
+import type { AuthRepository } from '../../domain/auth.repository';
 import { AuthError } from '../auth.error';
 import { OAuthSignInResult } from '../auth.types';
 import { OAuthUser } from '../../domain/auth.types';
 import { issueAuthResult } from '../policies/auth-result.policy';
 
+@Injectable()
 export class LinkAccountUseCase {
-  constructor(private readonly authRepository: AuthRepository) {}
+  constructor(
+    @Inject(AUTH_REPOSITORY)
+    private readonly authRepository: AuthRepository,
+  ) {}
 
   async execute(oauthUser: OAuthUser): Promise<OAuthSignInResult> {
     if (!oauthUser.currentUserId) {
