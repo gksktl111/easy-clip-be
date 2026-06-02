@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { AuthContext } from '../auth-context';
-import { AuthError } from '../auth.error';
+import { AuthError } from '../errors/auth.error';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AccessTokenResult } from '../auth.types';

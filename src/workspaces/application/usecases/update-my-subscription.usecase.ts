@@ -10,7 +10,7 @@ import {
   WorkspaceSubscriptionStatus,
 } from '../../domain/workspace.types';
 import { normalizeExpiredSubscription } from '../policies/subscription-expiration.policy';
-import { WorkspacesError } from '../workspaces.error';
+import { WorkspacesError } from '../errors/workspaces.error';
 
 const DEFAULT_PRO_BILLING_DAYS = 30;
 

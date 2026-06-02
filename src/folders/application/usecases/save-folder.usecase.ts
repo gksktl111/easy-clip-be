@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { FOLDERS_REPOSITORY } from '../../domain/folders.repository';
 import type { FoldersRepository } from '../../domain/folders.repository';
-import { FoldersError } from '../folders.error';
+import { FoldersError } from '../errors/folders.error';
 
 export type SaveFolderInput =
   | {

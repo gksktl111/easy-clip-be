@@ -6,7 +6,7 @@ import {
 } from '../../domain/clips.repository';
 import { ClipType, RecentClipItem } from '../../domain/clip.types';
 import type { ClipsRepository } from '../../domain/clips.repository';
-import { ClipsError } from '../clips.error';
+import { ClipsError } from '../errors/clips.error';
 import {
   LIST_CLIPS_LIMIT,
   buildRecentPage,

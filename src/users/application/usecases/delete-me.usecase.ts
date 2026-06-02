@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { USERS_REPOSITORY } from '../../domain/users.repository';
 import type { UsersRepository } from '../../domain/users.repository';
-import { UsersError } from '../users.error';
+import { UsersError } from '../errors/users.error';
 
 @Injectable()
 export class DeleteMeUseCase {

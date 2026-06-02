@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ClipTypeFilter } from '../../domain/clips.repository';
-import { ClipsError } from '../clips.error';
+import { ClipsError } from '../errors/clips.error';
 import { ListFavoriteClipsUseCase } from './list-favorite-clips.usecase';
 import { ListFolderClipsUseCase } from './list-folder-clips.usecase';
 import { ListRecentClipsUseCase } from './list-recent-clips.usecase';

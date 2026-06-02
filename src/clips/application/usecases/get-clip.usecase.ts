@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
-import { ClipsError } from '../clips.error';
+import { ClipsError } from '../errors/clips.error';
 
 @Injectable()
 export class GetClipUseCase {

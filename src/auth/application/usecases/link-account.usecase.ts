@@ -3,7 +3,7 @@ import { AUTH_REPOSITORY } from '../../domain/auth.repository';
 import type { AuthRepository } from '../../domain/auth.repository';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
-import { AuthError } from '../auth.error';
+import { AuthError } from '../errors/auth.error';
 import { OAuthSignInResult } from '../auth.types';
 import { OAuthUser } from '../../domain/auth.types';
 import { issueAuthResult } from '../policies/auth-result.policy';

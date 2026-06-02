@@ -5,7 +5,7 @@ import {
 } from '../../domain/users.repository';
 import type { UsersRepository } from '../../domain/users.repository';
 import { mapMeResponse } from '../policies/map-me-response.policy';
-import { UsersError } from '../users.error';
+import { UsersError } from '../errors/users.error';
 
 export type UpdateMeInput = {
   displayName?: string | null;

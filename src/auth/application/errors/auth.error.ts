@@ -1,7 +1,7 @@
 import {
   ApplicationError,
   ApplicationErrorCode,
-} from '../../common/application/application.error';
+} from '../../../common/application/application.error';
 
 export type AuthErrorCode = ApplicationErrorCode;
 

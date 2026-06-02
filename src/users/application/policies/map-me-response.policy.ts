@@ -1,5 +1,5 @@
 import { UserProfile, UserWithAuthAccounts } from '../../domain/user.types';
-import { UsersError } from '../users.error';
+import { UsersError } from '../errors/users.error';
 
 export function mapMeResponse(
   user: UserWithAuthAccounts,
