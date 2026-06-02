@@ -8,11 +8,15 @@ import {
 } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
+  toAuthAccount,
+  resolveDisplayName,
+} from './mappers/auth-account.mapper';
+import { AuthAccount } from '../domain/auth-account.entity';
+import {
   AuthRepository,
   CreateAuthAccountInput,
   UserInfo,
 } from '../domain/auth.repository';
-import { AuthAccount } from '../domain/auth-account.entity';
 import { AuthProvider } from '../domain/auth.types';
 
 @Injectable()
@@ -32,7 +36,7 @@ export class PrismaAuthRepository implements AuthRepository {
       },
     });
 
-    return account ? this.mapAuthAccount(account) : null;
+    return account ? toAuthAccount(account) : null;
   }
 
   async findAccountById(accountId: string): Promise<AuthAccount | null> {
@@ -40,7 +44,7 @@ export class PrismaAuthRepository implements AuthRepository {
       where: { id: accountId },
     });
 
-    return account ? this.mapAuthAccount(account) : null;
+    return account ? toAuthAccount(account) : null;
   }
 
   async findUserById(userId: string): Promise<UserInfo | null> {
@@ -70,7 +74,7 @@ export class PrismaAuthRepository implements AuthRepository {
   async createUserWithAuthAccount(
     input: CreateAuthAccountInput,
   ): Promise<AuthAccount> {
-    const resolvedDisplayName = this.resolveDisplayName(
+    const resolvedDisplayName = resolveDisplayName(
       input.displayName,
       input.email,
     );
@@ -118,7 +122,7 @@ export class PrismaAuthRepository implements AuthRepository {
       return user.authAccounts[0];
     });
 
-    return this.mapAuthAccount(account);
+    return toAuthAccount(account);
   }
 
   async createAuthAccountForUser(
@@ -131,53 +135,11 @@ export class PrismaAuthRepository implements AuthRepository {
         provider: input.provider as PrismaAuthProvider,
         providerUserId: input.providerUserId,
         email: input.email,
-        displayName: this.resolveDisplayName(input.displayName, input.email),
+        displayName: resolveDisplayName(input.displayName, input.email),
         profileImageUrl: input.profileImageUrl ?? null,
       },
     });
 
-    return this.mapAuthAccount(account);
-  }
-
-  private mapAuthAccount(account: {
-    id: string;
-    userId: string;
-    provider: PrismaAuthProvider;
-    providerUserId: string;
-    email: string;
-    displayName: string | null;
-    profileImageUrl: string | null;
-  }): AuthAccount {
-    return {
-      id: account.id,
-      userId: account.userId,
-      provider: account.provider as AuthProvider,
-      providerUserId: account.providerUserId,
-      email: account.email,
-      displayName: this.resolveDisplayName(
-        account.displayName ?? undefined,
-        account.email,
-      ),
-      profileImageUrl: account.profileImageUrl,
-    };
-  }
-
-  private resolveDisplayName(
-    displayName: string | undefined,
-    email: string,
-  ): string {
-    const normalizedDisplayName = displayName?.trim();
-
-    if (normalizedDisplayName) {
-      return normalizedDisplayName;
-    }
-
-    const emailName = email.split('@')[0]?.trim();
-
-    if (emailName) {
-      return emailName;
-    }
-
-    return '사용자';
+    return toAuthAccount(account);
   }
 }
