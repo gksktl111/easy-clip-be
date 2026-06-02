@@ -1,14 +1,7 @@
-import { AuthContext } from '../application/auth-context';
 import { AuthAccount } from './auth-account.entity';
-import { AuthPlatform, AuthProvider } from './auth.types';
+import { AuthProvider } from './auth.types';
 
 export const AUTH_REPOSITORY = Symbol('AUTH_REPOSITORY');
-
-export type RefreshTokenSession = {
-  tokenHash: string;
-  revokedAt: Date | null;
-  expiresAt: Date;
-};
 
 export type CreateAuthAccountInput = {
   provider: AuthProvider;
@@ -20,11 +13,6 @@ export type CreateAuthAccountInput = {
 
 export type UserInfo = {
   id: string;
-};
-
-export type IssuedTokens = {
-  accessToken: string;
-  refreshToken: string;
 };
 
 export interface AuthRepository {
@@ -42,14 +30,4 @@ export interface AuthRepository {
     userId: string,
     input: CreateAuthAccountInput,
   ): Promise<AuthAccount>;
-  issueTokens(context: AuthContext): Promise<IssuedTokens>;
-  signAccessToken(context: AuthContext): string;
-  findRefreshTokenSession(
-    authAccountId: string,
-    platform: AuthPlatform,
-  ): Promise<RefreshTokenSession | null>;
-  revokeRefreshTokens(
-    authAccountId: string,
-    platform: AuthPlatform,
-  ): Promise<void>;
 }

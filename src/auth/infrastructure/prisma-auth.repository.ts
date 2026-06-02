@@ -1,34 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import {
   AuthProvider as PrismaAuthProvider,
-  Platform,
   SubscriptionPlan,
   SubscriptionStatus,
   WorkspaceRole,
   WorkspaceType,
 } from '@prisma/client';
-import { createHash } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   AuthRepository,
   CreateAuthAccountInput,
-  IssuedTokens,
-  RefreshTokenSession,
   UserInfo,
 } from '../domain/auth.repository';
 import { AuthAccount } from '../domain/auth-account.entity';
-import { AuthContext } from '../application/auth-context';
-import { AuthPlatform, AuthProvider } from '../domain/auth.types';
+import { AuthProvider } from '../domain/auth.types';
 
 @Injectable()
 export class PrismaAuthRepository implements AuthRepository {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAccountByProvider(
     provider: AuthProvider,
@@ -150,101 +139,6 @@ export class PrismaAuthRepository implements AuthRepository {
     return this.mapAuthAccount(account);
   }
 
-  async issueTokens(context: AuthContext): Promise<IssuedTokens> {
-    const accessToken = this.signAccessToken(context);
-    const refreshToken = this.signRefreshToken(context);
-    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
-
-    const verified = await this.jwtService.verifyAsync<{ exp: number }>(
-      refreshToken,
-      {
-        secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
-        audience: 'refresh',
-        issuer: 'easy-clip',
-      },
-    );
-
-    const expiresAt = new Date(verified.exp * 1000);
-
-    await this.prisma.refreshToken.upsert({
-      where: {
-        authAccountId_platform: {
-          authAccountId: context.accountId,
-          platform: context.platform as Platform,
-        },
-      },
-      update: {
-        tokenHash,
-        revokedAt: null,
-        expiresAt,
-      },
-      create: {
-        userId: context.userId,
-        authAccountId: context.accountId,
-        platform: context.platform as Platform,
-        tokenHash,
-        expiresAt,
-      },
-    });
-
-    return { accessToken, refreshToken };
-  }
-
-  signAccessToken(context: AuthContext): string {
-    return this.jwtService.sign(this.toJwtPayload(context), {
-      secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
-      expiresIn: '15m',
-      audience: 'api',
-      issuer: 'easy-clip',
-    });
-  }
-
-  private signRefreshToken(context: AuthContext): string {
-    return this.jwtService.sign(this.toJwtPayload(context), {
-      secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
-      expiresIn: '14d',
-      audience: 'refresh',
-      issuer: 'easy-clip',
-    });
-  }
-
-  async findRefreshTokenSession(
-    authAccountId: string,
-    platform: AuthPlatform,
-  ): Promise<RefreshTokenSession | null> {
-    const session = await this.prisma.refreshToken.findUnique({
-      where: {
-        authAccountId_platform: {
-          authAccountId,
-          platform: platform as Platform,
-        },
-      },
-      select: {
-        tokenHash: true,
-        revokedAt: true,
-        expiresAt: true,
-      },
-    });
-
-    return session ?? null;
-  }
-
-  async revokeRefreshTokens(
-    authAccountId: string,
-    platform: AuthPlatform,
-  ): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
-      where: {
-        authAccountId,
-        platform: platform as Platform,
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: new Date(),
-      },
-    });
-  }
-
   private mapAuthAccount(account: {
     id: string;
     userId: string;
@@ -285,13 +179,5 @@ export class PrismaAuthRepository implements AuthRepository {
     }
 
     return '사용자';
-  }
-
-  private toJwtPayload(context: AuthContext) {
-    return {
-      sub: context.userId,
-      accountId: context.accountId,
-      platform: context.platform,
-    };
   }
 }

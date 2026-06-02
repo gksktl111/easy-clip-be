@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { SignInUseCase } from './sign-in.usecase';
-import { AuthRepository } from '../../domain/auth.repository';
+import type { AuthRepository } from '../../domain/auth.repository';
+import type { AuthSessionPort } from '../ports/auth-session.port';
 import { OAuthUser } from '../../domain/auth.types';
 
 const createRepository = (): jest.Mocked<AuthRepository> => ({
@@ -10,6 +11,9 @@ const createRepository = (): jest.Mocked<AuthRepository> => ({
   findUserByAuthEmail: jest.fn(),
   createUserWithAuthAccount: jest.fn(),
   createAuthAccountForUser: jest.fn(),
+});
+
+const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
   signAccessToken: jest.fn(),
   findRefreshTokenSession: jest.fn(),
@@ -30,7 +34,8 @@ const createOAuthUser = (overrides: Partial<OAuthUser> = {}): OAuthUser => ({
 describe('SignInUseCase', () => {
   it('이메일이 없으면 BAD_REQUEST 오류를 반환한다', async () => {
     const repo = createRepository();
-    const usecase = new SignInUseCase(repo);
+    const sessionPort = createSessionPort();
+    const usecase = new SignInUseCase(repo, sessionPort);
 
     await expect(
       usecase.execute(createOAuthUser({ email: null })),
@@ -39,6 +44,7 @@ describe('SignInUseCase', () => {
 
   it('기존 계정이 있으면 토큰을 발급한다', async () => {
     const repo = createRepository();
+    const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue({
       id: 'account-id',
       userId: 'user-id',
@@ -48,15 +54,15 @@ describe('SignInUseCase', () => {
       displayName: 'Test User',
       profileImageUrl: 'https://example.com/avatar.png',
     });
-    repo.issueTokens.mockResolvedValue({
+    sessionPort.issueTokens.mockResolvedValue({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
     });
 
-    const usecase = new SignInUseCase(repo);
+    const usecase = new SignInUseCase(repo, sessionPort);
     const result = await usecase.execute(createOAuthUser());
 
-    expect(repo.issueTokens).toHaveBeenCalledWith({
+    expect(sessionPort.issueTokens).toHaveBeenCalledWith({
       userId: 'user-id',
       accountId: 'account-id',
       platform: 'WEB',
@@ -76,10 +82,11 @@ describe('SignInUseCase', () => {
 
   it('동일 이메일 사용자가 있으면 CONFLICT 오류를 반환한다', async () => {
     const repo = createRepository();
+    const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue(null);
     repo.findUserByAuthEmail.mockResolvedValue({ id: 'user-id' });
 
-    const usecase = new SignInUseCase(repo);
+    const usecase = new SignInUseCase(repo, sessionPort);
 
     await expect(usecase.execute(createOAuthUser())).rejects.toMatchObject({
       code: 'CONFLICT',
@@ -88,6 +95,7 @@ describe('SignInUseCase', () => {
 
   it('신규 계정이면 계정을 생성하고 토큰을 발급한다', async () => {
     const repo = createRepository();
+    const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue(null);
     repo.findUserByAuthEmail.mockResolvedValue(null);
     repo.createUserWithAuthAccount.mockResolvedValue({
@@ -99,12 +107,12 @@ describe('SignInUseCase', () => {
       displayName: 'user',
       profileImageUrl: null,
     });
-    repo.issueTokens.mockResolvedValue({
+    sessionPort.issueTokens.mockResolvedValue({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
     });
 
-    const usecase = new SignInUseCase(repo);
+    const usecase = new SignInUseCase(repo, sessionPort);
     const result = await usecase.execute(createOAuthUser());
 
     expect(repo.createUserWithAuthAccount).toHaveBeenCalled();

@@ -9,11 +9,13 @@ import { JwtAccessGuard } from './presentation/guards/jwt-access-token.guard';
 import { JwtRefreshGuard } from './presentation/guards/jwt-refresh-token.guard';
 import { AUTH_REPOSITORY } from './domain/auth.repository';
 import { PrismaAuthRepository } from './infrastructure/prisma-auth.repository';
+import { AUTH_SESSION_PORT } from './application/ports/auth-session.port';
 import { SignInUseCase } from './application/usecases/sign-in.usecase';
 import { LinkAccountUseCase } from './application/usecases/link-account.usecase';
 import { SwitchUserUseCase } from './application/usecases/switch-user.usecase';
 import { RefreshAccessTokenUseCase } from './application/usecases/refresh-access-token.usecase';
 import { LogoutUseCase } from './application/usecases/logout.usecase';
+import { JwtAuthSessionPort } from './infrastructure/jwt-auth-session.port';
 
 @Module({
   imports: [
@@ -28,6 +30,7 @@ import { LogoutUseCase } from './application/usecases/logout.usecase';
   controllers: [AuthController],
   providers: [
     { provide: AUTH_REPOSITORY, useClass: PrismaAuthRepository },
+    { provide: AUTH_SESSION_PORT, useClass: JwtAuthSessionPort },
     SignInUseCase,
     LinkAccountUseCase,
     SwitchUserUseCase,

@@ -1,14 +1,8 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { LogoutUseCase } from './logout.usecase';
-import { AuthRepository } from '../../domain/auth.repository';
+import type { AuthSessionPort } from '../ports/auth-session.port';
 
-const createRepository = (): jest.Mocked<AuthRepository> => ({
-  findAccountByProvider: jest.fn(),
-  findAccountById: jest.fn(),
-  findUserById: jest.fn(),
-  findUserByAuthEmail: jest.fn(),
-  createUserWithAuthAccount: jest.fn(),
-  createAuthAccountForUser: jest.fn(),
+const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
   signAccessToken: jest.fn(),
   findRefreshTokenSession: jest.fn(),
@@ -17,13 +11,16 @@ const createRepository = (): jest.Mocked<AuthRepository> => ({
 
 describe('LogoutUseCase', () => {
   it('리프레시 토큰을 폐기하고 성공을 반환한다', async () => {
-    const repo = createRepository();
-    repo.revokeRefreshTokens.mockResolvedValue();
+    const sessionPort = createSessionPort();
+    sessionPort.revokeRefreshTokens.mockResolvedValue();
 
-    const usecase = new LogoutUseCase(repo);
+    const usecase = new LogoutUseCase(sessionPort);
     const result = await usecase.execute('account-id', 'WEB');
 
-    expect(repo.revokeRefreshTokens).toHaveBeenCalledWith('account-id', 'WEB');
+    expect(sessionPort.revokeRefreshTokens).toHaveBeenCalledWith(
+      'account-id',
+      'WEB',
+    );
     expect(result).toEqual({ success: true });
   });
 });

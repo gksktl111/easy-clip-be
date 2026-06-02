@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AUTH_REPOSITORY } from '../../domain/auth.repository';
 import type { AuthRepository } from '../../domain/auth.repository';
+import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
+import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AuthError } from '../auth.error';
 import { OAuthSignInResult } from '../auth.types';
 import { OAuthUser } from '../../domain/auth.types';
@@ -11,6 +13,8 @@ export class SignInUseCase {
   constructor(
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: AuthRepository,
+    @Inject(AUTH_SESSION_PORT)
+    private readonly authSessionPort: AuthSessionPort,
   ) {}
 
   async execute(oauthUser: OAuthUser): Promise<OAuthSignInResult> {
@@ -27,7 +31,7 @@ export class SignInUseCase {
     );
 
     if (existingAccount) {
-      return issueAuthResult(this.authRepository, {
+      return issueAuthResult(this.authSessionPort, {
         userId: existingAccount.userId,
         account: existingAccount,
         platform: oauthUser.platform,
@@ -53,7 +57,7 @@ export class SignInUseCase {
       profileImageUrl: oauthUser.avatarUrl ?? null,
     });
 
-    return issueAuthResult(this.authRepository, {
+    return issueAuthResult(this.authSessionPort, {
       userId: newAccount.userId,
       account: newAccount,
       platform: oauthUser.platform,
