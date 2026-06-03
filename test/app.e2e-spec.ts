@@ -14,8 +14,8 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue({
-        onModuleInit: async () => undefined,
-        onModuleDestroy: async () => undefined,
+        onModuleInit: () => Promise.resolve(),
+        onModuleDestroy: () => Promise.resolve(),
       })
       .compile();
 
@@ -24,9 +24,8 @@ describe('AppController (e2e)', () => {
   });
 
   it('/ (GET)', () => {
-    return request(app.getHttpAdapter().getInstance())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+    const instance = app.getHttpAdapter().getInstance() as unknown as App;
+
+    return request(instance).get('/').expect(200).expect('Hello World!');
   });
 });
