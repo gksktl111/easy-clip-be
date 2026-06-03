@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
+import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
 import { GetMySubscriptionUseCase } from './application/usecases/get-my-subscription.usecase';
 import { UpdateMySubscriptionUseCase } from './application/usecases/update-my-subscription.usecase';
 import { WORKSPACES_REPOSITORY } from './domain/workspaces.repository';

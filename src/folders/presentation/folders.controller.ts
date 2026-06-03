@@ -10,8 +10,8 @@ import {
   UseGuards,
   UseFilters,
 } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
-import { AuthContext } from 'src/auth/application/auth-context';
+import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { AuthContext } from 'src/common/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
 import { CreateFolderDto } from './dtos/create-folder.dto';
 import { ReorderFolderDto } from './dtos/reorder-folder.dto';

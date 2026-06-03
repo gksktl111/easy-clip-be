@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AuthPlatform } from '../../domain/auth.types';
+import { AuthPlatform } from 'src/common/types/auth-platform.type';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { LogoutResult } from '../auth.types';

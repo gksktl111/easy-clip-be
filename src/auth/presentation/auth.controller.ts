@@ -9,16 +9,16 @@ import {
 } from '@nestjs/common';
 import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
 import { Request as ExpressRequest } from 'express';
+import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { AuthContext } from 'src/common/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
 import { SwitchUserDto } from './dtos/switch-user.dto';
-import { JwtAccessGuard } from './guards/jwt-access-token.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh-token.guard';
 import { SignInUseCase } from '../application/usecases/sign-in.usecase';
 import { LinkAccountUseCase } from '../application/usecases/link-account.usecase';
 import { SwitchUserUseCase } from '../application/usecases/switch-user.usecase';
 import { RefreshAccessTokenUseCase } from '../application/usecases/refresh-access-token.usecase';
 import { LogoutUseCase } from '../application/usecases/logout.usecase';
-import { AuthContext } from '../application/auth-context';
 import { OAuthUser } from '../domain/auth.types';
 
 interface OAuthRequest extends ExpressRequest {

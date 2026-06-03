@@ -1,4 +1,4 @@
-import type { AuthProvider } from 'src/auth/domain/auth.types';
+import type { AuthProvider } from 'src/common/types/auth-provider.type';
 
 export const USER_THEMES = ['LIGHT', 'DARK', 'SYSTEM'] as const;
 export type UserTheme = (typeof USER_THEMES)[number];

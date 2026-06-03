@@ -15,8 +15,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
-import { AuthContext } from 'src/auth/application/auth-context';
+import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { AuthContext } from 'src/common/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';

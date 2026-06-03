@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
+import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
 import { AuthController } from './presentation/auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { GoogleStrategy } from './presentation/strategies/google.strategy';
 import { GithubStrategy } from './presentation/strategies/github.strategy';
-import { JwtAccessGuard } from './presentation/guards/jwt-access-token.guard';
 import { JwtRefreshGuard } from './presentation/guards/jwt-refresh-token.guard';
 import { AUTH_REPOSITORY } from './domain/auth.repository';
 import { PrismaAuthRepository } from './infrastructure/prisma-auth.repository';

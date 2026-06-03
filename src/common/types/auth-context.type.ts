@@ -1,6 +1,4 @@
-// src/auth/application/auth-context.ts
-
-import { AuthPlatform } from '../domain/auth.types';
+import { AuthPlatform } from './auth-platform.type';
 
 export type AuthContext = {
   userId: string;

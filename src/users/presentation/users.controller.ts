@@ -8,8 +8,8 @@ import {
   UseGuards,
   UseFilters,
 } from '@nestjs/common';
-import { AuthContext } from 'src/auth/application/auth-context';
-import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
+import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { AuthContext } from 'src/common/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
 import { GetMeUseCase } from '../application/usecases/get-me.usecase';
 import { UpdateMeUseCase } from '../application/usecases/update-me.usecase';

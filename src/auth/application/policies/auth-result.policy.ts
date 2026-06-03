@@ -1,4 +1,4 @@
-import { AuthContext } from '../auth-context';
+import { AuthContext } from 'src/common/types/auth-context.type';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { OAuthSignInResult } from '../auth.types';
 

@@ -5,7 +5,7 @@ import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AuthError } from '../errors/auth.error';
 import { OAuthSignInResult } from '../auth.types';
-import { AuthPlatform } from '../../domain/auth.types';
+import { AuthPlatform } from 'src/common/types/auth-platform.type';
 import { issueAuthResult } from '../policies/auth-result.policy';
 
 @Injectable()

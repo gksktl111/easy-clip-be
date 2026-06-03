@@ -1,6 +1,6 @@
 import type { AuthProvider as PrismaAuthProvider } from '@prisma/client';
+import type { AuthProvider } from 'src/common/types/auth-provider.type';
 import type { AuthAccount } from '../../domain/auth-account.entity';
-import type { AuthProvider } from '../../domain/auth.types';
 
 type AuthAccountRecord = {
   id: string;

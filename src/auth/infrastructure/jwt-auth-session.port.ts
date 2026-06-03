@@ -4,13 +4,13 @@ import { JwtService } from '@nestjs/jwt';
 import { Platform } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import type { AuthContext } from '../application/auth-context';
+import type { AuthContext } from 'src/common/types/auth-context.type';
 import type {
   AuthSessionPort,
   IssuedTokens,
   RefreshTokenSession,
 } from '../application/ports/auth-session.port';
-import type { AuthPlatform } from '../domain/auth.types';
+import type { AuthPlatform } from 'src/common/types/auth-platform.type';
 
 @Injectable()
 export class JwtAuthSessionPort implements AuthSessionPort {

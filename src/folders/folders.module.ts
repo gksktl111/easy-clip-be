@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
+import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
 import { FoldersController } from './presentation/folders.controller';
 import { FOLDERS_REPOSITORY } from './domain/folders.repository';
 import { PrismaFoldersRepository } from './infrastructure/prisma-folders.repository';
