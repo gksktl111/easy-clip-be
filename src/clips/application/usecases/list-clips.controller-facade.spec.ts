@@ -110,6 +110,7 @@ describe('ListClipsControllerFacade', () => {
       createFacade();
     listFavoriteClips.execute.mockResolvedValue({
       items: [],
+      hasMore: false,
       nextCursor: null,
     });
 
