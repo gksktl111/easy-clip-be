@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { LinkAccountUseCase } from './link-account.usecase';
-import { AuthRepository } from '../../domain/auth.repository';
+import type { AuthRepository } from '../../domain/auth.repository';
+import type { AuthSessionPort } from '../ports/auth-session.port';
 import { OAuthUser } from '../../domain/auth.types';
 
 const createRepository = (): jest.Mocked<AuthRepository> => ({
@@ -10,6 +11,9 @@ const createRepository = (): jest.Mocked<AuthRepository> => ({
   findUserByAuthEmail: jest.fn(),
   createUserWithAuthAccount: jest.fn(),
   createAuthAccountForUser: jest.fn(),
+});
+
+const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
   signAccessToken: jest.fn(),
   findRefreshTokenSession: jest.fn(),
@@ -31,7 +35,8 @@ const createOAuthUser = (overrides: Partial<OAuthUser> = {}): OAuthUser => ({
 describe('LinkAccountUseCase', () => {
   it('로그인이 없으면 FORBIDDEN 오류를 반환한다', async () => {
     const repo = createRepository();
-    const usecase = new LinkAccountUseCase(repo);
+    const sessionPort = createSessionPort();
+    const usecase = new LinkAccountUseCase(repo, sessionPort);
 
     await expect(
       usecase.execute(createOAuthUser({ currentUserId: undefined })),
@@ -40,7 +45,8 @@ describe('LinkAccountUseCase', () => {
 
   it('이메일이 없으면 BAD_REQUEST 오류를 반환한다', async () => {
     const repo = createRepository();
-    const usecase = new LinkAccountUseCase(repo);
+    const sessionPort = createSessionPort();
+    const usecase = new LinkAccountUseCase(repo, sessionPort);
 
     await expect(
       usecase.execute(createOAuthUser({ email: null })),
@@ -49,9 +55,10 @@ describe('LinkAccountUseCase', () => {
 
   it('사용자가 없으면 NOT_FOUND 오류를 반환한다', async () => {
     const repo = createRepository();
+    const sessionPort = createSessionPort();
     repo.findUserById.mockResolvedValue(null);
 
-    const usecase = new LinkAccountUseCase(repo);
+    const usecase = new LinkAccountUseCase(repo, sessionPort);
 
     await expect(usecase.execute(createOAuthUser())).rejects.toMatchObject({
       code: 'NOT_FOUND',
@@ -60,6 +67,7 @@ describe('LinkAccountUseCase', () => {
 
   it('이미 연동된 계정이면 CONFLICT 오류를 반환한다', async () => {
     const repo = createRepository();
+    const sessionPort = createSessionPort();
     repo.findUserById.mockResolvedValue({ id: 'current-user-id' });
     repo.findAccountByProvider.mockResolvedValue({
       id: 'account-id',
@@ -71,7 +79,7 @@ describe('LinkAccountUseCase', () => {
       profileImageUrl: null,
     });
 
-    const usecase = new LinkAccountUseCase(repo);
+    const usecase = new LinkAccountUseCase(repo, sessionPort);
 
     await expect(usecase.execute(createOAuthUser())).rejects.toMatchObject({
       code: 'CONFLICT',
@@ -80,6 +88,7 @@ describe('LinkAccountUseCase', () => {
 
   it('정상적인 요청이면 계정을 생성하고 토큰을 발급한다', async () => {
     const repo = createRepository();
+    const sessionPort = createSessionPort();
     repo.findUserById.mockResolvedValue({ id: 'current-user-id' });
     repo.findAccountByProvider.mockResolvedValue(null);
     repo.createAuthAccountForUser.mockResolvedValue({
@@ -91,12 +100,12 @@ describe('LinkAccountUseCase', () => {
       displayName: 'Link User',
       profileImageUrl: 'https://example.com/avatar.png',
     });
-    repo.issueTokens.mockResolvedValue({
+    sessionPort.issueTokens.mockResolvedValue({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
     });
 
-    const usecase = new LinkAccountUseCase(repo);
+    const usecase = new LinkAccountUseCase(repo, sessionPort);
     const result = await usecase.execute(createOAuthUser());
 
     expect(repo.createAuthAccountForUser).toHaveBeenCalledWith(

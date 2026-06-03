@@ -1,14 +1,20 @@
-import { Theme } from '@prisma/client';
-import { UsersRepository } from '../../domain/users.repository';
-import { UsersError } from '../users.error';
+import { Inject, Injectable } from '@nestjs/common';
+import { USERS_REPOSITORY } from '../../domain/users.repository';
+import type { UsersRepository } from '../../domain/users.repository';
+import type { UserTheme } from '../../domain/user.types';
+import { UsersError } from '../errors/users.error';
 
 export type UpdateUserSettingsInput = {
-  theme?: Theme;
+  theme?: UserTheme;
   language?: string;
 };
 
+@Injectable()
 export class UpdateUserSettingsUseCase {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepository,
+  ) {}
 
   async execute(userId: string, input: UpdateUserSettingsInput) {
     const user = await this.usersRepository.findUserById(userId);

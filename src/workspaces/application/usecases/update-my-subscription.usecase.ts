@@ -1,4 +1,6 @@
-import { WorkspacesRepository } from '../../domain/workspaces.repository';
+import { Inject, Injectable } from '@nestjs/common';
+import { WORKSPACES_REPOSITORY } from '../../domain/workspaces.repository';
+import type { WorkspacesRepository } from '../../domain/workspaces.repository';
 import {
   MySubscriptionResponse,
   UpdateMySubscriptionInput,
@@ -8,12 +10,16 @@ import {
   WorkspaceSubscriptionStatus,
 } from '../../domain/workspace.types';
 import { normalizeExpiredSubscription } from '../policies/subscription-expiration.policy';
-import { WorkspacesError } from '../workspaces.error';
+import { WorkspacesError } from '../errors/workspaces.error';
 
 const DEFAULT_PRO_BILLING_DAYS = 30;
 
+@Injectable()
 export class UpdateMySubscriptionUseCase {
-  constructor(private readonly workspacesRepository: WorkspacesRepository) {}
+  constructor(
+    @Inject(WORKSPACES_REPOSITORY)
+    private readonly workspacesRepository: WorkspacesRepository,
+  ) {}
 
   async execute(
     userId: string,

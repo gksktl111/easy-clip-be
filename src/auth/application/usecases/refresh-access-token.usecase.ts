@@ -1,11 +1,17 @@
+import { Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { AuthRepository } from '../../domain/auth.repository';
-import { AuthContext } from '../auth-context';
-import { AuthError } from '../auth.error';
+import { AuthError } from '../errors/auth.error';
+import { AuthContext } from 'src/common/types/auth-context.type';
+import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
+import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AccessTokenResult } from '../auth.types';
 
+@Injectable()
 export class RefreshAccessTokenUseCase {
-  constructor(private readonly authRepository: AuthRepository) {}
+  constructor(
+    @Inject(AUTH_SESSION_PORT)
+    private readonly authSessionPort: AuthSessionPort,
+  ) {}
 
   async execute(
     context: AuthContext,
@@ -13,7 +19,7 @@ export class RefreshAccessTokenUseCase {
   ): Promise<AccessTokenResult> {
     const { accountId, platform } = context;
 
-    const session = await this.authRepository.findRefreshTokenSession(
+    const session = await this.authSessionPort.findRefreshTokenSession(
       accountId,
       platform,
     );
@@ -38,7 +44,7 @@ export class RefreshAccessTokenUseCase {
       throw new AuthError('UNAUTHORIZED', '리프레쉬 토큰이 일치하지 않습니다.');
     }
 
-    const accessToken = this.authRepository.signAccessToken(context);
+    const accessToken = this.authSessionPort.signAccessToken(context);
 
     return { access_token: accessToken };
   }

@@ -1,5 +1,7 @@
-import { FoldersRepository } from '../../domain/folders.repository';
-import { FoldersError } from '../folders.error';
+import { Inject, Injectable } from '@nestjs/common';
+import { FOLDERS_REPOSITORY } from '../../domain/folders.repository';
+import type { FoldersRepository } from '../../domain/folders.repository';
+import { FoldersError } from '../errors/folders.error';
 
 export type GetFolderInput =
   | {
@@ -10,8 +12,12 @@ export type GetFolderInput =
       mode: 'list';
     };
 
+@Injectable()
 export class GetFolderUseCase {
-  constructor(private readonly repo: FoldersRepository) {}
+  constructor(
+    @Inject(FOLDERS_REPOSITORY)
+    private readonly repo: FoldersRepository,
+  ) {}
 
   async execute(userId: string, input: GetFolderInput) {
     switch (input.mode) {

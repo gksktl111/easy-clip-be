@@ -1,10 +1,10 @@
-import { Theme } from '@prisma/client';
-import { IsEnum, IsIn, IsOptional } from 'class-validator';
+import { IsIn, IsOptional } from 'class-validator';
+import { USER_THEMES, type UserTheme } from '../../domain/user.types';
 
 export class UpdateUserSettingsDto {
   @IsOptional()
-  @IsEnum(Theme)
-  theme?: Theme;
+  @IsIn(USER_THEMES)
+  theme?: UserTheme;
 
   @IsOptional()
   @IsIn(['ko', 'en'])

@@ -1,9 +1,15 @@
-import { UsersRepository } from '../../domain/users.repository';
+import { Inject, Injectable } from '@nestjs/common';
+import { USERS_REPOSITORY } from '../../domain/users.repository';
+import type { UsersRepository } from '../../domain/users.repository';
 import { mapMeResponse } from '../policies/map-me-response.policy';
-import { UsersError } from '../users.error';
+import { UsersError } from '../errors/users.error';
 
+@Injectable()
 export class GetMeUseCase {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepository,
+  ) {}
 
   async execute(userId: string, accountId: string) {
     const user = await this.usersRepository.findUserWithAuthAccounts(userId);

@@ -1,17 +1,23 @@
+import { Inject, Injectable } from '@nestjs/common';
 import {
+  USERS_REPOSITORY,
   UpdateAuthAccountProfileParams,
-  UsersRepository,
 } from '../../domain/users.repository';
+import type { UsersRepository } from '../../domain/users.repository';
 import { mapMeResponse } from '../policies/map-me-response.policy';
-import { UsersError } from '../users.error';
+import { UsersError } from '../errors/users.error';
 
 export type UpdateMeInput = {
   displayName?: string | null;
   avatarUrl?: string | null;
 };
 
+@Injectable()
 export class UpdateMeUseCase {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepository,
+  ) {}
 
   async execute(userId: string, accountId: string, input: UpdateMeInput) {
     const user = await this.usersRepository.findUserWithAuthAccounts(userId);

@@ -1,11 +1,21 @@
-import { AuthRepository } from '../../domain/auth.repository';
-import { AuthError } from '../auth.error';
+import { Inject, Injectable } from '@nestjs/common';
+import { AUTH_REPOSITORY } from '../../domain/auth.repository';
+import type { AuthRepository } from '../../domain/auth.repository';
+import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
+import type { AuthSessionPort } from '../ports/auth-session.port';
+import { AuthError } from '../errors/auth.error';
 import { OAuthSignInResult } from '../auth.types';
-import { AuthPlatform } from '../../domain/auth.types';
+import { AuthPlatform } from 'src/common/types/auth-platform.type';
 import { issueAuthResult } from '../policies/auth-result.policy';
 
+@Injectable()
 export class SwitchUserUseCase {
-  constructor(private readonly authRepository: AuthRepository) {}
+  constructor(
+    @Inject(AUTH_REPOSITORY)
+    private readonly authRepository: AuthRepository,
+    @Inject(AUTH_SESSION_PORT)
+    private readonly authSessionPort: AuthSessionPort,
+  ) {}
 
   async execute(
     currentUserId: string,
@@ -23,7 +33,7 @@ export class SwitchUserUseCase {
       throw new AuthError('FORBIDDEN', '연동되지 않은 계정입니다.');
     }
 
-    return issueAuthResult(this.authRepository, {
+    return issueAuthResult(this.authSessionPort, {
       userId: targetAccount.userId,
       account: targetAccount,
       platform,

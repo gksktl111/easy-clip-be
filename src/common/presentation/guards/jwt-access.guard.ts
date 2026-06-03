@@ -4,11 +4,11 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-import { ConfigService } from '@nestjs/config';
-import { AuthContext } from 'src/auth/application/auth-context';
-import { AuthPlatform } from 'src/auth/domain/auth.types';
+import { AuthContext } from 'src/common/types/auth-context.type';
+import { AuthPlatform } from 'src/common/types/auth-platform.type';
 
 type JwtClaims = {
   sub: string;
@@ -19,8 +19,8 @@ type JwtClaims = {
 @Injectable()
 export class JwtAccessGuard implements CanActivate {
   constructor(
-    private jwtService: JwtService,
-    private config: ConfigService,
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

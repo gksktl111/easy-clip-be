@@ -1,5 +1,7 @@
-import { FoldersRepository } from '../../domain/folders.repository';
-import { FoldersError } from '../folders.error';
+import { Inject, Injectable } from '@nestjs/common';
+import { FOLDERS_REPOSITORY } from '../../domain/folders.repository';
+import type { FoldersRepository } from '../../domain/folders.repository';
+import { FoldersError } from '../errors/folders.error';
 
 export type SaveFolderInput =
   | {
@@ -12,8 +14,12 @@ export type SaveFolderInput =
       name?: string;
     };
 
+@Injectable()
 export class SaveFolderUseCase {
-  constructor(private readonly foldersRepository: FoldersRepository) {}
+  constructor(
+    @Inject(FOLDERS_REPOSITORY)
+    private readonly foldersRepository: FoldersRepository,
+  ) {}
 
   async execute(userId: string, input: SaveFolderInput) {
     if (input.mode === 'create') {
