@@ -1,14 +1,8 @@
 // src/auth/domain/auth.types.ts
-export const AuthProvider = {
-  GOOGLE: 'GOOGLE',
-  GITHUB: 'GITHUB',
-} as const;
-
-export type AuthProvider = (typeof AuthProvider)[keyof typeof AuthProvider];
+import { AuthPlatform } from 'src/common/types/auth-platform.type';
+import { AuthProvider } from 'src/common/types/auth-provider.type';
 
 export type OAuthMode = 'login' | 'link';
-
-export type AuthPlatform = 'WEB' | 'APP';
 
 export type OAuthUser = {
   provider: AuthProvider;

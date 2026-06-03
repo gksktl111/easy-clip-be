@@ -1,12 +1,9 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   HttpCode,
-  InternalServerErrorException,
-  NotFoundException,
   Param,
   Patch,
   Post,
@@ -14,11 +11,13 @@ import {
   Request,
   UploadedFile,
   UseGuards,
+  UseFilters,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { JwtAccessGuard } from 'src/auth/presentation/guards/jwt-access-token.guard';
-import { AuthContext } from 'src/auth/application/auth-context';
+import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { AuthContext } from 'src/common/types/auth-context.type';
+import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
@@ -28,7 +27,6 @@ import { SaveClipUseCase } from '../application/usecases/save-clip.usecase';
 import { ListClipsControllerFacade } from '../application/usecases/list-clips.controller-facade';
 import { LikeClipUseCase } from '../application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
-import { ClipsError } from '../application/clips.error';
 import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
 
@@ -54,6 +52,7 @@ import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recen
 // - Clip은 Interaction을 모르도록 의존성 단방향 유지
 
 @Controller('clips')
+@UseFilters(ApplicationExceptionFilter)
 export class ClipsController {
   constructor(
     private readonly saveClipUseCase: SaveClipUseCase,
@@ -73,29 +72,25 @@ export class ClipsController {
     @Request() req: { user: AuthContext },
     @Query() query: ListClipsQueryDto,
   ) {
-    return this.run(() =>
-      this.listClipsFacade.execute(req.user.userId, {
-        ...query,
-        favorite: query.favorite === 'true',
-        recent: query.recent === 'true',
-      }),
-    );
+    return this.listClipsFacade.execute(req.user.userId, {
+      ...query,
+      favorite: query.favorite === 'true',
+      recent: query.recent === 'true',
+    });
   }
 
   // 최근 조회한 클립 50개를 최신순으로 조회한다.
   @Get('views/recent')
   @UseGuards(JwtAccessGuard)
   getRecentViewedClips(@Request() req: { user: AuthContext }) {
-    return this.run(() =>
-      this.listRecentViewedClipsUseCase.execute(req.user.userId),
-    );
+    return this.listRecentViewedClipsUseCase.execute(req.user.userId);
   }
 
   // 삭제되지 않은 내 클립을 단건으로 조회한다.
   @Get(':id')
   @UseGuards(JwtAccessGuard)
   getClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.run(() => this.getClipUseCase.execute(req.user.userId, id));
+    return this.getClipUseCase.execute(req.user.userId, id);
   }
 
   // multipart 입력에서 file 우선 규칙으로 타입을 판별해 클립을 생성한다.
@@ -107,15 +102,13 @@ export class ClipsController {
     @Body() dto: CreateClipDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.run(() =>
-      this.saveClipUseCase.execute(
-        req.user.userId,
-        {
-          mode: 'create',
-          ...dto,
-        },
-        file,
-      ),
+    return this.saveClipUseCase.execute(
+      req.user.userId,
+      {
+        mode: 'create',
+        ...dto,
+      },
+      file,
     );
   }
 
@@ -129,16 +122,14 @@ export class ClipsController {
     @Body() dto: UpdateClipDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.run(() =>
-      this.saveClipUseCase.execute(
-        req.user.userId,
-        {
-          mode: 'update',
-          clipId: id,
-          ...dto,
-        },
-        file,
-      ),
+    return this.saveClipUseCase.execute(
+      req.user.userId,
+      {
+        mode: 'update',
+        clipId: id,
+        ...dto,
+      },
+      file,
     );
   }
 
@@ -146,7 +137,7 @@ export class ClipsController {
   @Delete(':id')
   @UseGuards(JwtAccessGuard)
   deleteClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.run(() => this.deleteClipUseCase.execute(req.user.userId, id));
+    return this.deleteClipUseCase.execute(req.user.userId, id);
   }
 
   // 클립 조회 이벤트를 기록한다.
@@ -157,44 +148,20 @@ export class ClipsController {
     @Request() req: { user: AuthContext },
     @Param('id') id: string,
   ) {
-    return this.run(() =>
-      this.recordClipViewUseCase.execute(req.user.userId, id),
-    );
+    return this.recordClipViewUseCase.execute(req.user.userId, id);
   }
 
   // 클립에 좋아요를 등록한다.
   @Post(':id/likes')
   @UseGuards(JwtAccessGuard)
   likeClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.run(() => this.likeClipUseCase.execute(req.user.userId, id));
+    return this.likeClipUseCase.execute(req.user.userId, id);
   }
 
   // 클립 좋아요를 취소한다.
   @Delete(':id/likes')
   @UseGuards(JwtAccessGuard)
   unlikeClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.run(() => this.unlikeClipUseCase.execute(req.user.userId, id));
-  }
-
-  private async run<T>(action: () => Promise<T>): Promise<T> {
-    try {
-      return await action();
-    } catch (error) {
-      if (error instanceof ClipsError) {
-        throw this.toHttpException(error);
-      }
-      throw error;
-    }
-  }
-
-  private toHttpException(error: ClipsError) {
-    switch (error.code) {
-      case 'BAD_REQUEST':
-        return new BadRequestException(error.message);
-      case 'NOT_FOUND':
-        return new NotFoundException(error.message);
-      default:
-        return new InternalServerErrorException(error.message);
-    }
+    return this.unlikeClipUseCase.execute(req.user.userId, id);
   }
 }

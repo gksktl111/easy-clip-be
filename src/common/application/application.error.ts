@@ -1,4 +1,4 @@
-export type AuthErrorCode =
+export type ApplicationErrorCode =
   | 'BAD_REQUEST'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
@@ -6,12 +6,12 @@ export type AuthErrorCode =
   | 'CONFLICT'
   | 'INTERNAL';
 
-export class AuthError extends Error {
+export class ApplicationError extends Error {
   constructor(
-    public readonly code: AuthErrorCode,
+    public readonly code: ApplicationErrorCode,
     message: string,
   ) {
     super(message);
-    this.name = 'AuthError';
+    this.name = 'ApplicationError';
   }
 }

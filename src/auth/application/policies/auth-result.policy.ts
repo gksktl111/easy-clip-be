@@ -1,9 +1,9 @@
-import { AuthContext } from '../auth-context';
+import { AuthContext } from 'src/common/types/auth-context.type';
+import type { AuthSessionPort } from '../ports/auth-session.port';
 import { OAuthSignInResult } from '../auth.types';
-import { AuthRepository } from 'src/auth/domain/auth.repository';
 
 export async function issueAuthResult(
-  authRepository: AuthRepository,
+  authSessionPort: AuthSessionPort,
   params: {
     userId: string;
     account: {
@@ -21,7 +21,7 @@ export async function issueAuthResult(
     platform: params.platform,
   };
 
-  const tokens = await authRepository.issueTokens(context);
+  const tokens = await authSessionPort.issueTokens(context);
 
   return {
     access_token: tokens.accessToken,

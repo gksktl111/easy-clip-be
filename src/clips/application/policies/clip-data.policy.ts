@@ -1,5 +1,5 @@
 import { ClipType } from '../../domain/clip.types';
-import { ClipsError } from '../clips.error';
+import { ClipsError } from '../errors/clips.error';
 import { DetectedClip, detectClipType } from './clip-type-detector';
 
 export type ClipData = {

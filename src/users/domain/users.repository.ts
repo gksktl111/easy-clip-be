@@ -1,8 +1,8 @@
-import { Theme } from '@prisma/client';
 import {
   UserAuthAccount,
   UserSettings,
   UserSummary,
+  UserTheme,
   UserWithAuthAccounts,
 } from './user.types';
 
@@ -14,7 +14,7 @@ export type UpdateAuthAccountProfileParams = {
 };
 
 export type UpdateUserSettingsParams = {
-  theme?: Theme;
+  theme?: UserTheme;
   language?: string;
 };
 

@@ -1,5 +1,7 @@
-import { ClipsRepository } from '../../domain/clips.repository';
-import { ClipsError } from '../clips.error';
+import { Inject, Injectable } from '@nestjs/common';
+import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
+import type { ClipsRepository } from '../../domain/clips.repository';
+import { ClipsError } from '../errors/clips.error';
 import { resolveClipData } from '../policies/clip-data.policy';
 
 export type SaveClipInput =
@@ -15,8 +17,12 @@ export type SaveClipInput =
       text?: string;
     };
 
+@Injectable()
 export class SaveClipUseCase {
-  constructor(private readonly clipsRepository: ClipsRepository) {}
+  constructor(
+    @Inject(CLIPS_REPOSITORY)
+    private readonly clipsRepository: ClipsRepository,
+  ) {}
 
   async execute(
     userId: string,
