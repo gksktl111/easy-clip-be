@@ -1,19 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ClipType } from '../../domain/clip.types';
 import {
   CLIPS_REPOSITORY,
-  ClipSearchTarget,
   ClipTypeFilter,
 } from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
-import { ClipsError } from '../errors/clips.error';
 import {
   LIST_CLIPS_LIMIT,
   buildPage,
   normalizeCursor,
   normalizeType,
 } from './list-clips.common';
-import { resolveClipSearchTarget } from './list-clips.policy';
+import {
+  resolveClipSearchTarget,
+  validateClipCursor,
+} from './list-clips.policy';
 
 export type ListFavoriteClipsInput = {
   cursor?: string;
@@ -41,12 +41,14 @@ export class ListFavoriteClipsUseCase {
     });
 
     if (cursor) {
-      await this.validateCursor({
+      await validateClipCursor({
+        clipsRepository: this.clipsRepository,
         userId,
         cursor,
         type,
         q: query,
         searchTarget,
+        likedOnly: true,
       });
     }
 
@@ -62,65 +64,5 @@ export class ListFavoriteClipsUseCase {
       }),
       LIST_CLIPS_LIMIT,
     );
-  }
-
-  private async validateCursor({
-    userId,
-    cursor,
-    type,
-    q,
-    searchTarget,
-  }: {
-    userId: string;
-    cursor: string;
-    type?: ClipType;
-    q?: string;
-    searchTarget?: ClipSearchTarget;
-  }) {
-    const cursorClip = await this.clipsRepository.findClipByIdForUser(
-      userId,
-      cursor,
-    );
-
-    if (!cursorClip) {
-      throw new ClipsError(
-        'NOT_FOUND',
-        '커서에 해당하는 클립을 찾을 수 없습니다.',
-      );
-    }
-
-    if (type && cursorClip.type !== type) {
-      throw new ClipsError(
-        'NOT_FOUND',
-        '커서에 해당하는 클립을 찾을 수 없습니다.',
-      );
-    }
-
-    const liked = await this.clipsRepository.isClipLikedByUser(userId, cursor);
-
-    if (!liked) {
-      throw new ClipsError(
-        'NOT_FOUND',
-        '커서에 해당하는 클립을 찾을 수 없습니다.',
-      );
-    }
-
-    if (q && searchTarget) {
-      const matches = await this.clipsRepository.isClipMatchingQuery({
-        userId,
-        type,
-        q,
-        searchTarget,
-        likedOnly: true,
-        clipId: cursor,
-      });
-
-      if (!matches) {
-        throw new ClipsError(
-          'NOT_FOUND',
-          '커서에 해당하는 클립을 찾을 수 없습니다.',
-        );
-      }
-    }
   }
 }

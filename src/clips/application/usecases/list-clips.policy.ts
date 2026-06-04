@@ -12,6 +12,7 @@ import {
   buildPage,
   buildRecentPage,
 } from './list-clips.common';
+import { ClipsError } from '../errors/clips.error';
 
 type ResolveSearchTargetParams = {
   userId: string;
@@ -41,6 +42,73 @@ export const resolveClipSearchTarget = async (
   });
 
   return hasTitleMatches ? 'title' : 'tag';
+};
+
+type ValidateClipCursorParams = {
+  clipsRepository: ClipsRepository;
+  userId: string;
+  cursor: string | undefined;
+  type?: ClipType;
+  q?: string;
+  searchTarget?: ClipSearchTarget;
+  folderId?: string;
+  workspaceId?: string;
+  likedOnly?: boolean;
+};
+
+export const validateClipCursor = async ({
+  clipsRepository,
+  userId,
+  cursor,
+  type,
+  q,
+  searchTarget,
+  folderId,
+  workspaceId,
+  likedOnly,
+}: ValidateClipCursorParams): Promise<boolean | null> => {
+  if (!cursor) {
+    return null;
+  }
+
+  const cursorClip = await clipsRepository.findClipByIdForUser(userId, cursor);
+
+  if (!cursorClip) {
+    throwCursorNotFound();
+  }
+
+  if (folderId && cursorClip.folderId !== folderId) {
+    throwCursorNotFound();
+  }
+
+  if (type && cursorClip.type !== type) {
+    throwCursorNotFound();
+  }
+
+  const liked = await clipsRepository.isClipLikedByUser(userId, cursor);
+
+  if (likedOnly === true && !liked) {
+    throwCursorNotFound();
+  }
+
+  if (q && searchTarget) {
+    const matches = await clipsRepository.isClipMatchingQuery({
+      userId,
+      folderId,
+      workspaceId,
+      type,
+      q,
+      searchTarget,
+      likedOnly,
+      clipId: cursor,
+    });
+
+    if (!matches) {
+      throwCursorNotFound();
+    }
+  }
+
+  return liked;
 };
 
 export const resolveRecentClipSearchTarget = async (
@@ -256,3 +324,7 @@ const stripRecentViewId = (items: RecentClipItem[]): ClipListItem[] => {
     return rest;
   });
 };
+
+function throwCursorNotFound(): never {
+  throw new ClipsError('NOT_FOUND', '커서에 해당하는 클립을 찾을 수 없습니다.');
+}

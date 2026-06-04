@@ -1,8 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ClipType } from '../../domain/clip.types';
 import {
   CLIPS_REPOSITORY,
-  ClipSearchTarget,
   ClipTypeFilter,
 } from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
@@ -11,6 +9,7 @@ import { normalizeCursor, normalizeType } from './list-clips.common';
 import {
   listClipsWithLikedPriority,
   resolveClipSearchTarget,
+  validateClipCursor,
 } from './list-clips.policy';
 
 export type ListFolderClipsInput = {
@@ -50,7 +49,8 @@ export class ListFolderClipsUseCase {
       likedOnly: undefined,
     });
 
-    const cursorLiked = await this.validateCursor({
+    const cursorLiked = await validateClipCursor({
+      clipsRepository: this.clipsRepository,
       userId,
       cursor,
       folderId: folder.id,
@@ -58,6 +58,7 @@ export class ListFolderClipsUseCase {
       type,
       q: query,
       searchTarget,
+      likedOnly: undefined,
     });
 
     return listClipsWithLikedPriority({
@@ -71,68 +72,5 @@ export class ListFolderClipsUseCase {
       q: query,
       searchTarget,
     });
-  }
-
-  private async validateCursor({
-    userId,
-    cursor,
-    folderId,
-    workspaceId,
-    type,
-    q,
-    searchTarget,
-  }: {
-    userId: string;
-    cursor: string | undefined;
-    folderId: string;
-    workspaceId: string;
-    type?: ClipType;
-    q?: string;
-    searchTarget?: ClipSearchTarget;
-  }) {
-    if (!cursor) {
-      return null;
-    }
-
-    const cursorClip = await this.clipsRepository.findClipByIdForUser(
-      userId,
-      cursor,
-    );
-
-    if (!cursorClip || cursorClip.folderId !== folderId) {
-      throw new ClipsError(
-        'NOT_FOUND',
-        '커서에 해당하는 클립을 찾을 수 없습니다.',
-      );
-    }
-
-    if (type && cursorClip.type !== type) {
-      throw new ClipsError(
-        'NOT_FOUND',
-        '커서에 해당하는 클립을 찾을 수 없습니다.',
-      );
-    }
-
-    if (q && searchTarget) {
-      const matches = await this.clipsRepository.isClipMatchingQuery({
-        userId,
-        folderId,
-        workspaceId,
-        type,
-        q,
-        searchTarget,
-        likedOnly: undefined,
-        clipId: cursor,
-      });
-
-      if (!matches) {
-        throw new ClipsError(
-          'NOT_FOUND',
-          '커서에 해당하는 클립을 찾을 수 없습니다.',
-        );
-      }
-    }
-
-    return this.clipsRepository.isClipLikedByUser(userId, cursor);
   }
 }
