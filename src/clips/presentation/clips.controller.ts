@@ -21,7 +21,6 @@ import { ApplicationExceptionFilter } from 'src/common/presentation/filters/appl
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
-import { GetClipUseCase } from '../application/usecases/get-clip.usecase';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
 import { SaveClipUseCase } from '../application/usecases/save-clip.usecase';
 import { ListClipsControllerFacade } from '../application/usecases/list-clips.controller-facade';
@@ -56,7 +55,6 @@ import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recen
 export class ClipsController {
   constructor(
     private readonly saveClipUseCase: SaveClipUseCase,
-    private readonly getClipUseCase: GetClipUseCase,
     private readonly deleteClipUseCase: DeleteClipUseCase,
     private readonly listClipsFacade: ListClipsControllerFacade,
     private readonly likeClipUseCase: LikeClipUseCase,
@@ -84,13 +82,6 @@ export class ClipsController {
   @UseGuards(JwtAccessGuard)
   getRecentViewedClips(@Request() req: { user: AuthContext }) {
     return this.listRecentViewedClipsUseCase.execute(req.user.userId);
-  }
-
-  // 삭제되지 않은 내 클립을 단건으로 조회한다.
-  @Get(':id')
-  @UseGuards(JwtAccessGuard)
-  getClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.getClipUseCase.execute(req.user.userId, id);
   }
 
   // multipart 입력에서 file 우선 규칙으로 타입을 판별해 클립을 생성한다.

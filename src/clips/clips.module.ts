@@ -3,7 +3,6 @@ import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard'
 import { ClipsController } from './presentation/clips.controller';
 import { CLIPS_REPOSITORY } from './domain/clips.repository';
 import { PrismaClipsRepository } from './infrastructure/prisma-clips.repository';
-import { GetClipUseCase } from './application/usecases/get-clip.usecase';
 import { DeleteClipUseCase } from './application/usecases/delete-clip.usecase';
 import { SaveClipUseCase } from './application/usecases/save-clip.usecase';
 import { ListFavoriteClipsUseCase } from './application/usecases/list-favorite-clips.usecase';
@@ -20,7 +19,6 @@ import { ListRecentViewedClipsUseCase } from './application/usecases/list-recent
   providers: [
     { provide: CLIPS_REPOSITORY, useClass: PrismaClipsRepository },
     SaveClipUseCase,
-    GetClipUseCase,
     ListFolderClipsUseCase,
     ListFavoriteClipsUseCase,
     ListRecentClipsUseCase,
