@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   UpdateAuthAccountProfileParams,
@@ -95,7 +94,6 @@ export class PrismaUsersRepository implements UsersRepository {
       const ownedPersonalWorkspaces = await tx.workspace.findMany({
         where: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
         select: { id: true },
       });

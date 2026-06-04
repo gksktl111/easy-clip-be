@@ -4,8 +4,6 @@ import {
   AuthProvider as PrismaAuthProvider,
   SubscriptionPlan,
   SubscriptionStatus,
-  WorkspaceRole,
-  WorkspaceType,
 } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
@@ -100,14 +98,7 @@ export class PrismaAuthRepository implements AuthRepository {
       await tx.workspace.create({
         data: {
           name: 'Personal Workspace',
-          type: WorkspaceType.PERSONAL,
           ownerUserId: user.id,
-          users: {
-            create: {
-              userId: user.id,
-              role: WorkspaceRole.OWNER,
-            },
-          },
           subscription: {
             create: {
               plan: SubscriptionPlan.FREE,

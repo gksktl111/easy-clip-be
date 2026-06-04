@@ -1,10 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  SubscriptionPlan,
-  SubscriptionStatus,
-  WorkspaceRole,
-  WorkspaceType,
-} from '@prisma/client';
+import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   CreateFolderParams,
@@ -20,10 +15,7 @@ export class PrismaFoldersRepository implements FoldersRepository {
   async findPersonalWorkspaceId(userId: string): Promise<string | null> {
     const workspace = await this.prisma.workspace.findUnique({
       where: {
-        ownerUserId_type: {
-          ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
-        },
+        ownerUserId: userId,
       },
       select: { id: true },
     });
@@ -35,22 +27,12 @@ export class PrismaFoldersRepository implements FoldersRepository {
     return this.prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.upsert({
         where: {
-          ownerUserId_type: {
-            ownerUserId: userId,
-            type: WorkspaceType.PERSONAL,
-          },
+          ownerUserId: userId,
         },
         update: {},
         create: {
           name: 'Personal Workspace',
-          type: WorkspaceType.PERSONAL,
           ownerUserId: userId,
-          users: {
-            create: {
-              userId,
-              role: WorkspaceRole.OWNER,
-            },
-          },
         },
         select: { id: true },
       });
@@ -90,7 +72,6 @@ export class PrismaFoldersRepository implements FoldersRepository {
         deletedAt: null,
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
     });

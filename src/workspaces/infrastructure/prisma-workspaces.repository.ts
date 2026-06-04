@@ -1,9 +1,4 @@
-import {
-  SubscriptionPlan,
-  SubscriptionStatus,
-  WorkspaceRole,
-  WorkspaceType,
-} from '@prisma/client';
+import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
@@ -22,22 +17,12 @@ export class PrismaWorkspacesRepository implements WorkspacesRepository {
     return this.prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.upsert({
         where: {
-          ownerUserId_type: {
-            ownerUserId: userId,
-            type: WorkspaceType.PERSONAL,
-          },
+          ownerUserId: userId,
         },
         update: {},
         create: {
           name: 'Personal Workspace',
-          type: WorkspaceType.PERSONAL,
           ownerUserId: userId,
-          users: {
-            create: {
-              userId,
-              role: WorkspaceRole.OWNER,
-            },
-          },
         },
         select: {
           id: true,

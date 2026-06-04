@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, WorkspaceType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   ClipSearchTarget,
@@ -30,7 +30,6 @@ export class PrismaClipsRepository implements ClipsRepository {
         deletedAt: null,
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
       select: {
@@ -50,7 +49,6 @@ export class PrismaClipsRepository implements ClipsRepository {
         deletedAt: null,
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
     });
@@ -161,7 +159,6 @@ export class PrismaClipsRepository implements ClipsRepository {
           deletedAt: null,
           workspace: {
             ownerUserId: userId,
-            type: WorkspaceType.PERSONAL,
           },
         },
       },
@@ -191,7 +188,6 @@ export class PrismaClipsRepository implements ClipsRepository {
         deletedAt: null,
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
       include: {
@@ -412,7 +408,6 @@ export class PrismaClipsRepository implements ClipsRepository {
         : {
             workspace: {
               ownerUserId: userId,
-              type: WorkspaceType.PERSONAL,
             },
           }),
       ...(type ? { type } : {}),
