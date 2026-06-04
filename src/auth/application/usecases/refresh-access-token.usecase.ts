@@ -1,10 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { createHash } from 'crypto';
-import { AuthError } from '../errors/auth.error';
 import { AuthContext } from 'src/common/types/auth-context.type';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AccessTokenResult } from '../auth.types';
+import {
+  assertRefreshTokenMatches,
+  assertRefreshTokenSession,
+} from '../policies/refresh-token.policy';
 
 @Injectable()
 export class RefreshAccessTokenUseCase {
@@ -19,30 +21,10 @@ export class RefreshAccessTokenUseCase {
   ): Promise<AccessTokenResult> {
     const { accountId, platform } = context;
 
-    const session = await this.authSessionPort.findRefreshTokenSession(
-      accountId,
-      platform,
+    const session = assertRefreshTokenSession(
+      await this.authSessionPort.findRefreshTokenSession(accountId, platform),
     );
-
-    if (!session) {
-      throw new AuthError('UNAUTHORIZED', '리프레쉬 세션이 존재하지 않습니다.');
-    }
-
-    if (session.revokedAt) {
-      throw new AuthError('UNAUTHORIZED', '폐기된 리프레쉬 토큰입니다.');
-    }
-
-    if (session.expiresAt < new Date()) {
-      throw new AuthError('UNAUTHORIZED', '리프레쉬 토큰이 만료되었습니다.');
-    }
-
-    const incomingHash = createHash('sha256')
-      .update(refreshToken)
-      .digest('hex');
-
-    if (incomingHash !== session.tokenHash) {
-      throw new AuthError('UNAUTHORIZED', '리프레쉬 토큰이 일치하지 않습니다.');
-    }
+    assertRefreshTokenMatches(refreshToken, session.tokenHash);
 
     const accessToken = this.authSessionPort.signAccessToken(context);
 
