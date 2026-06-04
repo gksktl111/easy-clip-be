@@ -1,0 +1,140 @@
+import type { UpdateWorkspaceSubscriptionParams } from '../../domain/workspaces.repository';
+import {
+  UpdateMySubscriptionInput,
+  WorkspaceSubscription,
+  WorkspaceSubscriptionAction,
+  WorkspaceSubscriptionPlan,
+  WorkspaceSubscriptionStatus,
+} from '../../domain/workspace.types';
+import { WorkspacesError } from '../errors/workspaces.error';
+
+const DEFAULT_PRO_BILLING_DAYS = 30;
+
+export function validateUpdateMySubscriptionInput(
+  input: UpdateMySubscriptionInput,
+) {
+  if (input.type === WorkspaceSubscriptionAction.CHANGE_PLAN) {
+    if (!input.plan) {
+      throw new WorkspacesError(
+        'BAD_REQUEST',
+        'CHANGE_PLAN 요청에는 plan 값이 필요합니다.',
+      );
+    }
+
+    return;
+  }
+
+  if (input.plan !== undefined) {
+    throw new WorkspacesError(
+      'BAD_REQUEST',
+      'plan 값은 CHANGE_PLAN 요청에서만 사용할 수 있습니다.',
+    );
+  }
+}
+
+export function buildSubscriptionUpdateParams(
+  subscription: WorkspaceSubscription,
+  input: UpdateMySubscriptionInput,
+): UpdateWorkspaceSubscriptionParams {
+  switch (input.type) {
+    case WorkspaceSubscriptionAction.CHANGE_PLAN:
+      return buildChangePlanUpdateParams(subscription, input.plan!);
+    case WorkspaceSubscriptionAction.CANCEL:
+      return buildCancelUpdateParams(subscription);
+    case WorkspaceSubscriptionAction.RESUME:
+      return buildResumeUpdateParams(subscription);
+    default:
+      throw new WorkspacesError(
+        'BAD_REQUEST',
+        '지원하지 않는 요청 타입입니다.',
+      );
+  }
+}
+
+function buildChangePlanUpdateParams(
+  subscription: WorkspaceSubscription,
+  plan: WorkspaceSubscriptionPlan,
+): UpdateWorkspaceSubscriptionParams {
+  if (plan === WorkspaceSubscriptionPlan.FREE) {
+    if (
+      subscription.plan === WorkspaceSubscriptionPlan.FREE &&
+      subscription.status === WorkspaceSubscriptionStatus.ACTIVE &&
+      !subscription.autoRenew
+    ) {
+      throw new WorkspacesError('CONFLICT', '이미 FREE 플랜입니다.');
+    }
+
+    return {
+      plan: WorkspaceSubscriptionPlan.FREE,
+      status: WorkspaceSubscriptionStatus.ACTIVE,
+      autoRenew: false,
+      currentPeriodEnd: null,
+    };
+  }
+
+  if (
+    subscription.plan === WorkspaceSubscriptionPlan.PRO &&
+    subscription.status === WorkspaceSubscriptionStatus.ACTIVE &&
+    subscription.autoRenew
+  ) {
+    throw new WorkspacesError('CONFLICT', '이미 PRO 플랜입니다.');
+  }
+
+  return {
+    plan: WorkspaceSubscriptionPlan.PRO,
+    status: WorkspaceSubscriptionStatus.ACTIVE,
+    autoRenew: true,
+    currentPeriodEnd: resolveCurrentPeriodEnd(subscription.currentPeriodEnd),
+  };
+}
+
+function buildCancelUpdateParams(
+  subscription: WorkspaceSubscription,
+): UpdateWorkspaceSubscriptionParams {
+  if (
+    subscription.plan !== WorkspaceSubscriptionPlan.PRO ||
+    subscription.status !== WorkspaceSubscriptionStatus.ACTIVE
+  ) {
+    throw new WorkspacesError(
+      'CONFLICT',
+      'CANCEL은 PRO ACTIVE 상태에서만 가능합니다.',
+    );
+  }
+
+  return {
+    status: WorkspaceSubscriptionStatus.CANCELED,
+    autoRenew: false,
+    currentPeriodEnd: resolveCurrentPeriodEnd(subscription.currentPeriodEnd),
+  };
+}
+
+function buildResumeUpdateParams(
+  subscription: WorkspaceSubscription,
+): UpdateWorkspaceSubscriptionParams {
+  if (
+    subscription.plan !== WorkspaceSubscriptionPlan.PRO ||
+    subscription.status !== WorkspaceSubscriptionStatus.CANCELED
+  ) {
+    throw new WorkspacesError(
+      'CONFLICT',
+      'RESUME은 PRO CANCELED 상태에서만 가능합니다.',
+    );
+  }
+
+  return {
+    status: WorkspaceSubscriptionStatus.ACTIVE,
+    autoRenew: true,
+    currentPeriodEnd: resolveCurrentPeriodEnd(subscription.currentPeriodEnd),
+  };
+}
+
+function resolveCurrentPeriodEnd(currentPeriodEnd: Date | null): Date {
+  if (currentPeriodEnd && currentPeriodEnd > new Date()) {
+    return currentPeriodEnd;
+  }
+
+  const nextPeriodEnd = new Date();
+  nextPeriodEnd.setDate(nextPeriodEnd.getDate() + DEFAULT_PRO_BILLING_DAYS);
+
+  return nextPeriodEnd;
+}
