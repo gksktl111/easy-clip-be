@@ -4,16 +4,20 @@ import { FoldersController } from './presentation/folders.controller';
 import { FOLDERS_REPOSITORY } from './domain/folders.repository';
 import { PrismaFoldersRepository } from './infrastructure/prisma-folders.repository';
 import { GetFolderUseCase } from './application/usecases/get-folder.usecase';
+import { ListFoldersUseCase } from './application/usecases/list-folders.usecase';
 import { ReorderFolderUseCase } from './application/usecases/reorder-folder.usecase';
 import { DeleteFolderUseCase } from './application/usecases/delete-folder.usecase';
-import { SaveFolderUseCase } from './application/usecases/save-folder.usecase';
+import { CreateFolderUseCase } from './application/usecases/create-folder.usecase';
+import { UpdateFolderUseCase } from './application/usecases/update-folder.usecase';
 
 @Module({
   controllers: [FoldersController],
   providers: [
     { provide: FOLDERS_REPOSITORY, useClass: PrismaFoldersRepository },
+    ListFoldersUseCase,
     GetFolderUseCase,
-    SaveFolderUseCase,
+    CreateFolderUseCase,
+    UpdateFolderUseCase,
     ReorderFolderUseCase,
     DeleteFolderUseCase,
     JwtAccessGuard,
