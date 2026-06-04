@@ -22,12 +22,16 @@ import { CreateClipDto } from './dtos/create-clip.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
-import { SaveClipUseCase } from '../application/usecases/save-clip.usecase';
-import { ListClipsControllerFacade } from '../application/usecases/list-clips.controller-facade';
+import { CreateClipUseCase } from '../application/usecases/create-clip.usecase';
+import { UpdateClipUseCase } from '../application/usecases/update-clip.usecase';
+import { ListFolderClipsUseCase } from '../application/usecases/list-folder-clips.usecase';
+import { ListFavoriteClipsUseCase } from '../application/usecases/list-favorite-clips.usecase';
+import { ListRecentClipsUseCase } from '../application/usecases/list-recent-clips.usecase';
 import { LikeClipUseCase } from '../application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
+import { ClipsError } from '../application/errors/clips.error';
 
 // TODO: 현재 clips 도메인이 콘텐츠 + 상호작용(Like, View, Favorite)을 모두 포함하며
 // Aggregate 경계가 흐려지고 있음.
@@ -54,9 +58,12 @@ import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recen
 @UseFilters(ApplicationExceptionFilter)
 export class ClipsController {
   constructor(
-    private readonly saveClipUseCase: SaveClipUseCase,
+    private readonly createClipUseCase: CreateClipUseCase,
+    private readonly updateClipUseCase: UpdateClipUseCase,
     private readonly deleteClipUseCase: DeleteClipUseCase,
-    private readonly listClipsFacade: ListClipsControllerFacade,
+    private readonly listFolderClipsUseCase: ListFolderClipsUseCase,
+    private readonly listFavoriteClipsUseCase: ListFavoriteClipsUseCase,
+    private readonly listRecentClipsUseCase: ListRecentClipsUseCase,
     private readonly likeClipUseCase: LikeClipUseCase,
     private readonly unlikeClipUseCase: UnlikeClipUseCase,
     private readonly recordClipViewUseCase: RecordClipViewUseCase,
@@ -70,10 +77,42 @@ export class ClipsController {
     @Request() req: { user: AuthContext },
     @Query() query: ListClipsQueryDto,
   ) {
-    return this.listClipsFacade.execute(req.user.userId, {
-      ...query,
-      favorite: query.favorite === 'true',
-      recent: query.recent === 'true',
+    const favorite = query.favorite === 'true';
+    const recent = query.recent === 'true';
+
+    if (!query.type) {
+      throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
+    }
+
+    if (query.folderId) {
+      if (favorite || recent) {
+        throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
+      }
+
+      return this.listFolderClipsUseCase.execute(req.user.userId, {
+        folderId: query.folderId,
+        cursor: query.cursor,
+        type: query.type,
+        q: query.q,
+      });
+    }
+
+    if (favorite === recent) {
+      throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
+    }
+
+    if (favorite) {
+      return this.listFavoriteClipsUseCase.execute(req.user.userId, {
+        cursor: query.cursor,
+        type: query.type,
+        q: query.q,
+      });
+    }
+
+    return this.listRecentClipsUseCase.execute(req.user.userId, {
+      cursor: query.cursor,
+      type: query.type,
+      q: query.q,
     });
   }
 
@@ -93,10 +132,9 @@ export class ClipsController {
     @Body() dto: CreateClipDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.saveClipUseCase.execute(
+    return this.createClipUseCase.execute(
       req.user.userId,
       {
-        mode: 'create',
         ...dto,
       },
       file,
@@ -113,10 +151,9 @@ export class ClipsController {
     @Body() dto: UpdateClipDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.saveClipUseCase.execute(
+    return this.updateClipUseCase.execute(
       req.user.userId,
       {
-        mode: 'update',
         clipId: id,
         ...dto,
       },

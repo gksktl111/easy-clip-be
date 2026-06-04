@@ -13,6 +13,7 @@ import {
   normalizeCursor,
   normalizeType,
 } from './list-clips.common';
+import { resolveClipSearchTarget } from './list-clips.policy';
 
 export type ListFavoriteClipsInput = {
   cursor?: string;
@@ -32,7 +33,7 @@ export class ListFavoriteClipsUseCase {
     const type = normalizeType(input.type);
     const query = input.q?.trim();
 
-    const searchTarget = await this.resolveSearchTarget({
+    const searchTarget = await resolveClipSearchTarget(this.clipsRepository, {
       userId,
       type,
       q: query,
@@ -61,32 +62,6 @@ export class ListFavoriteClipsUseCase {
       }),
       LIST_CLIPS_LIMIT,
     );
-  }
-
-  private async resolveSearchTarget({
-    userId,
-    type,
-    q,
-    likedOnly,
-  }: {
-    userId: string;
-    type?: ClipType;
-    q?: string;
-    likedOnly?: boolean;
-  }): Promise<ClipSearchTarget | undefined> {
-    if (!q) {
-      return undefined;
-    }
-
-    const hasTitleMatches = await this.clipsRepository.hasTitleMatches({
-      userId,
-      type,
-      q,
-      searchTarget: 'title',
-      likedOnly,
-    });
-
-    return hasTitleMatches ? 'title' : 'tag';
   }
 
   private async validateCursor({
