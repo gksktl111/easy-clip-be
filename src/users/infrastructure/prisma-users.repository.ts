@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { WorkspaceRole, WorkspaceType } from '@prisma/client';
+import { WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   UpdateAuthAccountProfileParams,
@@ -88,28 +88,6 @@ export class PrismaUsersRepository implements UsersRepository {
         ...(params.language !== undefined ? { language: params.language } : {}),
       },
     });
-  }
-
-  async hasOwnedTeamWorkspace(userId: string): Promise<boolean> {
-    const workspace = await this.prisma.workspace.findFirst({
-      where: {
-        type: WorkspaceType.TEAM,
-        OR: [
-          { ownerUserId: userId },
-          {
-            users: {
-              some: {
-                userId,
-                role: WorkspaceRole.OWNER,
-              },
-            },
-          },
-        ],
-      },
-      select: { id: true },
-    });
-
-    return Boolean(workspace);
   }
 
   async deleteUserAndOwnedPersonalWorkspaces(userId: string): Promise<void> {

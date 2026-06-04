@@ -31,6 +31,5 @@ export interface UsersRepository {
     userId: string,
     params: UpdateUserSettingsParams,
   ): Promise<UserSettings>;
-  hasOwnedTeamWorkspace(userId: string): Promise<boolean>;
   deleteUserAndOwnedPersonalWorkspaces(userId: string): Promise<void>;
 }
