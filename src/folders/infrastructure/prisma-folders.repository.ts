@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import {
   SubscriptionPlan,
   SubscriptionStatus,
-  WorkspaceRole,
   WorkspaceType,
 } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -45,12 +44,6 @@ export class PrismaFoldersRepository implements FoldersRepository {
           name: 'Personal Workspace',
           type: WorkspaceType.PERSONAL,
           ownerUserId: userId,
-          users: {
-            create: {
-              userId,
-              role: WorkspaceRole.OWNER,
-            },
-          },
         },
         select: { id: true },
       });
@@ -90,7 +83,6 @@ export class PrismaFoldersRepository implements FoldersRepository {
         deletedAt: null,
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
     });

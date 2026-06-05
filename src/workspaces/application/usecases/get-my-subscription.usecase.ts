@@ -1,11 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { WORKSPACES_REPOSITORY } from '../../domain/workspaces.repository';
 import type { WorkspacesRepository } from '../../domain/workspaces.repository';
-import {
-  MySubscriptionResponse,
-  WorkspaceSubscription,
-} from '../../domain/workspace.types';
+import { MySubscriptionResponse } from '../../domain/workspace.types';
 import { normalizeExpiredSubscription } from '../policies/subscription-expiration.policy';
+import { toMySubscriptionResponse } from '../policies/subscription-response.policy';
 
 @Injectable()
 export class GetMySubscriptionUseCase {
@@ -25,17 +23,6 @@ export class GetMySubscriptionUseCase {
       currentSubscription,
     );
 
-    return this.toResponse(normalizedSubscription);
-  }
-
-  private toResponse(
-    subscription: WorkspaceSubscription,
-  ): MySubscriptionResponse {
-    return {
-      plan: subscription.plan,
-      status: subscription.status,
-      autoRenew: subscription.autoRenew,
-      currentPeriodEnd: subscription.currentPeriodEnd,
-    };
+    return toMySubscriptionResponse(normalizedSubscription);
   }
 }

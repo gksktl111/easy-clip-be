@@ -1,7 +1,6 @@
 import {
   SubscriptionPlan,
   SubscriptionStatus,
-  WorkspaceRole,
   WorkspaceType,
 } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
@@ -32,12 +31,6 @@ export class PrismaWorkspacesRepository implements WorkspacesRepository {
           name: 'Personal Workspace',
           type: WorkspaceType.PERSONAL,
           ownerUserId: userId,
-          users: {
-            create: {
-              userId,
-              role: WorkspaceRole.OWNER,
-            },
-          },
         },
         select: {
           id: true,

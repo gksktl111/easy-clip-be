@@ -21,44 +21,28 @@ import { ApplicationExceptionFilter } from 'src/common/presentation/filters/appl
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
-import { GetClipUseCase } from '../application/usecases/get-clip.usecase';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
-import { SaveClipUseCase } from '../application/usecases/save-clip.usecase';
-import { ListClipsControllerFacade } from '../application/usecases/list-clips.controller-facade';
+import { CreateClipUseCase } from '../application/usecases/create-clip.usecase';
+import { UpdateClipUseCase } from '../application/usecases/update-clip.usecase';
+import { ListFolderClipsUseCase } from '../application/usecases/list-folder-clips.usecase';
+import { ListFavoriteClipsUseCase } from '../application/usecases/list-favorite-clips.usecase';
+import { ListRecentClipsUseCase } from '../application/usecases/list-recent-clips.usecase';
 import { LikeClipUseCase } from '../application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
-
-// TODO: 현재 clips 도메인이 콘텐츠 + 상호작용(Like, View, Favorite)을 모두 포함하며
-// Aggregate 경계가 흐려지고 있음.
-// → Clip(콘텐츠)과 Interaction(사용자-클립 관계)을 분리 필요.
-//
-// [분리 대상 엔드포인트]
-// 1. View 관련
-//    - POST   /clips/:id/views
-//    - GET    /clips/views/recent
-//
-// 2. Like 관련
-//    - POST   /clips/:id/likes
-//    - DELETE /clips/:id/likes
-//
-// → 위 엔드포인트는 ClipController에서 제거 후
-//   Interaction 전용 Controller로 이동.
-//
-// 목표:
-// - Clip 도메인은 콘텐츠 CRUD 및 검색만 책임
-// - Interaction 도메인은 사용자-클립 관계 데이터(Like/View/Favorite)만 책임
-// - Clip은 Interaction을 모르도록 의존성 단방향 유지
+import { ClipsError } from '../application/errors/clips.error';
 
 @Controller('clips')
 @UseFilters(ApplicationExceptionFilter)
 export class ClipsController {
   constructor(
-    private readonly saveClipUseCase: SaveClipUseCase,
-    private readonly getClipUseCase: GetClipUseCase,
+    private readonly createClipUseCase: CreateClipUseCase,
+    private readonly updateClipUseCase: UpdateClipUseCase,
     private readonly deleteClipUseCase: DeleteClipUseCase,
-    private readonly listClipsFacade: ListClipsControllerFacade,
+    private readonly listFolderClipsUseCase: ListFolderClipsUseCase,
+    private readonly listFavoriteClipsUseCase: ListFavoriteClipsUseCase,
+    private readonly listRecentClipsUseCase: ListRecentClipsUseCase,
     private readonly likeClipUseCase: LikeClipUseCase,
     private readonly unlikeClipUseCase: UnlikeClipUseCase,
     private readonly recordClipViewUseCase: RecordClipViewUseCase,
@@ -72,10 +56,42 @@ export class ClipsController {
     @Request() req: { user: AuthContext },
     @Query() query: ListClipsQueryDto,
   ) {
-    return this.listClipsFacade.execute(req.user.userId, {
-      ...query,
-      favorite: query.favorite === 'true',
-      recent: query.recent === 'true',
+    const favorite = query.favorite === 'true';
+    const recent = query.recent === 'true';
+
+    if (!query.type) {
+      throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
+    }
+
+    if (query.folderId) {
+      if (favorite || recent) {
+        throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
+      }
+
+      return this.listFolderClipsUseCase.execute(req.user.userId, {
+        folderId: query.folderId,
+        cursor: query.cursor,
+        type: query.type,
+        q: query.q,
+      });
+    }
+
+    if (favorite === recent) {
+      throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
+    }
+
+    if (favorite) {
+      return this.listFavoriteClipsUseCase.execute(req.user.userId, {
+        cursor: query.cursor,
+        type: query.type,
+        q: query.q,
+      });
+    }
+
+    return this.listRecentClipsUseCase.execute(req.user.userId, {
+      cursor: query.cursor,
+      type: query.type,
+      q: query.q,
     });
   }
 
@@ -84,13 +100,6 @@ export class ClipsController {
   @UseGuards(JwtAccessGuard)
   getRecentViewedClips(@Request() req: { user: AuthContext }) {
     return this.listRecentViewedClipsUseCase.execute(req.user.userId);
-  }
-
-  // 삭제되지 않은 내 클립을 단건으로 조회한다.
-  @Get(':id')
-  @UseGuards(JwtAccessGuard)
-  getClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
-    return this.getClipUseCase.execute(req.user.userId, id);
   }
 
   // multipart 입력에서 file 우선 규칙으로 타입을 판별해 클립을 생성한다.
@@ -102,10 +111,9 @@ export class ClipsController {
     @Body() dto: CreateClipDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.saveClipUseCase.execute(
+    return this.createClipUseCase.execute(
       req.user.userId,
       {
-        mode: 'create',
         ...dto,
       },
       file,
@@ -122,10 +130,9 @@ export class ClipsController {
     @Body() dto: UpdateClipDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.saveClipUseCase.execute(
+    return this.updateClipUseCase.execute(
       req.user.userId,
       {
-        mode: 'update',
         clipId: id,
         ...dto,
       },

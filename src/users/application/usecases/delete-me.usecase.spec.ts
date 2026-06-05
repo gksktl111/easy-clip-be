@@ -7,7 +7,6 @@ const createRepository = (): jest.Mocked<UsersRepository> => ({
   findUserWithAuthAccounts: jest.fn(),
   updateAuthAccountProfile: jest.fn(),
   upsertUserSettings: jest.fn(),
-  hasOwnedTeamWorkspace: jest.fn(),
   deleteUserAndOwnedPersonalWorkspaces: jest.fn(),
 });
 
@@ -23,24 +22,9 @@ describe('DeleteMeUseCase', () => {
     });
   });
 
-  it('팀 워크스페이스 OWNER면 BAD_REQUEST 에러를 던진다', async () => {
-    const repo = createRepository();
-    repo.findUserById.mockResolvedValue({ id: 'user-id' });
-    repo.hasOwnedTeamWorkspace.mockResolvedValue(true);
-
-    const usecase = new DeleteMeUseCase(repo);
-
-    await expect(usecase.execute('user-id')).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-
-    expect(repo.deleteUserAndOwnedPersonalWorkspaces).not.toHaveBeenCalled();
-  });
-
   it('탈퇴 처리 시 개인 워크스페이스와 유저를 삭제한다', async () => {
     const repo = createRepository();
     repo.findUserById.mockResolvedValue({ id: 'user-id' });
-    repo.hasOwnedTeamWorkspace.mockResolvedValue(false);
 
     const usecase = new DeleteMeUseCase(repo);
     const result = await usecase.execute('user-id');

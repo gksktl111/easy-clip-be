@@ -7,6 +7,10 @@ import { AuthError } from '../errors/auth.error';
 import { OAuthSignInResult } from '../auth.types';
 import { OAuthUser } from '../../domain/auth.types';
 import { issueAuthResult } from '../policies/auth-result.policy';
+import {
+  requireOAuthEmail,
+  toCreateAuthAccountInput,
+} from '../policies/oauth-account.policy';
 
 @Injectable()
 export class LinkAccountUseCase {
@@ -22,12 +26,7 @@ export class LinkAccountUseCase {
       throw new AuthError('FORBIDDEN', '로그인이 필요합니다.');
     }
 
-    if (!oauthUser.email) {
-      throw new AuthError(
-        'BAD_REQUEST',
-        'OAuth 이메일 정보를 가져올 수 없습니다.',
-      );
-    }
+    const email = requireOAuthEmail(oauthUser);
 
     const user = await this.authRepository.findUserById(
       oauthUser.currentUserId,
@@ -48,13 +47,7 @@ export class LinkAccountUseCase {
 
     const newAccount = await this.authRepository.createAuthAccountForUser(
       oauthUser.currentUserId,
-      {
-        provider: oauthUser.provider,
-        providerUserId: oauthUser.providerUserId,
-        email: oauthUser.email,
-        displayName: oauthUser.displayName ?? undefined,
-        profileImageUrl: oauthUser.avatarUrl ?? null,
-      },
+      toCreateAuthAccountInput(oauthUser, email),
     );
 
     return issueAuthResult(this.authSessionPort, {

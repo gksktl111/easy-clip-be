@@ -7,6 +7,10 @@ import { AuthError } from '../errors/auth.error';
 import { OAuthSignInResult } from '../auth.types';
 import { OAuthUser } from '../../domain/auth.types';
 import { issueAuthResult } from '../policies/auth-result.policy';
+import {
+  requireOAuthEmail,
+  toCreateAuthAccountInput,
+} from '../policies/oauth-account.policy';
 
 @Injectable()
 export class SignInUseCase {
@@ -18,12 +22,7 @@ export class SignInUseCase {
   ) {}
 
   async execute(oauthUser: OAuthUser): Promise<OAuthSignInResult> {
-    if (!oauthUser.email) {
-      throw new AuthError(
-        'BAD_REQUEST',
-        'OAuth 이메일 정보를 가져올 수 없습니다.',
-      );
-    }
+    const email = requireOAuthEmail(oauthUser);
 
     const existingAccount = await this.authRepository.findAccountByProvider(
       oauthUser.provider,
@@ -38,9 +37,8 @@ export class SignInUseCase {
       });
     }
 
-    const userWithSameEmail = await this.authRepository.findUserByAuthEmail(
-      oauthUser.email,
-    );
+    const userWithSameEmail =
+      await this.authRepository.findUserByAuthEmail(email);
 
     if (userWithSameEmail) {
       throw new AuthError(
@@ -49,13 +47,9 @@ export class SignInUseCase {
       );
     }
 
-    const newAccount = await this.authRepository.createUserWithAuthAccount({
-      provider: oauthUser.provider,
-      providerUserId: oauthUser.providerUserId,
-      email: oauthUser.email,
-      displayName: oauthUser.displayName ?? undefined,
-      profileImageUrl: oauthUser.avatarUrl ?? null,
-    });
+    const newAccount = await this.authRepository.createUserWithAuthAccount(
+      toCreateAuthAccountInput(oauthUser, email),
+    );
 
     return issueAuthResult(this.authSessionPort, {
       userId: newAccount.userId,
