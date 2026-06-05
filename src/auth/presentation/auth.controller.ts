@@ -8,11 +8,25 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
 import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
 import { AuthContext } from 'src/common/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
 import { SwitchUserDto } from './dtos/switch-user.dto';
+import {
+  AuthSignInResponseDto,
+  LogoutResponseDto,
+  RefreshAccessTokenResponseDto,
+} from './dtos/auth-response.dto';
 import { JwtRefreshGuard } from './guards/jwt-refresh-token.guard';
 import { SignInUseCase } from '../application/usecases/sign-in.usecase';
 import { LinkAccountUseCase } from '../application/usecases/link-account.usecase';
@@ -20,6 +34,7 @@ import { SwitchUserUseCase } from '../application/usecases/switch-user.usecase';
 import { RefreshAccessTokenUseCase } from '../application/usecases/refresh-access-token.usecase';
 import { LogoutUseCase } from '../application/usecases/logout.usecase';
 import { OAuthUser } from '../domain/auth.types';
+import { ErrorResponseDto } from 'src/common/presentation/dtos/error-response.dto';
 
 interface OAuthRequest extends ExpressRequest {
   user: OAuthUser;
@@ -27,6 +42,7 @@ interface OAuthRequest extends ExpressRequest {
 
 @Controller('auth')
 @UseFilters(ApplicationExceptionFilter)
+@ApiTags('Auth')
 export class AuthController {
   constructor(
     private readonly signInUseCase: SignInUseCase,
@@ -40,32 +56,38 @@ export class AuthController {
    * Google OAuth
    * ====================================================== */
 
-  /**
-   * Google OAuth 로그인 시작
-   * GET /auth/google
-   */
   @Get('google')
   @UseGuards(PassportAuthGuard('google'))
-  googleLogin(): void {
-    // Passport가 Google 로그인 페이지로 리다이렉트
-  }
+  @ApiOperation({ summary: 'Google OAuth 로그인 시작' })
+  @ApiOkResponse({
+    description: 'OAuth 제공자 로그인 페이지로 리다이렉트됩니다.',
+  })
+  googleLogin(): void {}
 
-  /**
-   * Google OAuth 계정 연결 시작 (JWT 필요)
-   * GET /auth/google/link
-   */
   @Get('google/link')
   @UseGuards(JwtAccessGuard, PassportAuthGuard('google'))
-  googleLink(): void {
-    // JWT 인증 후 Google 로그인 페이지로 리다이렉트
-  }
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Google OAuth 계정 연결 시작' })
+  @ApiOkResponse({
+    description: '인증 후 OAuth 제공자 로그인 페이지로 리다이렉트됩니다.',
+  })
+  @ApiUnauthorizedResponse({
+    description: '액세스 토큰이 없거나 유효하지 않습니다.',
+    type: ErrorResponseDto,
+  })
+  googleLink(): void {}
 
-  /**
-   * Google OAuth 콜백 (login / link 공통)
-   * GET /auth/google/callback
-   */
   @Get('google/callback')
   @UseGuards(PassportAuthGuard('google'))
+  @ApiOperation({ summary: 'Google OAuth 콜백 처리' })
+  @ApiOkResponse({
+    description: '로그인 또는 계정 연결 후 토큰과 사용자 정보를 반환합니다.',
+    type: AuthSignInResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: '계정 연결 요청이 올바르지 않습니다.',
+    type: ErrorResponseDto,
+  })
   googleCallback(@Request() req: OAuthRequest) {
     return this.handleOAuthCallback(req.user);
   }
@@ -74,32 +96,38 @@ export class AuthController {
    * GitHub OAuth
    * ====================================================== */
 
-  /**
-   * GitHub OAuth 로그인 시작
-   * GET /auth/github
-   */
   @Get('github')
   @UseGuards(PassportAuthGuard('github'))
-  githubLogin(): void {
-    // Passport가 GitHub 로그인 페이지로 리다이렉트
-  }
+  @ApiOperation({ summary: 'GitHub OAuth 로그인 시작' })
+  @ApiOkResponse({
+    description: 'OAuth 제공자 로그인 페이지로 리다이렉트됩니다.',
+  })
+  githubLogin(): void {}
 
-  /**
-   * GitHub OAuth 계정 연결 시작 (JWT 필요)
-   * GET /auth/github/link
-   */
   @Get('github/link')
   @UseGuards(JwtAccessGuard, PassportAuthGuard('github'))
-  githubLink(): void {
-    // JWT 인증 후 GitHub 로그인 페이지로 리다이렉트
-  }
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'GitHub OAuth 계정 연결 시작' })
+  @ApiOkResponse({
+    description: '인증 후 OAuth 제공자 로그인 페이지로 리다이렉트됩니다.',
+  })
+  @ApiUnauthorizedResponse({
+    description: '액세스 토큰이 없거나 유효하지 않습니다.',
+    type: ErrorResponseDto,
+  })
+  githubLink(): void {}
 
-  /**
-   * GitHub OAuth 콜백 (login / link 공통)
-   * GET /auth/github/callback
-   */
   @Get('github/callback')
   @UseGuards(PassportAuthGuard('github'))
+  @ApiOperation({ summary: 'GitHub OAuth 콜백 처리' })
+  @ApiOkResponse({
+    description: '로그인 또는 계정 연결 후 토큰과 사용자 정보를 반환합니다.',
+    type: AuthSignInResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: '계정 연결 요청이 올바르지 않습니다.',
+    type: ErrorResponseDto,
+  })
   githubCallback(@Request() req: OAuthRequest) {
     return this.handleOAuthCallback(req.user);
   }
@@ -108,12 +136,19 @@ export class AuthController {
    * Account Switch
    * ====================================================== */
 
-  /**
-   * 연동된 계정 전환
-   * POST /auth/switch-user
-   */
   @UseGuards(JwtAccessGuard)
   @Post('switch-user')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: '연동된 계정으로 전환' })
+  @ApiBody({ type: SwitchUserDto })
+  @ApiOkResponse({
+    description: '선택한 계정 기준으로 새 토큰과 사용자 정보를 반환합니다.',
+    type: AuthSignInResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '액세스 토큰이 없거나 유효하지 않습니다.',
+    type: ErrorResponseDto,
+  })
   switchUser(
     @Request() req: { user: AuthContext },
     @Body() switchUserDto: SwitchUserDto,
@@ -125,12 +160,18 @@ export class AuthController {
     );
   }
 
-  /**
-   * Access Token 재발급
-   * POST /auth/refresh
-   */
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: '액세스 토큰 재발급' })
+  @ApiOkResponse({
+    description: '새 액세스 토큰을 반환합니다.',
+    type: RefreshAccessTokenResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '리프레시 토큰이 없거나 유효하지 않습니다.',
+    type: ErrorResponseDto,
+  })
   refresh(
     @Request()
     req: {
@@ -141,12 +182,18 @@ export class AuthController {
     return this.refreshAccessTokenUseCase.execute(req.user, req.refreshToken);
   }
 
-  /**
-   * 로그아웃 (현재 플랫폼 세션만)
-   * POST /auth/logout
-   */
   @UseGuards(JwtAccessGuard)
   @Post('logout')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: '현재 플랫폼 로그아웃' })
+  @ApiOkResponse({
+    description: '현재 플랫폼의 리프레시 토큰 세션을 만료시킵니다.',
+    type: LogoutResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '액세스 토큰이 없거나 유효하지 않습니다.',
+    type: ErrorResponseDto,
+  })
   logout(@Request() req: { user: AuthContext }) {
     return this.logoutUseCase.execute(req.user.accountId, req.user.platform);
   }
