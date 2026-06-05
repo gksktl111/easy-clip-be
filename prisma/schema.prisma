@@ -33,17 +33,6 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
-enum WorkspaceType {
-  PERSONAL
-  TEAM
-}
-
-enum WorkspaceRole {
-  OWNER // 결제 책임자, 총 책임자
-  ADMIN // 워크스페이스 관리자
-  MEMBER // 일반 멤버
-}
-
 enum Platform {
   WEB
   APP
@@ -56,13 +45,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // PERSONAL workspace 소유자 (결제/삭제 기준)
-  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
+  ownedWorkspace Workspace? @relation("WorkspaceOwner")
   authAccounts AuthAccount[] // 1:N 관계
-  memberships  WorkspaceUser[]
-  settings     UserSettings? // 1:1 관계
-  clipLikes     ClipLike[]
-  clipViews     ClipView[]
+  settings UserSettings? // 1:1 관계
+  clipLikes ClipLike[]
+  clipViews ClipView[]
   refreshTokens RefreshToken[]
 }
 
@@ -110,43 +97,19 @@ model RefreshToken {
   @@index([userId])
 }
 
-
-// 워크스페이스는 개인/팀의 데이터 소유 단위
 model Workspace {
   id   String @id @default(cuid())
   name String
-  type WorkspaceType
-  // TEAM 워크스페이스는 ownerUserId를 사용하지 않는다.
-  ownerUserId String?
+  ownerUserId String @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  ownerUser User? @relation("WorkspaceOwner",fields: [ownerUserId],references: [id],onDelete: SetNull)
-  users        WorkspaceUser[]
+  ownerUser User @relation("WorkspaceOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   subscription Subscription?
   folders      Folder[]
   clips        Clip[]
   tags         Tag[]
-
-  @@unique([ownerUserId, type])
-}
-
-// 워크스페이스 멤버십 및 권한 관리용 (인명부)
-// TEAM 워크스페이스는 생성 시 OWNER 멤버십이 반드시 필요하다.
-model WorkspaceUser {
-  id String @id @default(cuid())
-
-  workspaceId String
-  userId      String
-  role        WorkspaceRole
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, userId])
-  @@index([workspaceId])
-  @@index([userId])
 }
 
 model UserSettings {

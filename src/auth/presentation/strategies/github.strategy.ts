@@ -6,6 +6,10 @@ import { Request } from 'express';
 import type { AuthenticateOptions } from 'passport';
 import { Profile, Strategy } from 'passport-github2';
 import { OAuthUser } from '../../domain/auth.types';
+import {
+  buildOAuthState,
+  parseOAuthState,
+} from '../policies/oauth-state.policy';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
@@ -20,16 +24,9 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
   }
 
   authenticate(req: Request, options?: AuthenticateOptions): void {
-    const platform = (req.query.platform as 'WEB' | 'APP') ?? 'WEB';
-    const mode = (req.query.mode as 'login' | 'link') ?? 'login';
-
-    const state = Buffer.from(JSON.stringify({ platform, mode })).toString(
-      'base64',
-    );
-
     super.authenticate(req, {
       ...options,
-      state,
+      state: buildOAuthState(req),
     });
   }
 
@@ -39,23 +36,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     refreshToken: string,
     profile: Profile,
   ): OAuthUser {
-    const rawState = req.query.state as string | undefined;
-
-    let platform: 'WEB' | 'APP' = 'WEB';
-    let mode: 'login' | 'link' = 'login';
-
-    if (rawState) {
-      try {
-        const parsed = JSON.parse(
-          Buffer.from(rawState, 'base64').toString(),
-        ) as { platform?: 'WEB' | 'APP'; mode?: 'login' | 'link' };
-
-        platform = parsed.platform ?? platform;
-        mode = parsed.mode ?? mode;
-      } catch {
-        // state 파싱 실패 → 기본값 유지
-      }
-    }
+    const state = parseOAuthState(req.query.state as string | undefined);
 
     return {
       provider: AuthProvider.GITHUB,
@@ -63,8 +44,9 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
       email: profile.emails?.[0]?.value,
       displayName: profile.displayName ?? profile.username ?? null,
       avatarUrl: profile.photos?.[0]?.value,
-      mode,
-      platform,
+      mode: state.mode,
+      platform: state.platform,
+      currentUserId: state.currentUserId,
     };
   }
 }

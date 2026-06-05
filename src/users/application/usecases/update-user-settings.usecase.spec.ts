@@ -7,7 +7,6 @@ const createRepository = (): jest.Mocked<UsersRepository> => ({
   findUserWithAuthAccounts: jest.fn(),
   updateAuthAccountProfile: jest.fn(),
   upsertUserSettings: jest.fn(),
-  hasOwnedTeamWorkspace: jest.fn(),
   deleteUserAndOwnedPersonalWorkspaces: jest.fn(),
 });
 

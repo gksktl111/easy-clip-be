@@ -1,18 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ClipType } from '../../domain/clip.types';
 import {
   CLIPS_REPOSITORY,
-  ClipSearchTarget,
   ClipTypeFilter,
 } from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
 import { ClipsError } from '../errors/clips.error';
+import { normalizeCursor, normalizeType } from './list-clips.common';
 import {
-  LIST_CLIPS_LIMIT,
-  buildPage,
-  normalizeCursor,
-  normalizeType,
-} from './list-clips.common';
+  listClipsWithLikedPriority,
+  resolveClipSearchTarget,
+  validateClipCursor,
+} from './list-clips.policy';
 
 export type ListFolderClipsInput = {
   folderId: string;
@@ -42,7 +40,7 @@ export class ListFolderClipsUseCase {
       throw new ClipsError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
     }
 
-    const searchTarget = await this.resolveSearchTarget({
+    const searchTarget = await resolveClipSearchTarget(this.clipsRepository, {
       userId,
       folderId: folder.id,
       workspaceId: folder.workspaceId,
@@ -51,7 +49,8 @@ export class ListFolderClipsUseCase {
       likedOnly: undefined,
     });
 
-    const cursorLiked = await this.validateCursor({
+    const cursorLiked = await validateClipCursor({
+      clipsRepository: this.clipsRepository,
       userId,
       cursor,
       folderId: folder.id,
@@ -59,9 +58,11 @@ export class ListFolderClipsUseCase {
       type,
       q: query,
       searchTarget,
+      likedOnly: undefined,
     });
 
-    return this.listWithLikedPriority({
+    return listClipsWithLikedPriority({
+      clipsRepository: this.clipsRepository,
       userId,
       folderId: folder.id,
       workspaceId: folder.workspaceId,
@@ -71,189 +72,5 @@ export class ListFolderClipsUseCase {
       q: query,
       searchTarget,
     });
-  }
-
-  private async resolveSearchTarget({
-    userId,
-    folderId,
-    workspaceId,
-    type,
-    q,
-    likedOnly,
-  }: {
-    userId: string;
-    folderId?: string;
-    workspaceId?: string;
-    type?: ClipType;
-    q?: string;
-    likedOnly?: boolean;
-  }): Promise<ClipSearchTarget | undefined> {
-    if (!q) {
-      return undefined;
-    }
-
-    const hasTitleMatches = await this.clipsRepository.hasTitleMatches({
-      userId,
-      folderId,
-      workspaceId,
-      type,
-      q,
-      searchTarget: 'title',
-      likedOnly,
-    });
-
-    return hasTitleMatches ? 'title' : 'tag';
-  }
-
-  private async validateCursor({
-    userId,
-    cursor,
-    folderId,
-    workspaceId,
-    type,
-    q,
-    searchTarget,
-  }: {
-    userId: string;
-    cursor: string | undefined;
-    folderId: string;
-    workspaceId: string;
-    type?: ClipType;
-    q?: string;
-    searchTarget?: ClipSearchTarget;
-  }) {
-    if (!cursor) {
-      return null;
-    }
-
-    const cursorClip = await this.clipsRepository.findClipByIdForUser(
-      userId,
-      cursor,
-    );
-
-    if (!cursorClip || cursorClip.folderId !== folderId) {
-      throw new ClipsError(
-        'NOT_FOUND',
-        '커서에 해당하는 클립을 찾을 수 없습니다.',
-      );
-    }
-
-    if (type && cursorClip.type !== type) {
-      throw new ClipsError(
-        'NOT_FOUND',
-        '커서에 해당하는 클립을 찾을 수 없습니다.',
-      );
-    }
-
-    if (q && searchTarget) {
-      const matches = await this.clipsRepository.isClipMatchingQuery({
-        userId,
-        folderId,
-        workspaceId,
-        type,
-        q,
-        searchTarget,
-        likedOnly: undefined,
-        clipId: cursor,
-      });
-
-      if (!matches) {
-        throw new ClipsError(
-          'NOT_FOUND',
-          '커서에 해당하는 클립을 찾을 수 없습니다.',
-        );
-      }
-    }
-
-    return this.clipsRepository.isClipLikedByUser(userId, cursor);
-  }
-
-  private async listWithLikedPriority({
-    userId,
-    folderId,
-    workspaceId,
-    cursor,
-    cursorLiked,
-    type,
-    q,
-    searchTarget,
-  }: {
-    userId: string;
-    folderId: string;
-    workspaceId: string;
-    cursor: string | undefined;
-    cursorLiked: boolean | null;
-    type?: ClipType;
-    q?: string;
-    searchTarget?: ClipSearchTarget;
-  }) {
-    const baseParams = {
-      userId,
-      folderId,
-      workspaceId,
-      limit: LIST_CLIPS_LIMIT,
-      type,
-      q,
-      searchTarget,
-    };
-
-    if (cursorLiked === false) {
-      return buildPage(
-        await this.clipsRepository.findClips({
-          ...baseParams,
-          cursor,
-          likedOnly: false,
-        }),
-        LIST_CLIPS_LIMIT,
-      );
-    }
-
-    const likedClips = await this.clipsRepository.findClips({
-      ...baseParams,
-      cursor: cursorLiked ? cursor : undefined,
-      likedOnly: true,
-    });
-    const likedResult = buildPage(likedClips, LIST_CLIPS_LIMIT);
-
-    if (likedResult.hasMore) {
-      return {
-        items: likedResult.items,
-        nextCursor: likedResult.nextCursor,
-      };
-    }
-
-    const remaining = LIST_CLIPS_LIMIT - likedResult.items.length;
-
-    if (remaining > 0) {
-      const nonLikedClips = await this.clipsRepository.findClips({
-        ...baseParams,
-        likedOnly: false,
-        limit: remaining,
-      });
-      const combined = likedResult.items.concat(nonLikedClips);
-      const combinedResult = buildPage(combined, LIST_CLIPS_LIMIT);
-
-      return {
-        items: combinedResult.items,
-        nextCursor: combinedResult.nextCursor,
-      };
-    }
-
-    const hasNonLiked =
-      (
-        await this.clipsRepository.findClips({
-          ...baseParams,
-          likedOnly: false,
-          limit: 1,
-        })
-      ).length > 0;
-
-    return {
-      items: likedResult.items,
-      nextCursor:
-        hasNonLiked && likedResult.items.length > 0
-          ? likedResult.items[likedResult.items.length - 1].id
-          : null,
-    };
   }
 }

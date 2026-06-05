@@ -4,19 +4,26 @@ import type { FoldersRepository } from '../../domain/folders.repository';
 import { FoldersError } from '../errors/folders.error';
 
 @Injectable()
-export class GetFolderUseCase {
+export class UpdateFolderUseCase {
   constructor(
     @Inject(FOLDERS_REPOSITORY)
-    private readonly repo: FoldersRepository,
+    private readonly foldersRepository: FoldersRepository,
   ) {}
 
-  async execute(userId: string, folderId: string) {
-    const folder = await this.repo.findPersonalFolderById(userId, folderId);
+  async execute(userId: string, folderId: string, name?: string) {
+    const folder = await this.foldersRepository.findPersonalFolderById(
+      userId,
+      folderId,
+    );
 
     if (!folder) {
       throw new FoldersError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
     }
 
-    return folder;
+    if (!name) {
+      return folder;
+    }
+
+    return this.foldersRepository.updateFolderName(folder.id, name);
   }
 }
