@@ -63,7 +63,7 @@ export class JwtAuthSessionPort implements AuthSessionPort {
   signAccessToken(context: AuthContext): string {
     return this.jwtService.sign(this.toJwtPayload(context), {
       secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
-      expiresIn: '15m',
+      expiresIn: '30m',
       audience: 'api',
       issuer: 'easy-clip',
     });
