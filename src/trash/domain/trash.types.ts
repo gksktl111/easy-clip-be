@@ -1,7 +1,7 @@
 export type TrashFolderItem = {
   id: string;
   name: string;
-  deletedAt: Date;
+  deletedAt: Date | null;
 };
 
 export type TrashClipItem = {
@@ -9,5 +9,5 @@ export type TrashClipItem = {
   title: string;
   type: 'TEXT' | 'COLOR' | 'IMAGE';
   folderId: string;
-  deletedAt: Date;
+  deletedAt: Date | null;
 };

@@ -13,8 +13,8 @@ export class TrashClipResponseDto {
   @ApiProperty({ example: 'cmfolder123' })
   folderId: string;
 
-  @ApiProperty({ example: '2026-06-05T09:00:00.000Z' })
-  deletedAt: Date;
+  @ApiProperty({ example: '2026-06-05T09:00:00.000Z', nullable: true })
+  deletedAt: Date | null;
 }
 
 export class TrashClipListResponseDto {
@@ -29,8 +29,8 @@ export class TrashFolderResponseDto {
   @ApiProperty({ example: '삭제된 폴더' })
   name: string;
 
-  @ApiProperty({ example: '2026-06-05T09:00:00.000Z' })
-  deletedAt: Date;
+  @ApiProperty({ example: '2026-06-05T09:00:00.000Z', nullable: true })
+  deletedAt: Date | null;
 }
 
 export class TrashFolderListResponseDto {
