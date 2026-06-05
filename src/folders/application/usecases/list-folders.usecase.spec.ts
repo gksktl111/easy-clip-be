@@ -13,7 +13,7 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   createFolder: jest.fn(),
   updateFolderName: jest.fn(),
   updateFolderOrder: jest.fn(),
-  softDeleteFolder: jest.fn(),
+  softDeleteFolderWithClips: jest.fn(),
   findPreviousFolderOrder: jest.fn(),
   findNextFolderOrder: jest.fn(),
 });

@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { FoldersModule } from './folders/folders.module';
 import { ClipsModule } from './clips/clips.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
+import { TrashModule } from './trash/trash.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     FoldersModule,
     ClipsModule,
     WorkspacesModule,
+    TrashModule,
   ],
   controllers: [AppController],
   providers: [AppService],
