@@ -15,12 +15,31 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
 import { AuthContext } from 'src/common/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
+import {
+  ClipCursorPageResponseDto,
+  ClipResponseDto,
+  LikeClipResponseDto,
+  RecentViewedClipListResponseDto,
+} from './dtos/clip-response.dto';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
 import { CreateClipUseCase } from '../application/usecases/create-clip.usecase';
 import { UpdateClipUseCase } from '../application/usecases/update-clip.usecase';
@@ -32,9 +51,16 @@ import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
 import { ClipsError } from '../application/errors/clips.error';
+import { ErrorResponseDto } from 'src/common/presentation/dtos/error-response.dto';
 
 @Controller('clips')
 @UseFilters(ApplicationExceptionFilter)
+@ApiTags('Clips')
+@ApiBearerAuth('access-token')
+@ApiUnauthorizedResponse({
+  description: '액세스 토큰이 없거나 유효하지 않습니다.',
+  type: ErrorResponseDto,
+})
 export class ClipsController {
   constructor(
     private readonly createClipUseCase: CreateClipUseCase,
@@ -49,9 +75,24 @@ export class ClipsController {
     private readonly listRecentViewedClipsUseCase: ListRecentViewedClipsUseCase,
   ) {}
 
-  // 클립 목록을 커서 기반으로 조회한다.
   @Get()
   @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 목록 조회' })
+  @ApiQuery({ name: 'folderId', required: false })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({ name: 'favorite', required: false, enum: ['true'] })
+  @ApiQuery({ name: 'recent', required: false, enum: ['true'] })
+  @ApiQuery({
+    name: 'type',
+    required: true,
+    enum: ['TEXT', 'COLOR', 'IMAGE', 'ALL'],
+  })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiOkResponse({
+    description:
+      '폴더, 좋아요, 최근 기준의 커서 페이지네이션 결과를 반환합니다.',
+    type: ClipCursorPageResponseDto,
+  })
   getClips(
     @Request() req: { user: AuthContext },
     @Query() query: ListClipsQueryDto,
@@ -95,17 +136,31 @@ export class ClipsController {
     });
   }
 
-  // 최근 조회한 클립 50개를 최신순으로 조회한다.
   @Get('views/recent')
   @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '최근 조회한 클립 목록 조회' })
+  @ApiOkResponse({
+    description: '최근 조회한 클립 최대 50개를 반환합니다.',
+    type: RecentViewedClipListResponseDto,
+  })
   getRecentViewedClips(@Request() req: { user: AuthContext }) {
     return this.listRecentViewedClipsUseCase.execute(req.user.userId);
   }
 
-  // multipart 입력에서 file 우선 규칙으로 타입을 판별해 클립을 생성한다.
   @Post()
   @UseGuards(JwtAccessGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: '클립 생성' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateClipDto })
+  @ApiOkResponse({
+    description: '생성된 클립 정보를 반환합니다.',
+    type: ClipResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: '폴더를 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
   createClip(
     @Request() req: { user: AuthContext },
     @Body() dto: CreateClipDto,
@@ -120,10 +175,21 @@ export class ClipsController {
     );
   }
 
-  // multipart 입력에서 file/text가 주어지면 타입을 재판별해 클립을 갱신한다.
   @Patch(':id')
   @UseGuards(JwtAccessGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: '클립 수정' })
+  @ApiParam({ name: 'id', description: '클립 ID' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: UpdateClipDto })
+  @ApiOkResponse({
+    description: '수정된 클립 정보를 반환합니다.',
+    type: ClipResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: '클립 또는 폴더를 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
   updateClip(
     @Request() req: { user: AuthContext },
     @Param('id') id: string,
@@ -140,17 +206,34 @@ export class ClipsController {
     );
   }
 
-  // 클립을 즉시 제거하지 않고 deletedAt만 기록한다.
   @Delete(':id')
   @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 삭제' })
+  @ApiParam({ name: 'id', description: '클립 ID' })
+  @ApiOkResponse({
+    description: '소프트 삭제된 클립 정보를 반환합니다.',
+    type: ClipResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: '클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
   deleteClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
     return this.deleteClipUseCase.execute(req.user.userId, id);
   }
 
-  // 클립 조회 이벤트를 기록한다.
   @Post(':id/views')
   @HttpCode(204)
   @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 조회 이벤트 기록' })
+  @ApiParam({ name: 'id', description: '클립 ID' })
+  @ApiNoContentResponse({
+    description: '조회 이벤트가 기록되었습니다.',
+  })
+  @ApiNotFoundResponse({
+    description: '클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
   recordClipView(
     @Request() req: { user: AuthContext },
     @Param('id') id: string,
@@ -158,16 +241,34 @@ export class ClipsController {
     return this.recordClipViewUseCase.execute(req.user.userId, id);
   }
 
-  // 클립에 좋아요를 등록한다.
   @Post(':id/likes')
   @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 좋아요 등록' })
+  @ApiParam({ name: 'id', description: '클립 ID' })
+  @ApiOkResponse({
+    description: '좋아요 상태를 반환합니다.',
+    type: LikeClipResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: '클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
   likeClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
     return this.likeClipUseCase.execute(req.user.userId, id);
   }
 
-  // 클립 좋아요를 취소한다.
   @Delete(':id/likes')
   @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 좋아요 취소' })
+  @ApiParam({ name: 'id', description: '클립 ID' })
+  @ApiOkResponse({
+    description: '좋아요 상태를 반환합니다.',
+    type: LikeClipResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: '클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
   unlikeClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
     return this.unlikeClipUseCase.execute(req.user.userId, id);
   }
