@@ -72,6 +72,7 @@ async function bootstrap() {
     .addTag('Folders', '개인 워크스페이스 폴더 관리 API')
     .addTag('Users', '내 프로필 및 사용자 설정 API')
     .addTag('Workspaces', '개인 워크스페이스 구독 정보 API')
+    .addTag('Trash', '휴지통 조회, 복구, 영구 삭제 API')
     .addBearerAuth(
       {
         type: 'http',

@@ -13,7 +13,7 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   createFolder: jest.fn(),
   updateFolderName: jest.fn(),
   updateFolderOrder: jest.fn(),
-  softDeleteFolder: jest.fn(),
+  softDeleteFolderWithClips: jest.fn(),
   findPreviousFolderOrder: jest.fn(),
   findNextFolderOrder: jest.fn(),
 });
@@ -33,11 +33,13 @@ describe('DeleteFolderUseCase', () => {
   it('폴더를 삭제한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
-    repo.softDeleteFolder.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.softDeleteFolderWithClips.mockResolvedValue({
+      id: 'folder-id',
+    } as never);
 
     const usecase = new DeleteFolderUseCase(repo);
     await usecase.execute('user-id', 'folder-id');
 
-    expect(repo.softDeleteFolder).toHaveBeenCalledWith('folder-id');
+    expect(repo.softDeleteFolderWithClips).toHaveBeenCalledWith('folder-id');
   });
 });
