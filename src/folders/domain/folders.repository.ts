@@ -31,7 +31,7 @@ export interface FoldersRepository {
   createFolder(params: CreateFolderParams): Promise<Folder>;
   updateFolderName(folderId: string, name: string): Promise<Folder>;
   updateFolderOrder(folderId: string, order: number): Promise<Folder>;
-  softDeleteFolder(folderId: string): Promise<Folder>;
+  softDeleteFolderWithClips(folderId: string): Promise<Folder>;
   findPreviousFolderOrder(params: FolderOrderParams): Promise<number | null>;
   findNextFolderOrder(params: FolderOrderParams): Promise<number | null>;
 }
