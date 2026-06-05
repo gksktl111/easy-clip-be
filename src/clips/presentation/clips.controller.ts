@@ -33,27 +33,6 @@ import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.
 import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
 import { ClipsError } from '../application/errors/clips.error';
 
-// TODO: 현재 clips 도메인이 콘텐츠 + 상호작용(Like, View, Favorite)을 모두 포함하며
-// Aggregate 경계가 흐려지고 있음.
-// → Clip(콘텐츠)과 Interaction(사용자-클립 관계)을 분리 필요.
-//
-// [분리 대상 엔드포인트]
-// 1. View 관련
-//    - POST   /clips/:id/views
-//    - GET    /clips/views/recent
-//
-// 2. Like 관련
-//    - POST   /clips/:id/likes
-//    - DELETE /clips/:id/likes
-//
-// → 위 엔드포인트는 ClipController에서 제거 후
-//   Interaction 전용 Controller로 이동.
-//
-// 목표:
-// - Clip 도메인은 콘텐츠 CRUD 및 검색만 책임
-// - Interaction 도메인은 사용자-클립 관계 데이터(Like/View/Favorite)만 책임
-// - Clip은 Interaction을 모르도록 의존성 단방향 유지
-
 @Controller('clips')
 @UseFilters(ApplicationExceptionFilter)
 export class ClipsController {
