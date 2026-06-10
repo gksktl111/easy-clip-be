@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AuthContext } from 'src/common/types/auth-context.type';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
-import { AccessTokenResult } from '../auth.types';
+import { RefreshAccessTokenOutput } from '../dtos/refresh-access-token-output.dto';
 import {
   assertRefreshTokenMatches,
   assertRefreshTokenSession,
@@ -18,7 +18,7 @@ export class RefreshAccessTokenUseCase {
   async execute(
     context: AuthContext,
     refreshToken: string,
-  ): Promise<AccessTokenResult> {
+  ): Promise<RefreshAccessTokenOutput> {
     const { accountId, platform } = context;
 
     const session = assertRefreshTokenSession(

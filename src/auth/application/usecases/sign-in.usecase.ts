@@ -4,7 +4,7 @@ import type { AuthRepository } from '../../domain/auth.repository';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AuthError } from '../errors/auth.error';
-import { OAuthSignInResult } from '../auth.types';
+import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 import { OAuthUser } from '../../domain/auth.types';
 import { issueAuthResult } from '../policies/auth-result.policy';
 import {
@@ -21,7 +21,7 @@ export class SignInUseCase {
     private readonly authSessionPort: AuthSessionPort,
   ) {}
 
-  async execute(oauthUser: OAuthUser): Promise<OAuthSignInResult> {
+  async execute(oauthUser: OAuthUser): Promise<AuthSessionOutput> {
     const email = requireOAuthEmail(oauthUser);
 
     const existingAccount = await this.authRepository.findAccountByProvider(
