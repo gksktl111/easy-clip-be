@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { USERS_REPOSITORY } from '../../domain/users.repository';
 import type { UsersRepository } from '../../domain/users.repository';
+import { UserProfileOutput } from '../dtos/user-profile-output.dto';
 import { mapMeResponse } from '../policies/map-me-response.policy';
 import { UsersError } from '../errors/users.error';
 
@@ -11,7 +12,7 @@ export class GetMeUseCase {
     private readonly usersRepository: UsersRepository,
   ) {}
 
-  async execute(userId: string, accountId: string) {
+  async execute(userId: string, accountId: string): Promise<UserProfileOutput> {
     const user = await this.usersRepository.findUserWithAuthAccounts(userId);
 
     if (!user) {
