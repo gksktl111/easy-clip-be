@@ -1,11 +1,11 @@
 import type { UpdateWorkspaceSubscriptionParams } from '../../domain/workspaces.repository';
 import {
-  UpdateMySubscriptionInput,
   WorkspaceSubscription,
   WorkspaceSubscriptionAction,
   WorkspaceSubscriptionPlan,
   WorkspaceSubscriptionStatus,
 } from '../../domain/workspace.types';
+import { UpdateMySubscriptionInput } from '../dtos/update-my-subscription-input.dto';
 import { WorkspacesError } from '../errors/workspaces.error';
 
 const DEFAULT_PRO_BILLING_DAYS = 30;

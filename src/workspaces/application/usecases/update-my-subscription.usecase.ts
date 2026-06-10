@@ -1,10 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { WORKSPACES_REPOSITORY } from '../../domain/workspaces.repository';
 import type { WorkspacesRepository } from '../../domain/workspaces.repository';
-import {
-  MySubscriptionResponse,
-  UpdateMySubscriptionInput,
-} from '../../domain/workspace.types';
+import { MySubscriptionOutput } from '../dtos/my-subscription-output.dto';
+import { UpdateMySubscriptionInput } from '../dtos/update-my-subscription-input.dto';
 import { normalizeExpiredSubscription } from '../policies/subscription-expiration.policy';
 import { toMySubscriptionResponse } from '../policies/subscription-response.policy';
 import {
@@ -22,7 +20,7 @@ export class UpdateMySubscriptionUseCase {
   async execute(
     userId: string,
     input: UpdateMySubscriptionInput,
-  ): Promise<MySubscriptionResponse> {
+  ): Promise<MySubscriptionOutput> {
     validateUpdateMySubscriptionInput(input);
 
     const currentSubscription =

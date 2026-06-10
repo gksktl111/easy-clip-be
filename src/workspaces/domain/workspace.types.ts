@@ -33,15 +33,3 @@ export type WorkspaceSubscription = {
   currentPeriodEnd: Date | null;
   startedAt: Date;
 };
-
-export type UpdateMySubscriptionInput = {
-  type: WorkspaceSubscriptionAction;
-  plan?: WorkspaceSubscriptionPlan;
-};
-
-export type MySubscriptionResponse = {
-  plan: WorkspaceSubscriptionPlan;
-  status: WorkspaceSubscriptionStatus;
-  autoRenew: boolean;
-  currentPeriodEnd: Date | null;
-};

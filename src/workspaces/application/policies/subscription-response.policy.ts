@@ -1,11 +1,9 @@
-import {
-  MySubscriptionResponse,
-  WorkspaceSubscription,
-} from '../../domain/workspace.types';
+import { WorkspaceSubscription } from '../../domain/workspace.types';
+import { MySubscriptionOutput } from '../dtos/my-subscription-output.dto';
 
 export function toMySubscriptionResponse(
   subscription: WorkspaceSubscription,
-): MySubscriptionResponse {
+): MySubscriptionOutput {
   return {
     plan: subscription.plan,
     status: subscription.status,
