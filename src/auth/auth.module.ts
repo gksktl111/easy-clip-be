@@ -16,6 +16,7 @@ import { SwitchUserUseCase } from './application/usecases/switch-user.usecase';
 import { RefreshAccessTokenUseCase } from './application/usecases/refresh-access-token.usecase';
 import { LogoutUseCase } from './application/usecases/logout.usecase';
 import { JwtAuthSessionPort } from './infrastructure/jwt-auth-session.port';
+import { TestAdminLoginUseCase } from './application/usecases/test-admin-login.usecase';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { JwtAuthSessionPort } from './infrastructure/jwt-auth-session.port';
     SwitchUserUseCase,
     RefreshAccessTokenUseCase,
     LogoutUseCase,
+    TestAdminLoginUseCase,
     GoogleStrategy,
     GithubStrategy,
     JwtAccessGuard,
