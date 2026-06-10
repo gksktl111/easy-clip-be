@@ -1,18 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { FOLDERS_REPOSITORY } from '../../domain/folders.repository';
 import type { FoldersRepository } from '../../domain/folders.repository';
+import { FolderOutput } from '../dtos/folder-output.dto';
+import { ReorderFolderInput } from '../dtos/reorder-folder-input.dto';
 import { FoldersError } from '../errors/folders.error';
 import {
   calculateReorderedFolderOrder,
   resolveReferenceId,
   validateReorderFolderInput,
 } from '../policies/reorder-folder.policy';
-
-export type ReorderFolderInput = {
-  targetId: string;
-  afterId?: string;
-  beforeId?: string;
-};
 
 @Injectable()
 export class ReorderFolderUseCase {
@@ -21,7 +17,10 @@ export class ReorderFolderUseCase {
     private readonly foldersRepository: FoldersRepository,
   ) {}
 
-  async execute(userId: string, input: ReorderFolderInput) {
+  async execute(
+    userId: string,
+    input: ReorderFolderInput,
+  ): Promise<FolderOutput> {
     const { targetId, beforeId } = input;
     validateReorderFolderInput(input);
 

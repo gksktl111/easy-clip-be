@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { FOLDERS_REPOSITORY } from '../../domain/folders.repository';
 import type { FoldersRepository } from '../../domain/folders.repository';
+import { FolderOutput } from '../dtos/folder-output.dto';
 import { FoldersError } from '../errors/folders.error';
 
 @Injectable()
@@ -10,7 +11,7 @@ export class DeleteFolderUseCase {
     private readonly foldersRepository: FoldersRepository,
   ) {}
 
-  async execute(userId: string, folderId: string) {
+  async execute(userId: string, folderId: string): Promise<FolderOutput> {
     const folder = await this.foldersRepository.findPersonalFolderById(
       userId,
       folderId,

@@ -1,7 +1,7 @@
 import { UpdateAuthAccountProfileParams } from '../../domain/users.repository';
 import { UserAuthAccount, UserWithAuthAccounts } from '../../domain/user.types';
 import { UsersError } from '../errors/users.error';
-import { UpdateMeInput } from '../usecases/update-me.usecase';
+import { UpdateMeInput } from '../dtos/update-me-input.dto';
 
 export function resolveCurrentAuthAccount(
   user: UserWithAuthAccounts,

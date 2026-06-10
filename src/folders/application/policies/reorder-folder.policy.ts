@@ -1,6 +1,6 @@
 import { Folder } from '../../domain/folder.types';
 import { FoldersError } from '../errors/folders.error';
-import { ReorderFolderInput } from '../usecases/reorder-folder.usecase';
+import { ReorderFolderInput } from '../dtos/reorder-folder-input.dto';
 
 export function validateReorderFolderInput(input: ReorderFolderInput) {
   const { targetId, afterId, beforeId } = input;

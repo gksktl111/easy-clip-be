@@ -1,13 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { USERS_REPOSITORY } from '../../domain/users.repository';
 import type { UsersRepository } from '../../domain/users.repository';
-import type { UserTheme } from '../../domain/user.types';
+import { UpdateUserSettingsInput } from '../dtos/update-user-settings-input.dto';
+import { UserSettingsOutput } from '../dtos/user-settings-output.dto';
 import { UsersError } from '../errors/users.error';
-
-export type UpdateUserSettingsInput = {
-  theme?: UserTheme;
-  language?: string;
-};
 
 @Injectable()
 export class UpdateUserSettingsUseCase {
@@ -16,7 +12,10 @@ export class UpdateUserSettingsUseCase {
     private readonly usersRepository: UsersRepository,
   ) {}
 
-  async execute(userId: string, input: UpdateUserSettingsInput) {
+  async execute(
+    userId: string,
+    input: UpdateUserSettingsInput,
+  ): Promise<UserSettingsOutput> {
     const user = await this.usersRepository.findUserById(userId);
 
     if (!user) {

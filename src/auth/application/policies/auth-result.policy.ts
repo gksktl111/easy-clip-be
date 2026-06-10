@@ -1,6 +1,6 @@
 import { AuthContext } from 'src/common/types/auth-context.type';
 import type { AuthSessionPort } from '../ports/auth-session.port';
-import { OAuthSignInResult } from '../auth.types';
+import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 
 export async function issueAuthResult(
   authSessionPort: AuthSessionPort,
@@ -14,7 +14,7 @@ export async function issueAuthResult(
     };
     platform: AuthContext['platform'];
   },
-): Promise<OAuthSignInResult> {
+): Promise<AuthSessionOutput> {
   const context: AuthContext = {
     userId: params.userId,
     accountId: params.account.id,
