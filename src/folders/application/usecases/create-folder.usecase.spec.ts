@@ -26,7 +26,7 @@ describe('CreateFolderUseCase', () => {
     repo.createFolder.mockResolvedValue({ id: 'folder-id' } as never);
 
     const usecase = new CreateFolderUseCase(repo);
-    const result = await usecase.execute('user-id', 'Inbox');
+    const result = await usecase.execute('user-id', { name: 'Inbox' });
 
     expect(repo.createFolder).toHaveBeenCalledWith({
       name: 'Inbox',
@@ -43,7 +43,7 @@ describe('CreateFolderUseCase', () => {
     repo.createFolder.mockResolvedValue({ id: 'folder-id' } as never);
 
     const usecase = new CreateFolderUseCase(repo);
-    await usecase.execute('user-id', 'Inbox');
+    await usecase.execute('user-id', { name: 'Inbox' });
 
     expect(repo.createFolder).toHaveBeenCalledWith({
       name: 'Inbox',

@@ -1,10 +1,11 @@
-import { UserProfile, UserWithAuthAccounts } from '../../domain/user.types';
+import { UserWithAuthAccounts } from '../../domain/user.types';
+import { UserProfileOutput } from '../dtos/user-profile-output.dto';
 import { UsersError } from '../errors/users.error';
 
 export function mapMeResponse(
   user: UserWithAuthAccounts,
   accountId: string,
-): UserProfile {
+): UserProfileOutput {
   const account = user.authAccounts.find((item) => item.id === accountId);
 
   if (!account) {

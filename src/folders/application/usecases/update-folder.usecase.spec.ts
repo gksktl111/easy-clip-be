@@ -26,7 +26,7 @@ describe('UpdateFolderUseCase', () => {
     const usecase = new UpdateFolderUseCase(repo);
 
     await expect(
-      usecase.execute('user-id', 'folder-id', 'Renamed'),
+      usecase.execute('user-id', { folderId: 'folder-id', name: 'Renamed' }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
@@ -36,7 +36,7 @@ describe('UpdateFolderUseCase', () => {
     repo.findPersonalFolderById.mockResolvedValue(folder as never);
 
     const usecase = new UpdateFolderUseCase(repo);
-    const result = await usecase.execute('user-id', 'folder-id');
+    const result = await usecase.execute('user-id', { folderId: 'folder-id' });
 
     expect(repo.updateFolderName).not.toHaveBeenCalled();
     expect(result).toBe(folder);
@@ -48,7 +48,10 @@ describe('UpdateFolderUseCase', () => {
     repo.updateFolderName.mockResolvedValue({ id: 'folder-id' } as never);
 
     const usecase = new UpdateFolderUseCase(repo);
-    await usecase.execute('user-id', 'folder-id', 'Renamed');
+    await usecase.execute('user-id', {
+      folderId: 'folder-id',
+      name: 'Renamed',
+    });
 
     expect(repo.updateFolderName).toHaveBeenCalledWith('folder-id', 'Renamed');
   });

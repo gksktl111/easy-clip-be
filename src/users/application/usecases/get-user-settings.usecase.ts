@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { USERS_REPOSITORY } from '../../domain/users.repository';
 import type { UsersRepository } from '../../domain/users.repository';
+import { UserSettingsOutput } from '../dtos/user-settings-output.dto';
 import { UsersError } from '../errors/users.error';
 
 @Injectable()
@@ -10,7 +11,7 @@ export class GetUserSettingsUseCase {
     private readonly usersRepository: UsersRepository,
   ) {}
 
-  async execute(userId: string) {
+  async execute(userId: string): Promise<UserSettingsOutput> {
     const user = await this.usersRepository.findUserById(userId);
 
     if (!user) {

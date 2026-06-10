@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { FOLDERS_REPOSITORY } from '../../domain/folders.repository';
 import type { FoldersRepository } from '../../domain/folders.repository';
+import { CreateFolderInput } from '../dtos/create-folder-input.dto';
+import { FolderOutput } from '../dtos/folder-output.dto';
 
 @Injectable()
 export class CreateFolderUseCase {
@@ -9,7 +11,10 @@ export class CreateFolderUseCase {
     private readonly foldersRepository: FoldersRepository,
   ) {}
 
-  async execute(userId: string, name: string) {
+  async execute(
+    userId: string,
+    input: CreateFolderInput,
+  ): Promise<FolderOutput> {
     const workspaceId =
       await this.foldersRepository.getOrCreatePersonalWorkspaceId(userId);
 
@@ -18,7 +23,7 @@ export class CreateFolderUseCase {
     const nextOrder = lastOrder ? lastOrder + 1 : 1;
 
     return this.foldersRepository.createFolder({
-      name,
+      name: input.name,
       order: nextOrder,
       workspaceId,
     });

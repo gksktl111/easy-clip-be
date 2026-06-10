@@ -93,7 +93,7 @@ export class FoldersController {
     @Request() req: { user: AuthContext },
     @Body() dto: CreateFolderDto,
   ) {
-    return this.createFolderUseCase.execute(req.user.userId, dto.name);
+    return this.createFolderUseCase.execute(req.user.userId, dto);
   }
 
   @Patch('reorder')
@@ -133,7 +133,10 @@ export class FoldersController {
     @Param('id') id: string,
     @Body() dto: UpdateFolderDto,
   ) {
-    return this.updateFolderUseCase.execute(req.user.userId, id, dto.name);
+    return this.updateFolderUseCase.execute(req.user.userId, {
+      folderId: id,
+      ...dto,
+    });
   }
 
   @Delete(':id')

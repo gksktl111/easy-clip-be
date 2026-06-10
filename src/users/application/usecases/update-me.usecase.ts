@@ -1,17 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { USERS_REPOSITORY } from '../../domain/users.repository';
 import type { UsersRepository } from '../../domain/users.repository';
+import { UpdateMeInput } from '../dtos/update-me-input.dto';
+import { UserProfileOutput } from '../dtos/user-profile-output.dto';
 import { mapMeResponse } from '../policies/map-me-response.policy';
 import { UsersError } from '../errors/users.error';
 import {
   buildUpdateMeParams,
   resolveCurrentAuthAccount,
 } from '../policies/update-me.policy';
-
-export type UpdateMeInput = {
-  displayName?: string | null;
-  avatarUrl?: string | null;
-};
 
 @Injectable()
 export class UpdateMeUseCase {
@@ -20,7 +17,11 @@ export class UpdateMeUseCase {
     private readonly usersRepository: UsersRepository,
   ) {}
 
-  async execute(userId: string, accountId: string, input: UpdateMeInput) {
+  async execute(
+    userId: string,
+    accountId: string,
+    input: UpdateMeInput,
+  ): Promise<UserProfileOutput> {
     const user = await this.usersRepository.findUserWithAuthAccounts(userId);
 
     if (!user) {

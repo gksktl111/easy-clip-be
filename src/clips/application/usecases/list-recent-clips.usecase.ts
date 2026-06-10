@@ -2,22 +2,17 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   CLIPS_REPOSITORY,
   ClipSearchTarget,
-  ClipTypeFilter,
 } from '../../domain/clips.repository';
 import { ClipType } from '../../domain/clip.types';
 import type { ClipsRepository } from '../../domain/clips.repository';
+import { ClipCursorPageOutput } from '../dtos/clip-cursor-page-output.dto';
+import { ListRecentClipsInput } from '../dtos/list-recent-clips-input.dto';
 import { ClipsError } from '../errors/clips.error';
 import { normalizeCursor, normalizeType } from './list-clips.common';
 import {
   listRecentClipsWithLikedPriority,
   resolveRecentClipSearchTarget,
 } from './list-clips.policy';
-
-export type ListRecentClipsInput = {
-  cursor?: string;
-  type: ClipTypeFilter;
-  q?: string;
-};
 
 @Injectable()
 export class ListRecentClipsUseCase {
@@ -26,7 +21,10 @@ export class ListRecentClipsUseCase {
     private readonly clipsRepository: ClipsRepository,
   ) {}
 
-  async execute(userId: string, input: ListRecentClipsInput) {
+  async execute(
+    userId: string,
+    input: ListRecentClipsInput,
+  ): Promise<ClipCursorPageOutput> {
     const cursor = normalizeCursor(input.cursor);
     const type = normalizeType(input.type);
     const query = input.q?.trim();

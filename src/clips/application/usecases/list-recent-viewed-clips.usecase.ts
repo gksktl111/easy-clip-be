@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ClipListItem } from '../../domain/clip.types';
 import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
+import { RecentViewedClipsOutput } from '../dtos/recent-viewed-clips-output.dto';
 
 export const RECENT_VIEWED_CLIPS_LIMIT = 50;
 
@@ -12,7 +12,7 @@ export class ListRecentViewedClipsUseCase {
     private readonly clipsRepository: ClipsRepository,
   ) {}
 
-  async execute(userId: string): Promise<{ items: ClipListItem[] }> {
+  async execute(userId: string): Promise<RecentViewedClipsOutput> {
     const recentViews = await this.clipsRepository.findRecentViewedClipIds(
       userId,
       RECENT_VIEWED_CLIPS_LIMIT,

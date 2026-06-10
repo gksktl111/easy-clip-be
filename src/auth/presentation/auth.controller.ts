@@ -33,8 +33,10 @@ import { LinkAccountUseCase } from '../application/usecases/link-account.usecase
 import { SwitchUserUseCase } from '../application/usecases/switch-user.usecase';
 import { RefreshAccessTokenUseCase } from '../application/usecases/refresh-access-token.usecase';
 import { LogoutUseCase } from '../application/usecases/logout.usecase';
+import { TestAdminLoginUseCase } from '../application/usecases/test-admin-login.usecase';
 import { OAuthUser } from '../domain/auth.types';
 import { ErrorResponseDto } from 'src/common/presentation/dtos/error-response.dto';
+import { TestAdminLoginDto } from './dtos/test-admin-login.dto';
 
 interface OAuthRequest extends ExpressRequest {
   user: OAuthUser;
@@ -50,6 +52,7 @@ export class AuthController {
     private readonly switchUserUseCase: SwitchUserUseCase,
     private readonly refreshAccessTokenUseCase: RefreshAccessTokenUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly testAdminLoginUseCase: TestAdminLoginUseCase,
   ) {}
 
   /* ======================================================
@@ -130,6 +133,22 @@ export class AuthController {
   })
   githubCallback(@Request() req: OAuthRequest) {
     return this.handleOAuthCallback(req.user);
+  }
+
+  @Post('test/admin-login')
+  @ApiOperation({ summary: '테스트용 관리자 로그인' })
+  @ApiBody({ type: TestAdminLoginDto, required: false })
+  @ApiOkResponse({
+    description: '테스트 관리자 계정으로 토큰과 사용자 정보를 발급합니다.',
+    type: AuthSignInResponseDto,
+  })
+  testAdminLogin(@Body() dto: TestAdminLoginDto = {}) {
+    return this.testAdminLoginUseCase.execute({
+      email: 'admin@easyclip.local',
+      displayName: 'Test Admin',
+      avatarUrl: null,
+      platform: dto.platform ?? 'WEB',
+    });
   }
 
   /* ======================================================

@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   CLIPS_REPOSITORY,
-  ClipTypeFilter,
 } from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
+import { ClipCursorPageOutput } from '../dtos/clip-cursor-page-output.dto';
+import { ListFolderClipsInput } from '../dtos/list-folder-clips-input.dto';
 import { ClipsError } from '../errors/clips.error';
 import { normalizeCursor, normalizeType } from './list-clips.common';
 import {
@@ -12,13 +13,6 @@ import {
   validateClipCursor,
 } from './list-clips.policy';
 
-export type ListFolderClipsInput = {
-  folderId: string;
-  cursor?: string;
-  type: ClipTypeFilter;
-  q?: string;
-};
-
 @Injectable()
 export class ListFolderClipsUseCase {
   constructor(
@@ -26,7 +20,10 @@ export class ListFolderClipsUseCase {
     private readonly clipsRepository: ClipsRepository,
   ) {}
 
-  async execute(userId: string, input: ListFolderClipsInput) {
+  async execute(
+    userId: string,
+    input: ListFolderClipsInput,
+  ): Promise<ClipCursorPageOutput> {
     const cursor = normalizeCursor(input.cursor);
     const type = normalizeType(input.type);
     const query = input.q?.trim();
