@@ -1,13 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
+import type { Clip } from '../../domain/clip.types';
 import type { ClipsRepository } from '../../domain/clips.repository';
+import { CreateClipInput } from '../dtos/create-clip-input.dto';
 import { ClipsError } from '../errors/clips.error';
 import { resolveClipData } from '../policies/clip-data.policy';
-
-export type CreateClipInput = {
-  folderId: string;
-  text?: string;
-};
 
 @Injectable()
 export class CreateClipUseCase {
@@ -20,7 +17,7 @@ export class CreateClipUseCase {
     userId: string,
     input: CreateClipInput,
     file?: Express.Multer.File,
-  ) {
+  ): Promise<Clip> {
     const folder = await this.clipsRepository.findPersonalFolderById(
       userId,
       input.folderId,
