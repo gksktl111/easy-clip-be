@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { WorkspaceType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TrashRepository } from '../domain/trash.repository';
 import { TrashClipItem, TrashFolderItem } from '../domain/trash.types';
@@ -16,7 +15,6 @@ export class PrismaTrashRepository implements TrashRepository {
         },
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
       orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
@@ -42,7 +40,6 @@ export class PrismaTrashRepository implements TrashRepository {
         },
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
       select: {
@@ -85,7 +82,6 @@ export class PrismaTrashRepository implements TrashRepository {
         },
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
       orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
@@ -109,7 +105,6 @@ export class PrismaTrashRepository implements TrashRepository {
         },
         workspace: {
           ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
         },
       },
       select: {

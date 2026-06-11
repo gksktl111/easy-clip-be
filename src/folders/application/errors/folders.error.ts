@@ -5,7 +5,7 @@ import {
 
 export type FoldersErrorCode = Extract<
   ApplicationErrorCode,
-  'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL'
+  'BAD_REQUEST' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL'
 >;
 
 export class FoldersError extends ApplicationError {

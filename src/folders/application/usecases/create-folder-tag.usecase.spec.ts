@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { UpdateFolderUseCase } from './update-folder.usecase';
 import { FoldersRepository } from '../../domain/folders.repository';
+import { CreateFolderTagUseCase } from './create-folder-tag.usecase';
 
 const createRepository = (): jest.Mocked<FoldersRepository> => ({
   findPersonalWorkspaceId: jest.fn(),
@@ -24,41 +24,50 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   findNextFolderOrder: jest.fn(),
 });
 
-describe('UpdateFolderUseCase', () => {
+describe('CreateFolderTagUseCase', () => {
   it('폴더가 없으면 에러를 던진다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue(null);
 
-    const usecase = new UpdateFolderUseCase(repo);
+    const usecase = new CreateFolderTagUseCase(repo);
 
     await expect(
-      usecase.execute('user-id', { folderId: 'folder-id', name: 'Renamed' }),
+      usecase.execute('user-id', { folderId: 'folder-id', name: 'backend' }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('이름이 없으면 기존 폴더를 반환한다', async () => {
-    const repo = createRepository();
-    const folder = { id: 'folder-id' };
-    repo.findPersonalFolderById.mockResolvedValue(folder as never);
-
-    const usecase = new UpdateFolderUseCase(repo);
-    const result = await usecase.execute('user-id', { folderId: 'folder-id' });
-
-    expect(repo.updateFolderName).not.toHaveBeenCalled();
-    expect(result).toBe(folder);
-  });
-
-  it('이름이 있으면 업데이트한다', async () => {
+  it('같은 폴더에 같은 이름의 태그가 있으면 에러를 던진다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
-    repo.updateFolderName.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.findTagByNameInFolder.mockResolvedValue({ id: 'tag-id' } as never);
 
-    const usecase = new UpdateFolderUseCase(repo);
-    await usecase.execute('user-id', {
+    const usecase = new CreateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', { folderId: 'folder-id', name: 'backend' }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('폴더 태그를 생성한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.findTagByNameInFolder.mockResolvedValue(null);
+    repo.createFolderTag.mockResolvedValue({
+      id: 'tag-id',
       folderId: 'folder-id',
-      name: 'Renamed',
+      name: 'backend',
+    } as never);
+
+    const usecase = new CreateFolderTagUseCase(repo);
+    const result = await usecase.execute('user-id', {
+      folderId: 'folder-id',
+      name: 'backend',
     });
 
-    expect(repo.updateFolderName).toHaveBeenCalledWith('folder-id', 'Renamed');
+    expect(repo.createFolderTag).toHaveBeenCalledWith({
+      folderId: 'folder-id',
+      name: 'backend',
+    });
+    expect(result.id).toBe('tag-id');
   });
 });

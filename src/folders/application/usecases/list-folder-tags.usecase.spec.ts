@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { DeleteFolderUseCase } from './delete-folder.usecase';
 import { FoldersRepository } from '../../domain/folders.repository';
+import { ListFolderTagsUseCase } from './list-folder-tags.usecase';
 
 const createRepository = (): jest.Mocked<FoldersRepository> => ({
   findPersonalWorkspaceId: jest.fn(),
@@ -24,28 +24,28 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   findNextFolderOrder: jest.fn(),
 });
 
-describe('DeleteFolderUseCase', () => {
+describe('ListFolderTagsUseCase', () => {
   it('폴더가 없으면 에러를 던진다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue(null);
 
-    const usecase = new DeleteFolderUseCase(repo);
+    const usecase = new ListFolderTagsUseCase(repo);
 
     await expect(usecase.execute('user-id', 'folder-id')).rejects.toMatchObject(
       { code: 'NOT_FOUND' },
     );
   });
 
-  it('폴더를 삭제한다', async () => {
+  it('폴더 태그 목록을 조회한다', async () => {
     const repo = createRepository();
+    const tags = [{ id: 'tag-id', name: 'backend', folderId: 'folder-id' }];
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
-    repo.softDeleteFolderWithClips.mockResolvedValue({
-      id: 'folder-id',
-    } as never);
+    repo.findTagsByFolderId.mockResolvedValue(tags as never);
 
-    const usecase = new DeleteFolderUseCase(repo);
-    await usecase.execute('user-id', 'folder-id');
+    const usecase = new ListFolderTagsUseCase(repo);
+    const result = await usecase.execute('user-id', 'folder-id');
 
-    expect(repo.softDeleteFolderWithClips).toHaveBeenCalledWith('folder-id');
+    expect(repo.findTagsByFolderId).toHaveBeenCalledWith('folder-id');
+    expect(result).toBe(tags);
   });
 });
