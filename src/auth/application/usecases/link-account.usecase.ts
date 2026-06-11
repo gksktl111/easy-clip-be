@@ -6,11 +6,11 @@ import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AuthError } from '../errors/auth.error';
 import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 import { OAuthUser } from '../../domain/auth.types';
-import { issueAuthResult } from '../policies/auth-result.policy';
+import { issueAuthResult } from '../helpers/auth-result.helper';
 import {
   requireOAuthEmail,
   toCreateAuthAccountInput,
-} from '../policies/oauth-account.policy';
+} from '../helpers/oauth-account.helper';
 
 @Injectable()
 export class LinkAccountUseCase {

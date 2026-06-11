@@ -11,7 +11,7 @@ import {
   listClipsWithLikedPriority,
   resolveClipSearchTarget,
   validateClipCursor,
-} from './list-clips.policy';
+} from './list-clips.helper';
 
 @Injectable()
 export class ListFolderClipsUseCase {

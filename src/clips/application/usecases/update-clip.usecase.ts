@@ -4,7 +4,7 @@ import type { Clip } from '../../domain/clip.types';
 import type { ClipsRepository } from '../../domain/clips.repository';
 import { UpdateClipInput } from '../dtos/update-clip-input.dto';
 import { ClipsError } from '../errors/clips.error';
-import { resolveClipData } from '../policies/clip-data.policy';
+import { resolveClipData } from '../helpers/clip-data.helper';
 
 @Injectable()
 export class UpdateClipUseCase {

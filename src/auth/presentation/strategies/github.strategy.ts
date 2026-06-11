@@ -9,7 +9,7 @@ import { OAuthUser } from '../../domain/auth.types';
 import {
   buildOAuthState,
   parseOAuthState,
-} from '../policies/oauth-state.policy';
+} from '../helpers/oauth-state.helper';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
