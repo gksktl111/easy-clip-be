@@ -9,6 +9,10 @@ import { ReorderFolderUseCase } from './application/usecases/reorder-folder.usec
 import { DeleteFolderUseCase } from './application/usecases/delete-folder.usecase';
 import { CreateFolderUseCase } from './application/usecases/create-folder.usecase';
 import { UpdateFolderUseCase } from './application/usecases/update-folder.usecase';
+import { ListFolderTagsUseCase } from './application/usecases/list-folder-tags.usecase';
+import { CreateFolderTagUseCase } from './application/usecases/create-folder-tag.usecase';
+import { UpdateFolderTagUseCase } from './application/usecases/update-folder-tag.usecase';
+import { DeleteFolderTagUseCase } from './application/usecases/delete-folder-tag.usecase';
 
 @Module({
   controllers: [FoldersController],
@@ -18,6 +22,10 @@ import { UpdateFolderUseCase } from './application/usecases/update-folder.usecas
     GetFolderUseCase,
     CreateFolderUseCase,
     UpdateFolderUseCase,
+    ListFolderTagsUseCase,
+    CreateFolderTagUseCase,
+    UpdateFolderTagUseCase,
+    DeleteFolderTagUseCase,
     ReorderFolderUseCase,
     DeleteFolderUseCase,
     JwtAccessGuard,
