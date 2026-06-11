@@ -109,7 +109,6 @@ model Workspace {
   subscription Subscription?
   folders      Folder[]
   clips        Clip[]
-  tags         Tag[]
 }
 
 model UserSettings {
@@ -153,6 +152,7 @@ model Folder {
   // 폴더 소유자 (워크스페이스 삭제 시 폴더도 삭제)
 
   clips Clip[] // 폴더에 포함된 클립들
+  tags  Tag[]  // 폴더에 포함된 태그들
 
   createdAt DateTime @default(now())    // 생성 시각
   updatedAt DateTime @updatedAt         // 수정 시각
@@ -197,14 +197,14 @@ model Tag {
   id   String @id @default(cuid()) // 태그 고유 ID
   name String                      // 태그 이름
 
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  // 태그 소유자 (워크스페이스별 태그)
+  folderId String
+  folder   Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  // 태그 소유자 (폴더별 태그)
 
   clips ClipTag[] // 태그가 연결된 클립들
 
-  @@unique([workspaceId, name]) // 워크스페이스 내 태그 이름 중복 방지
-  @@index([workspaceId])        // 워크스페이스별 태그 조회 성능 최적화
+  @@unique([folderId, name]) // 폴더 내 태그 이름 중복 방지
+  @@index([folderId])        // 폴더별 태그 조회 성능 최적화
 }
 
 model ClipTag {

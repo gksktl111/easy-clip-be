@@ -2,15 +2,16 @@ import { Injectable } from '@nestjs/common';
 import {
   SubscriptionPlan,
   SubscriptionStatus,
-  WorkspaceType,
 } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   CreateFolderParams,
+  CreateFolderTagParams,
   FolderOrderParams,
   FoldersRepository,
 } from '../domain/folders.repository';
 import { Folder } from '../domain/folder.types';
+import { FolderTag } from '../domain/folder-tag.types';
 
 @Injectable()
 export class PrismaFoldersRepository implements FoldersRepository {
@@ -19,10 +20,7 @@ export class PrismaFoldersRepository implements FoldersRepository {
   async findPersonalWorkspaceId(userId: string): Promise<string | null> {
     const workspace = await this.prisma.workspace.findUnique({
       where: {
-        ownerUserId_type: {
-          ownerUserId: userId,
-          type: WorkspaceType.PERSONAL,
-        },
+        ownerUserId: userId,
       },
       select: { id: true },
     });
@@ -34,15 +32,11 @@ export class PrismaFoldersRepository implements FoldersRepository {
     return this.prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.upsert({
         where: {
-          ownerUserId_type: {
-            ownerUserId: userId,
-            type: WorkspaceType.PERSONAL,
-          },
+          ownerUserId: userId,
         },
         update: {},
         create: {
           name: 'Personal Workspace',
-          type: WorkspaceType.PERSONAL,
           ownerUserId: userId,
         },
         select: { id: true },
@@ -107,6 +101,45 @@ export class PrismaFoldersRepository implements FoldersRepository {
     });
   }
 
+  async findTagsByFolderId(folderId: string): Promise<FolderTag[]> {
+    return (this.prisma.tag as unknown as {
+      findMany(args: unknown): Promise<FolderTag[]>;
+    }).findMany({
+      where: {
+        folderId,
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  async findTagByIdInFolder(
+    folderId: string,
+    tagId: string,
+  ): Promise<FolderTag | null> {
+    return (this.prisma.tag as unknown as {
+      findFirst(args: unknown): Promise<FolderTag | null>;
+    }).findFirst({
+      where: {
+        id: tagId,
+        folderId,
+      },
+    });
+  }
+
+  async findTagByNameInFolder(
+    folderId: string,
+    name: string,
+  ): Promise<FolderTag | null> {
+    return (this.prisma.tag as unknown as {
+      findFirst(args: unknown): Promise<FolderTag | null>;
+    }).findFirst({
+      where: {
+        folderId,
+        name,
+      },
+    });
+  }
+
   async findLastFolderOrder(workspaceId: string): Promise<number | null> {
     const lastFolder = await this.prisma.folder.findFirst({
       where: { workspaceId, deletedAt: null },
@@ -127,9 +160,29 @@ export class PrismaFoldersRepository implements FoldersRepository {
     });
   }
 
+  async createFolderTag(params: CreateFolderTagParams): Promise<FolderTag> {
+    return (this.prisma.tag as unknown as {
+      create(args: unknown): Promise<FolderTag>;
+    }).create({
+      data: {
+        folderId: params.folderId,
+        name: params.name,
+      },
+    });
+  }
+
   async updateFolderName(folderId: string, name: string): Promise<Folder> {
     return this.prisma.folder.update({
       where: { id: folderId },
+      data: { name },
+    });
+  }
+
+  async updateFolderTagName(tagId: string, name: string): Promise<FolderTag> {
+    return (this.prisma.tag as unknown as {
+      update(args: unknown): Promise<FolderTag>;
+    }).update({
+      where: { id: tagId },
       data: { name },
     });
   }
@@ -138,6 +191,12 @@ export class PrismaFoldersRepository implements FoldersRepository {
     return this.prisma.folder.update({
       where: { id: folderId },
       data: { order },
+    });
+  }
+
+  async deleteFolderTag(tagId: string): Promise<void> {
+    await this.prisma.tag.delete({
+      where: { id: tagId },
     });
   }
 

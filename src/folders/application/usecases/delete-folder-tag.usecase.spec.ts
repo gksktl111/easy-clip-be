@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { DeleteFolderUseCase } from './delete-folder.usecase';
 import { FoldersRepository } from '../../domain/folders.repository';
+import { DeleteFolderTagUseCase } from './delete-folder-tag.usecase';
 
 const createRepository = (): jest.Mocked<FoldersRepository> => ({
   findPersonalWorkspaceId: jest.fn(),
@@ -24,28 +24,38 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   findNextFolderOrder: jest.fn(),
 });
 
-describe('DeleteFolderUseCase', () => {
+describe('DeleteFolderTagUseCase', () => {
   it('폴더가 없으면 에러를 던진다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue(null);
 
-    const usecase = new DeleteFolderUseCase(repo);
+    const usecase = new DeleteFolderTagUseCase(repo);
 
-    await expect(usecase.execute('user-id', 'folder-id')).rejects.toMatchObject(
-      { code: 'NOT_FOUND' },
-    );
+    await expect(
+      usecase.execute('user-id', 'folder-id', 'tag-id'),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('폴더를 삭제한다', async () => {
+  it('태그가 없으면 에러를 던진다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
-    repo.softDeleteFolderWithClips.mockResolvedValue({
-      id: 'folder-id',
-    } as never);
+    repo.findTagByIdInFolder.mockResolvedValue(null);
 
-    const usecase = new DeleteFolderUseCase(repo);
-    await usecase.execute('user-id', 'folder-id');
+    const usecase = new DeleteFolderTagUseCase(repo);
 
-    expect(repo.softDeleteFolderWithClips).toHaveBeenCalledWith('folder-id');
+    await expect(
+      usecase.execute('user-id', 'folder-id', 'tag-id'),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('태그를 삭제한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.findTagByIdInFolder.mockResolvedValue({ id: 'tag-id' } as never);
+
+    const usecase = new DeleteFolderTagUseCase(repo);
+    await usecase.execute('user-id', 'folder-id', 'tag-id');
+
+    expect(repo.deleteFolderTag).toHaveBeenCalledWith('tag-id');
   });
 });
