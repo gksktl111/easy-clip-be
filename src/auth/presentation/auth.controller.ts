@@ -18,9 +18,9 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
-import { AuthContext } from 'src/common/types/auth-context.type';
-import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
+import { AuthContext } from 'src/shared/types/auth-context.type';
+import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
 import { SwitchUserDto } from './dtos/switch-user.dto';
 import {
   AuthSignInResponseDto,
@@ -35,7 +35,7 @@ import { RefreshAccessTokenUseCase } from '../application/usecases/refresh-acces
 import { LogoutUseCase } from '../application/usecases/logout.usecase';
 import { TestAdminLoginUseCase } from '../application/usecases/test-admin-login.usecase';
 import { OAuthUser } from '../domain/auth.types';
-import { ErrorResponseDto } from 'src/common/presentation/dtos/error-response.dto';
+import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 import { TestAdminLoginDto } from './dtos/test-admin-login.dto';
 
 interface OAuthRequest extends ExpressRequest {

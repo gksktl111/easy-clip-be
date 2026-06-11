@@ -28,9 +28,9 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
-import { AuthContext } from 'src/common/types/auth-context.type';
-import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
+import { AuthContext } from 'src/shared/types/auth-context.type';
+import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
@@ -51,7 +51,7 @@ import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
 import { ClipsError } from '../application/errors/clips.error';
-import { ErrorResponseDto } from 'src/common/presentation/dtos/error-response.dto';
+import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 
 @Controller('clips')
 @UseFilters(ApplicationExceptionFilter)

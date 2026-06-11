@@ -15,14 +15,14 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { AuthContext } from 'src/common/types/auth-context.type';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
-import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
+import { AuthContext } from 'src/shared/types/auth-context.type';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
+import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
 import { GetMySubscriptionUseCase } from '../application/usecases/get-my-subscription.usecase';
 import { UpdateMySubscriptionUseCase } from '../application/usecases/update-my-subscription.usecase';
 import { UpdateMySubscriptionDto } from './dtos/update-my-subscription.dto';
 import { MySubscriptionResponseDto } from './dtos/workspace-response.dto';
-import { ErrorResponseDto } from 'src/common/presentation/dtos/error-response.dto';
+import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 
 @Controller('workspaces')
 @UseFilters(ApplicationExceptionFilter)

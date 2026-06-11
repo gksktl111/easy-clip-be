@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { ClipsController } from './presentation/clips.controller';
 import { CLIPS_REPOSITORY } from './domain/clips.repository';
 import { PrismaClipsRepository } from './infrastructure/prisma-clips.repository';

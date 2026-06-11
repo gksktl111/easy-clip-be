@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AuthContext } from 'src/common/types/auth-context.type';
+import { AuthContext } from 'src/shared/types/auth-context.type';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { RefreshAccessTokenOutput } from '../dtos/refresh-access-token-output.dto';

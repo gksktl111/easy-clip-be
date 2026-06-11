@@ -20,9 +20,9 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
-import { AuthContext } from 'src/common/types/auth-context.type';
-import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
+import { AuthContext } from 'src/shared/types/auth-context.type';
+import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
 import { CreateFolderDto } from './dtos/create-folder.dto';
 import { ReorderFolderDto } from './dtos/reorder-folder.dto';
 import { UpdateFolderDto } from './dtos/update-folder.dto';
@@ -33,7 +33,7 @@ import { ReorderFolderUseCase } from '../application/usecases/reorder-folder.use
 import { DeleteFolderUseCase } from '../application/usecases/delete-folder.usecase';
 import { CreateFolderUseCase } from '../application/usecases/create-folder.usecase';
 import { UpdateFolderUseCase } from '../application/usecases/update-folder.usecase';
-import { ErrorResponseDto } from 'src/common/presentation/dtos/error-response.dto';
+import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 
 @Controller('folders')
 @UseFilters(ApplicationExceptionFilter)

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { TRASH_REPOSITORY } from './domain/trash.repository';
 import { PrismaTrashRepository } from './infrastructure/prisma-trash.repository';
 import { TrashController } from './presentation/trash.controller';
