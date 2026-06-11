@@ -8,7 +8,7 @@ import {
   calculateReorderedFolderOrder,
   resolveReferenceId,
   validateReorderFolderInput,
-} from '../policies/reorder-folder.policy';
+} from '../helpers/reorder-folder.helper';
 
 @Injectable()
 export class ReorderFolderUseCase {

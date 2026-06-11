@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { USERS_REPOSITORY } from '../../domain/users.repository';
 import type { UsersRepository } from '../../domain/users.repository';
 import { UserProfileOutput } from '../dtos/user-profile-output.dto';
-import { mapMeResponse } from '../policies/map-me-response.policy';
+import { mapMeResponse } from '../helpers/map-me-response.helper';
 import { UsersError } from '../errors/users.error';
 
 @Injectable()

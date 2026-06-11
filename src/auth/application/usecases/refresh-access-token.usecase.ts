@@ -6,7 +6,7 @@ import { RefreshAccessTokenOutput } from '../dtos/refresh-access-token-output.dt
 import {
   assertRefreshTokenMatches,
   assertRefreshTokenSession,
-} from '../policies/refresh-token.policy';
+} from '../helpers/refresh-token.helper';
 
 @Injectable()
 export class RefreshAccessTokenUseCase {
