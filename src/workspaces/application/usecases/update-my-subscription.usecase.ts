@@ -3,12 +3,12 @@ import { WORKSPACES_REPOSITORY } from '../../domain/workspaces.repository';
 import type { WorkspacesRepository } from '../../domain/workspaces.repository';
 import { MySubscriptionOutput } from '../dtos/my-subscription-output.dto';
 import { UpdateMySubscriptionInput } from '../dtos/update-my-subscription-input.dto';
-import { normalizeExpiredSubscription } from '../policies/subscription-expiration.policy';
-import { toMySubscriptionResponse } from '../policies/subscription-response.policy';
+import { normalizeExpiredSubscription } from '../helpers/subscription-expiration.helper';
+import { toMySubscriptionResponse } from '../helpers/subscription-response.helper';
 import {
   buildSubscriptionUpdateParams,
   validateUpdateMySubscriptionInput,
-} from '../policies/update-subscription.policy';
+} from '../helpers/update-subscription.helper';
 
 @Injectable()
 export class UpdateMySubscriptionUseCase {

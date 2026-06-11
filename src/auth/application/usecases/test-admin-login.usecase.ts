@@ -5,7 +5,7 @@ import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 import { TestAdminLoginInput } from '../dtos/test-admin-login-input.dto';
-import { issueAuthResult } from '../policies/auth-result.policy';
+import { issueAuthResult } from '../helpers/auth-result.helper';
 
 const TEST_ADMIN_PROVIDER = 'GITHUB';
 const TEST_ADMIN_PROVIDER_USER_ID = 'easy-clip-test-admin';
