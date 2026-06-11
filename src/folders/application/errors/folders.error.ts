@@ -1,7 +1,7 @@
 import {
   ApplicationError,
   ApplicationErrorCode,
-} from '../../../common/application/application.error';
+} from '../../../shared/application/application.error';
 
 export type FoldersErrorCode = Extract<
   ApplicationErrorCode,

@@ -1,5 +1,5 @@
-import type { AuthContext } from 'src/common/types/auth-context.type';
-import type { AuthPlatform } from 'src/common/types/auth-platform.type';
+import type { AuthContext } from 'src/shared/types/auth-context.type';
+import type { AuthPlatform } from 'src/shared/types/auth-platform.type';
 
 export const AUTH_SESSION_PORT = Symbol('AUTH_SESSION_PORT');
 

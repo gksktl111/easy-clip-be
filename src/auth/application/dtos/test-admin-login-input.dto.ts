@@ -1,4 +1,4 @@
-import type { AuthPlatform } from 'src/common/types/auth-platform.type';
+import type { AuthPlatform } from 'src/shared/types/auth-platform.type';
 
 export type TestAdminLoginInput = {
   email: string;

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
-import { AuthProvider } from 'src/common/types/auth-provider.type';
+import { AuthProvider } from 'src/shared/types/auth-provider.type';
 import { Request } from 'express';
 import type { AuthenticateOptions } from 'passport';
 import { Profile, Strategy } from 'passport-github2';

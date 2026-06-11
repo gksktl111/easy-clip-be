@@ -1,6 +1,6 @@
 import type { Request } from 'express';
-import { AuthContext } from 'src/common/types/auth-context.type';
-import { AuthPlatform } from 'src/common/types/auth-platform.type';
+import { AuthContext } from 'src/shared/types/auth-context.type';
+import { AuthPlatform } from 'src/shared/types/auth-platform.type';
 import { OAuthMode } from '../../domain/auth.types';
 
 type OAuthStatePayload = {

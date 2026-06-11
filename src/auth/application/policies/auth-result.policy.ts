@@ -1,4 +1,4 @@
-import { AuthContext } from 'src/common/types/auth-context.type';
+import { AuthContext } from 'src/shared/types/auth-context.type';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 

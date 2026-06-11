@@ -1,5 +1,5 @@
 import { AuthAccount } from './auth-account.entity';
-import { AuthProvider } from 'src/common/types/auth-provider.type';
+import { AuthProvider } from 'src/shared/types/auth-provider.type';
 
 export const AUTH_REPOSITORY = Symbol('AUTH_REPOSITORY');
 

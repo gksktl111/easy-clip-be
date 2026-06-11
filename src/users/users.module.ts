@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { UsersController } from './presentation/users.controller';
 import { USERS_REPOSITORY } from './domain/users.repository';
 import { PrismaUsersRepository } from './infrastructure/prisma-users.repository';
