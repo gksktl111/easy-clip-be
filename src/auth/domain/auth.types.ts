@@ -1,6 +1,6 @@
 // src/auth/domain/auth.types.ts
-import { AuthPlatform } from 'src/common/types/auth-platform.type';
-import { AuthProvider } from 'src/common/types/auth-provider.type';
+import { AuthPlatform } from 'src/shared/types/auth-platform.type';
+import { AuthProvider } from 'src/shared/types/auth-provider.type';
 
 export type OAuthMode = 'login' | 'link';
 

@@ -17,10 +17,10 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { ApplicationExceptionFilter } from 'src/common/presentation/filters/application-exception.filter';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
-import { ErrorResponseDto } from 'src/common/presentation/dtos/error-response.dto';
-import { AuthContext } from 'src/common/types/auth-context.type';
+import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
+import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
+import { AuthContext } from 'src/shared/types/auth-context.type';
 import { DeleteTrashClipUseCase } from '../application/usecases/delete-trash-clip.usecase';
 import { DeleteTrashFolderUseCase } from '../application/usecases/delete-trash-folder.usecase';
 import { ListTrashClipsUseCase } from '../application/usecases/list-trash-clips.usecase';

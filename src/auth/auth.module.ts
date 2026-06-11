@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/common/presentation/guards/jwt-access.guard';
+import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { AuthController } from './presentation/auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';

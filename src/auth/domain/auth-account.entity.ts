@@ -1,4 +1,4 @@
-import { AuthProvider } from 'src/common/types/auth-provider.type';
+import { AuthProvider } from 'src/shared/types/auth-provider.type';
 
 export type AuthAccount = {
   id: string;
