@@ -62,11 +62,10 @@ export function extractRefreshToken(request: Request): string | undefined {
 
 export function resolveOAuthSuccessRedirectUrl(
   config: ConfigService,
-  userId: string,
 ): string {
   const baseUrl = config.getOrThrow<string>('OAUTH_SUCCESS_REDIRECT_BASE_URL');
 
-  return `${trimTrailingSlash(baseUrl)}/${encodeURIComponent(userId)}`;
+  return `${trimTrailingSlash(baseUrl)}/favorites`;
 }
 
 function extractBearerToken(request: Request): string | undefined {

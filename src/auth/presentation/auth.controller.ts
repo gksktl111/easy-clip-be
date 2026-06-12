@@ -279,8 +279,6 @@ export class AuthController {
     const authSession = await this.handleOAuthCallback(oauthUser);
 
     setAuthCookies(response, this.configService, authSession);
-    response.redirect(
-      resolveOAuthSuccessRedirectUrl(this.configService, authSession.user.id),
-    );
+    response.redirect(resolveOAuthSuccessRedirectUrl(this.configService));
   }
 }

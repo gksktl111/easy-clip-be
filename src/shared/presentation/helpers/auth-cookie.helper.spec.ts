@@ -147,8 +147,8 @@ describe('auth-cookie helper', () => {
       OAUTH_SUCCESS_REDIRECT_BASE_URL: 'http://localhost:3001/',
     });
 
-    expect(resolveOAuthSuccessRedirectUrl(config, 'user-id')).toBe(
-      'http://localhost:3001/user-id',
+    expect(resolveOAuthSuccessRedirectUrl(config)).toBe(
+      'http://localhost:3001/favorites',
     );
   });
 });
