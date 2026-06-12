@@ -9,6 +9,7 @@ import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AuthContext } from 'src/shared/types/auth-context.type';
 import { AuthPlatform } from 'src/shared/types/auth-platform.type';
+import { extractRefreshToken } from 'src/shared/presentation/helpers/auth-cookie.helper';
 
 type JwtClaims = {
   sub: string;
@@ -25,7 +26,7 @@ export class JwtRefreshGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractTokenFromHeader(request);
+    const token = extractRefreshToken(request);
 
     if (!token) {
       throw new UnauthorizedException('Refresh token이 없습니다.');
@@ -51,10 +52,5 @@ export class JwtRefreshGuard implements CanActivate {
     }
 
     return true;
-  }
-
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
   }
 }
