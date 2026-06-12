@@ -115,8 +115,7 @@ PORT=3000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB_NAME
 JWT_ACCESS_SECRET=...
 JWT_REFRESH_SECRET=...
-OAUTH_LOGIN_SUCCESS_REDIRECT_URL=http://localhost:3000/login/success
-OAUTH_LINK_SUCCESS_REDIRECT_URL=http://localhost:3000/settings/accounts
+OAUTH_SUCCESS_REDIRECT_BASE_URL=http://localhost:3001
 AUTH_COOKIE_DOMAIN=
 AUTH_COOKIE_SECURE=false
 AUTH_ACCESS_TOKEN_COOKIE_NAME=easy_clip_access_token
@@ -132,10 +131,9 @@ GITHUB_CLIENT_SECRET=...
 GITHUB_REDIRECT_URI=...
 ```
 
-OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠키로 저장한 뒤 프론트엔드 성공 URL로 리다이렉트합니다.
+OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠키로 저장한 뒤 프론트엔드의 `/{userId}` 경로로 리다이렉트합니다.
 
-- `OAUTH_LOGIN_SUCCESS_REDIRECT_URL`: 로그인 완료 후 이동할 프론트 URL
-- `OAUTH_LINK_SUCCESS_REDIRECT_URL`: 계정 연결 완료 후 이동할 프론트 URL
+- `OAUTH_SUCCESS_REDIRECT_BASE_URL`: 로그인 완료 후 조합할 프론트 base URL. 최종 이동 주소는 `<base-url>/<userId>` 형태입니다.
 - `AUTH_COOKIE_DOMAIN`: 운영에서 쿠키를 공유할 도메인이 필요할 때만 설정
 - `AUTH_COOKIE_SECURE`: `true`면 `Secure` 쿠키로 발급, 미설정 시 `NODE_ENV=production`에서 자동 활성화
 - `AUTH_ACCESS_TOKEN_COOKIE_NAME`, `AUTH_REFRESH_TOKEN_COOKIE_NAME`: 쿠키 이름 커스터마이징

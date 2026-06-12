@@ -62,13 +62,11 @@ export function extractRefreshToken(request: Request): string | undefined {
 
 export function resolveOAuthSuccessRedirectUrl(
   config: ConfigService,
-  mode: 'login' | 'link',
+  userId: string,
 ): string {
-  if (mode === 'link') {
-    return config.getOrThrow<string>('OAUTH_LINK_SUCCESS_REDIRECT_URL');
-  }
+  const baseUrl = config.getOrThrow<string>('OAUTH_SUCCESS_REDIRECT_BASE_URL');
 
-  return config.getOrThrow<string>('OAUTH_LOGIN_SUCCESS_REDIRECT_URL');
+  return `${trimTrailingSlash(baseUrl)}/${encodeURIComponent(userId)}`;
 }
 
 function extractBearerToken(request: Request): string | undefined {
@@ -167,4 +165,8 @@ function resolveRefreshTokenCookieNameFromEnv(): string {
   return (
     process.env.AUTH_REFRESH_TOKEN_COOKIE_NAME ?? REFRESH_TOKEN_COOKIE_NAME
   );
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
 }

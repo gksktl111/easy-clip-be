@@ -280,7 +280,7 @@ export class AuthController {
 
     setAuthCookies(response, this.configService, authSession);
     response.redirect(
-      resolveOAuthSuccessRedirectUrl(this.configService, oauthUser.mode),
+      resolveOAuthSuccessRedirectUrl(this.configService, authSession.user.id),
     );
   }
 }

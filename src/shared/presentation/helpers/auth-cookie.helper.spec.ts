@@ -144,16 +144,11 @@ describe('auth-cookie helper', () => {
 
   it('OAuth 성공 리다이렉트 URL을 mode 기준으로 고른다', () => {
     const config = createConfigService({
-      OAUTH_LOGIN_SUCCESS_REDIRECT_URL: 'http://localhost:3000/login/success',
-      OAUTH_LINK_SUCCESS_REDIRECT_URL:
-        'http://localhost:3000/settings/accounts',
+      OAUTH_SUCCESS_REDIRECT_BASE_URL: 'http://localhost:3001/',
     });
 
-    expect(resolveOAuthSuccessRedirectUrl(config, 'login')).toBe(
-      'http://localhost:3000/login/success',
-    );
-    expect(resolveOAuthSuccessRedirectUrl(config, 'link')).toBe(
-      'http://localhost:3000/settings/accounts',
+    expect(resolveOAuthSuccessRedirectUrl(config, 'user-id')).toBe(
+      'http://localhost:3001/user-id',
     );
   });
 });
