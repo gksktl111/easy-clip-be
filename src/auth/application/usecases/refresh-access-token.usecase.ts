@@ -1,0 +1,33 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { AuthContext } from 'src/shared/types/auth-context.type';
+import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
+import type { AuthSessionPort } from '../ports/auth-session.port';
+import { RefreshAccessTokenOutput } from '../dtos/refresh-access-token-output.dto';
+import {
+  assertRefreshTokenMatches,
+  assertRefreshTokenSession,
+} from '../helpers/refresh-token.helper';
+
+@Injectable()
+export class RefreshAccessTokenUseCase {
+  constructor(
+    @Inject(AUTH_SESSION_PORT)
+    private readonly authSessionPort: AuthSessionPort,
+  ) {}
+
+  async execute(
+    context: AuthContext,
+    refreshToken: string,
+  ): Promise<RefreshAccessTokenOutput> {
+    const { accountId, platform } = context;
+
+    const session = assertRefreshTokenSession(
+      await this.authSessionPort.findRefreshTokenSession(accountId, platform),
+    );
+    assertRefreshTokenMatches(refreshToken, session.tokenHash);
+
+    const accessToken = this.authSessionPort.signAccessToken(context);
+
+    return { access_token: accessToken };
+  }
+}

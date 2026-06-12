@@ -1,0 +1,155 @@
+############################################################
+# Easy Clip OAuth API Test (최신 구조 / OAuth ONLY)
+# Base URL: http://localhost:3000
+#
+# 전제
+# - 인증 방식: OAuth ONLY (Google / GitHub)
+# - User = 계정 컨테이너
+# - AuthAccount = 로그인 수단(정체성)
+# - JWT payload: { sub: userId, accountId }
+# - OAuth login / link 는 브라우저 필요
+############################################################
+
+
+############################################################
+# 0. 변수 정의 (REST Client용)
+############################################################
+
+@baseUrl = http://localhost:3000
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWt3OXh1YzAwMDAwZ2RmaGNpeGZ0YmVvIiwiYWNjb3VudElkIjoiY21rdzl4dWMwMDAwMWdkZmg2Z2R0bzc0cyIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzY5NDk4ODY5LCJleHAiOjE3Njk0OTk3NjksImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.vMbNhufv5nnxSC9t_HIQvEq7I686KFkgS1_Bi2qTkMI
+@refreshToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWtxcHNyamswMDAwZ2RkYTc1Znpob24xIiwiYWNjb3VudElkIjoiY21rcXBzcmprMDAwMWdkZGF2YnNnNWdyaiIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzY5MTYyNzQ2LCJleHAiOjE3NzAzNzIzNDYsImF1ZCI6InJlZnJlc2giLCJpc3MiOiJlYXN5LWNsaXAifQ.qcV4UMPQpQc0EPaMwVf8ROTVEON-MBp9Lk2f-pJREtA
+
+@authAccountId = REPLACE_WITH_AUTH_ACCOUNT_ID
+
+
+############################################################
+# 1. OAuth 로그인 시작 (신규 / 기존 로그인)
+# - 브라우저에서 실행해야 함
+# - 최초 로그인 시 User + AuthAccount 생성
+############################################################
+
+### Google OAuth 로그인 (WEB)
+GET {{baseUrl}}/auth/google?platform=WEB
+
+### Google OAuth 로그인 (APP)
+GET {{baseUrl}}/auth/google?platform=APP
+
+### GitHub OAuth 로그인 (WEB)
+GET {{baseUrl}}/auth/github?platform=WEB
+
+### GitHub OAuth 로그인 (APP)
+GET {{baseUrl}}/auth/github?platform=APP
+
+# 브라우저에서 OAuth 로그인 완료 후
+# /auth/:provider/callback 으로 자동 이동
+# 응답으로 access_token 반환됨
+# → access_token 값을 @accessToken 변수에 복사
+
+
+############################################################
+# 2. 현재 로그인된 사용자 정보 조회
+# - JWT 필수
+# - 현재 accountId 기준으로 프로필 반환
+############################################################
+
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+
+# 응답 예시
+# {
+#   "user": {
+#     "id": "userId",
+#     "displayName": "현재 로그인 계정 이름",
+#     "avatarUrl": "https://..."
+#   },
+#   "authAccounts": [
+#     {
+#       "id": "authAccountId",
+#       "provider": "GOOGLE",
+#       "email": "user@gmail.com"
+#     }
+#   ]
+# }
+#
+# authAccounts 배열에서 authAccountId 하나 복사해서
+# 아래 @authAccountId 변수에 저장
+
+
+############################################################
+# 3. OAuth 계정 추가 연동 (link)
+# - 반드시 JWT 로그인 상태여야 함
+# - 기존 User 하위에 AuthAccount 추가
+############################################################
+
+### Google 계정 추가 연동
+GET {{baseUrl}}/auth/google/link
+Authorization: Bearer {{accessToken}}
+
+### GitHub 계정 추가 연동
+GET {{baseUrl}}/auth/github/link
+Authorization: Bearer {{accessToken}}
+
+# 브라우저에서 OAuth 로그인 완료
+# /auth/:provider/callback 으로 이동
+# → 기존 User에 AuthAccount가 추가됨
+
+
+############################################################
+# 4. 연동된 계정 전환
+# - JWT 필수
+# - authAccountId 기준으로 로그인 계정 변경
+############################################################
+
+POST {{baseUrl}}/auth/switch-user
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "authAccountId": "{{authAccountId}}"
+}
+
+# 응답으로 새 access_token 반환
+# → payload.accountId 값이 변경됨
+
+
+############################################################
+# 5. 계정 전환 후 프로필 재확인
+############################################################
+
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+
+# displayName / avatarUrl 이
+# 전환된 AuthAccount 기준으로 바뀌어야 정상
+
+############################################################
+# 6. Access Token 재발급 (Refresh Token 사용)
+# - Refresh Token 필수
+# - 만료된 access token 이후에도 사용 가능
+############################################################
+
+# ⚠️ Authorization 헤더에는 "refresh token"을 넣어야 한다
+# access token ❌
+# refresh token ⭕
+
+POST {{baseUrl}}/auth/refresh
+Authorization: Bearer {{refreshToken}}
+
+# 응답 예시
+# {
+#   "access_token": "NEW_ACCESS_TOKEN"
+# }
+#
+# → 반환된 access_token 값을 다시 @accessToken 변수에 복사
+
+############################################################
+# 8. 로그아웃 (현재 플랫폼 세션)
+############################################################
+
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}
+
+# 응답
+# {
+#   "success": true
+# }
