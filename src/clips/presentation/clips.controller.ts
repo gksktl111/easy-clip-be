@@ -34,6 +34,7 @@ import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/appl
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
+import type { MulterFile } from 'src/shared/types/multer-file.type';
 import {
   ClipCursorPageResponseDto,
   ClipResponseDto,
@@ -164,7 +165,7 @@ export class ClipsController {
   createClip(
     @Request() req: { user: AuthContext },
     @Body() dto: CreateClipDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: MulterFile,
   ) {
     return this.createClipUseCase.execute(
       req.user.userId,
@@ -194,7 +195,7 @@ export class ClipsController {
     @Request() req: { user: AuthContext },
     @Param('id') id: string,
     @Body() dto: UpdateClipDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: MulterFile,
   ) {
     return this.updateClipUseCase.execute(
       req.user.userId,

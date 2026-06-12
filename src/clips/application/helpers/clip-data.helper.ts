@@ -1,4 +1,5 @@
 import { ClipType } from '../../domain/clip.types';
+import { MulterFile } from 'src/shared/types/multer-file.type';
 import { ClipsError } from '../errors/clips.error';
 import { DetectedClip, detectClipType } from './clip-type-detector';
 
@@ -12,7 +13,7 @@ export type ClipData = {
 
 export function resolveClipData(
   text: string | undefined,
-  file?: Express.Multer.File,
+  file?: MulterFile,
 ): ClipData {
   if (file) {
     if (!file.mimetype.startsWith('image/')) {

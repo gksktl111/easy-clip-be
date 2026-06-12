@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { CreateClipUseCase } from './create-clip.usecase';
 import { ClipsRepository } from '../../domain/clips.repository';
+import { MulterFile } from 'src/shared/types/multer-file.type';
 
 const createRepository = (): jest.Mocked<ClipsRepository> => ({
   findPersonalFolderById: jest.fn(),
@@ -140,7 +141,7 @@ describe('CreateClipUseCase', () => {
     const file = {
       mimetype: 'image/png',
       originalname: 'image.png',
-    } as Express.Multer.File;
+    } as MulterFile;
 
     const usecase = new CreateClipUseCase(repo);
     const result = await usecase.execute(
@@ -174,7 +175,7 @@ describe('CreateClipUseCase', () => {
     const file = {
       mimetype: 'application/pdf',
       originalname: 'a.pdf',
-    } as Express.Multer.File;
+    } as MulterFile;
 
     const usecase = new CreateClipUseCase(repo);
 
