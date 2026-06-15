@@ -38,7 +38,10 @@ export function toImageClipData(file: MulterFile, imageUrl: string): ClipData {
 function normalizeUploadedFileName(fileName: string): string {
   const decodedFileName = Buffer.from(fileName, 'latin1').toString('utf8');
 
-  if (isLikelyKoreanFileName(decodedFileName) && !isLikelyKoreanFileName(fileName)) {
+  if (
+    isLikelyKoreanFileName(decodedFileName) &&
+    !isLikelyKoreanFileName(fileName)
+  ) {
     return decodedFileName;
   }
 
