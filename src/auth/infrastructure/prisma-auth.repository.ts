@@ -110,6 +110,12 @@ export class PrismaAuthRepository implements AuthRepository {
         },
       });
 
+      await tx.userSettings.create({
+        data: {
+          userId: user.id,
+        },
+      });
+
       return user.authAccounts[0];
     });
 

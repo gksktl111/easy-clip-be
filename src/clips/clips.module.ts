@@ -13,11 +13,14 @@ import { LikeClipUseCase } from './application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from './application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from './application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from './application/usecases/list-recent-viewed-clips.usecase';
+import { CLIP_IMAGE_STORAGE_PORT } from './application/ports/clip-image-storage.port';
+import { R2ClipImageStorageService } from './infrastructure/r2-clip-image-storage.service';
 
 @Module({
   controllers: [ClipsController],
   providers: [
     { provide: CLIPS_REPOSITORY, useClass: PrismaClipsRepository },
+    { provide: CLIP_IMAGE_STORAGE_PORT, useClass: R2ClipImageStorageService },
     CreateClipUseCase,
     UpdateClipUseCase,
     ListFolderClipsUseCase,
