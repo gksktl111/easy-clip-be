@@ -10,7 +10,11 @@ export class DeleteFolderTagUseCase {
     private readonly foldersRepository: FoldersRepository,
   ) {}
 
-  async execute(userId: string, folderId: string, tagId: string): Promise<void> {
+  async execute(
+    userId: string,
+    folderId: string,
+    tagId: string,
+  ): Promise<void> {
     const folder = await this.foldersRepository.findPersonalFolderById(
       userId,
       folderId,
