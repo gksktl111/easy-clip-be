@@ -2,6 +2,7 @@
 import { CreateClipUseCase } from './create-clip.usecase';
 import { ClipsRepository } from '../../domain/clips.repository';
 import { MulterFile } from 'src/shared/types/multer-file.type';
+import { ClipImageStoragePort } from '../ports/clip-image-storage.port';
 
 const createRepository = (): jest.Mocked<ClipsRepository> => ({
   findPersonalFolderById: jest.fn(),
@@ -21,6 +22,10 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   createClip: jest.fn(),
   updateClip: jest.fn(),
   softDeleteClip: jest.fn(),
+});
+
+const createImageStorage = (): jest.Mocked<ClipImageStoragePort> => ({
+  uploadImage: jest.fn(),
 });
 
 describe('CreateClipUseCase', () => {
@@ -44,7 +49,8 @@ describe('CreateClipUseCase', () => {
       deletedAt: null,
     });
 
-    const usecase = new CreateClipUseCase(repo);
+    const imageStorage = createImageStorage();
+    const usecase = new CreateClipUseCase(repo, imageStorage);
     const result = await usecase.execute('user-id', {
       folderId: 'folder-id',
       text: 'hello',
@@ -69,8 +75,9 @@ describe('CreateClipUseCase', () => {
   it('폴더가 없으면 NOT_FOUND 오류를 반환한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue(null);
+    const imageStorage = createImageStorage();
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new CreateClipUseCase(repo, imageStorage);
 
     await expect(
       usecase.execute('user-id', {
@@ -100,7 +107,8 @@ describe('CreateClipUseCase', () => {
       deletedAt: null,
     });
 
-    const usecase = new CreateClipUseCase(repo);
+    const imageStorage = createImageStorage();
+    const usecase = new CreateClipUseCase(repo, imageStorage);
     const result = await usecase.execute('user-id', {
       folderId: 'folder-id',
       text: '#fff',
@@ -132,18 +140,24 @@ describe('CreateClipUseCase', () => {
       title: 'image.png',
       textContent: null,
       colorHex: null,
-      imageUrl: 'image.png',
+      imageUrl: 'https://cdn.example.com/clips/user-id/file.png',
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
+    });
+    const imageStorage = createImageStorage();
+    imageStorage.uploadImage.mockResolvedValue({
+      key: 'clips/user-id/file.png',
+      url: 'https://cdn.example.com/clips/user-id/file.png',
     });
 
     const file = {
       mimetype: 'image/png',
       originalname: 'image.png',
+      size: 100,
     } as MulterFile;
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new CreateClipUseCase(repo, imageStorage);
     const result = await usecase.execute(
       'user-id',
       {
@@ -160,9 +174,65 @@ describe('CreateClipUseCase', () => {
       workspaceId: 'workspace-id',
       textContent: null,
       colorHex: null,
-      imageUrl: 'image.png',
+      imageUrl: 'https://cdn.example.com/clips/user-id/file.png',
+    });
+    expect(imageStorage.uploadImage).toHaveBeenCalledWith({
+      userId: 'user-id',
+      file,
     });
     expect(result.type).toBe('IMAGE');
+  });
+
+  it('한글 파일명은 깨지지 않도록 title에 정규화해서 저장한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({
+      id: 'folder-id',
+      workspaceId: 'workspace-id',
+    });
+    repo.createClip.mockResolvedValue({
+      id: 'clip-id',
+      type: 'IMAGE',
+      folderId: 'folder-id',
+      workspaceId: 'workspace-id',
+      title: '다운로드.png',
+      textContent: null,
+      colorHex: null,
+      imageUrl: 'https://cdn.example.com/clips/user-id/file.png',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+    const imageStorage = createImageStorage();
+    imageStorage.uploadImage.mockResolvedValue({
+      key: 'clips/user-id/file.png',
+      url: 'https://cdn.example.com/clips/user-id/file.png',
+    });
+
+    const file = {
+      mimetype: 'image/png',
+      originalname: 'ë¤ì´ë¡ë.png',
+      size: 100,
+    } as MulterFile;
+
+    const usecase = new CreateClipUseCase(repo, imageStorage);
+
+    await usecase.execute(
+      'user-id',
+      {
+        folderId: 'folder-id',
+      },
+      file,
+    );
+
+    expect(repo.createClip).toHaveBeenCalledWith({
+      type: 'IMAGE',
+      title: '다운로드.png',
+      folderId: 'folder-id',
+      workspaceId: 'workspace-id',
+      textContent: null,
+      colorHex: null,
+      imageUrl: 'https://cdn.example.com/clips/user-id/file.png',
+    });
   });
 
   it('file이 있지만 image/*가 아니면 실패한다', async () => {
@@ -175,9 +245,11 @@ describe('CreateClipUseCase', () => {
     const file = {
       mimetype: 'application/pdf',
       originalname: 'a.pdf',
+      size: 100,
     } as MulterFile;
+    const imageStorage = createImageStorage();
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new CreateClipUseCase(repo, imageStorage);
 
     await expect(
       usecase.execute(
@@ -196,8 +268,9 @@ describe('CreateClipUseCase', () => {
       id: 'folder-id',
       workspaceId: 'workspace-id',
     });
+    const imageStorage = createImageStorage();
 
-    const usecase = new CreateClipUseCase(repo);
+    const usecase = new CreateClipUseCase(repo, imageStorage);
 
     await expect(
       usecase.execute('user-id', {

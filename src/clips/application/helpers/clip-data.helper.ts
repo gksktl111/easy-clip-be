@@ -11,32 +11,42 @@ export type ClipData = {
   imageUrl: string | null;
 };
 
-export function resolveClipData(
-  text: string | undefined,
-  file?: MulterFile,
-): ClipData {
-  if (file) {
-    if (!file.mimetype.startsWith('image/')) {
-      throw new ClipsError(
-        'BAD_REQUEST',
-        '이미지 파일만 업로드할 수 있습니다.',
-      );
-    }
-
-    return {
-      type: 'IMAGE',
-      title: file.originalname,
-      textContent: null,
-      colorHex: null,
-      imageUrl: file.originalname,
-    };
-  }
-
+export function resolveClipData(text: string | undefined): ClipData {
   if (!text) {
     throw new ClipsError('BAD_REQUEST', 'text 또는 file 중 하나는 필요합니다.');
   }
 
   return toClipData(detectClipType(text));
+}
+
+export function validateClipImageFile(file: MulterFile): void {
+  if (!file.mimetype.startsWith('image/')) {
+    throw new ClipsError('BAD_REQUEST', '이미지 파일만 업로드할 수 있습니다.');
+  }
+}
+
+export function toImageClipData(file: MulterFile, imageUrl: string): ClipData {
+  return {
+    type: 'IMAGE',
+    title: normalizeUploadedFileName(file.originalname),
+    textContent: null,
+    colorHex: null,
+    imageUrl,
+  };
+}
+
+function normalizeUploadedFileName(fileName: string): string {
+  const decodedFileName = Buffer.from(fileName, 'latin1').toString('utf8');
+
+  if (isLikelyKoreanFileName(decodedFileName) && !isLikelyKoreanFileName(fileName)) {
+    return decodedFileName;
+  }
+
+  return fileName;
+}
+
+function isLikelyKoreanFileName(value: string): boolean {
+  return /[가-힣]/.test(value);
 }
 
 function toClipData(detected: DetectedClip): ClipData {
