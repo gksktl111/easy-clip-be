@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  SubscriptionPlan,
-  SubscriptionStatus,
-} from '@prisma/client';
+import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   CreateFolderParams,
@@ -102,9 +99,11 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async findTagsByFolderId(folderId: string): Promise<FolderTag[]> {
-    return (this.prisma.tag as unknown as {
-      findMany(args: unknown): Promise<FolderTag[]>;
-    }).findMany({
+    return (
+      this.prisma.tag as unknown as {
+        findMany(args: unknown): Promise<FolderTag[]>;
+      }
+    ).findMany({
       where: {
         folderId,
       },
@@ -116,9 +115,11 @@ export class PrismaFoldersRepository implements FoldersRepository {
     folderId: string,
     tagId: string,
   ): Promise<FolderTag | null> {
-    return (this.prisma.tag as unknown as {
-      findFirst(args: unknown): Promise<FolderTag | null>;
-    }).findFirst({
+    return (
+      this.prisma.tag as unknown as {
+        findFirst(args: unknown): Promise<FolderTag | null>;
+      }
+    ).findFirst({
       where: {
         id: tagId,
         folderId,
@@ -130,9 +131,11 @@ export class PrismaFoldersRepository implements FoldersRepository {
     folderId: string,
     name: string,
   ): Promise<FolderTag | null> {
-    return (this.prisma.tag as unknown as {
-      findFirst(args: unknown): Promise<FolderTag | null>;
-    }).findFirst({
+    return (
+      this.prisma.tag as unknown as {
+        findFirst(args: unknown): Promise<FolderTag | null>;
+      }
+    ).findFirst({
       where: {
         folderId,
         name,
@@ -161,9 +164,11 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async createFolderTag(params: CreateFolderTagParams): Promise<FolderTag> {
-    return (this.prisma.tag as unknown as {
-      create(args: unknown): Promise<FolderTag>;
-    }).create({
+    return (
+      this.prisma.tag as unknown as {
+        create(args: unknown): Promise<FolderTag>;
+      }
+    ).create({
       data: {
         folderId: params.folderId,
         name: params.name,
@@ -179,9 +184,11 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async updateFolderTagName(tagId: string, name: string): Promise<FolderTag> {
-    return (this.prisma.tag as unknown as {
-      update(args: unknown): Promise<FolderTag>;
-    }).update({
+    return (
+      this.prisma.tag as unknown as {
+        update(args: unknown): Promise<FolderTag>;
+      }
+    ).update({
       where: { id: tagId },
       data: { name },
     });

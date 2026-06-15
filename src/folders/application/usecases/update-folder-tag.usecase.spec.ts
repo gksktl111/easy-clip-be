@@ -119,9 +119,6 @@ describe('UpdateFolderTagUseCase', () => {
       name: 'frontend',
     });
 
-    expect(repo.updateFolderTagName).toHaveBeenCalledWith(
-      'tag-id',
-      'frontend',
-    );
+    expect(repo.updateFolderTagName).toHaveBeenCalledWith('tag-id', 'frontend');
   });
 });

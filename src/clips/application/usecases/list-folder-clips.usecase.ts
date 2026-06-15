@@ -1,7 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  CLIPS_REPOSITORY,
-} from '../../domain/clips.repository';
+import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
 import { ClipCursorPageOutput } from '../dtos/clip-cursor-page-output.dto';
 import { ListFolderClipsInput } from '../dtos/list-folder-clips-input.dto';

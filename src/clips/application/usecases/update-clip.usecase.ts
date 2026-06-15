@@ -5,13 +5,21 @@ import type { ClipsRepository } from '../../domain/clips.repository';
 import { MulterFile } from 'src/shared/types/multer-file.type';
 import { UpdateClipInput } from '../dtos/update-clip-input.dto';
 import { ClipsError } from '../errors/clips.error';
-import { resolveClipData } from '../helpers/clip-data.helper';
+import {
+  resolveClipData,
+  toImageClipData,
+  validateClipImageFile,
+} from '../helpers/clip-data.helper';
+import { CLIP_IMAGE_STORAGE_PORT } from '../ports/clip-image-storage.port';
+import type { ClipImageStoragePort } from '../ports/clip-image-storage.port';
 
 @Injectable()
 export class UpdateClipUseCase {
   constructor(
     @Inject(CLIPS_REPOSITORY)
     private readonly clipsRepository: ClipsRepository,
+    @Inject(CLIP_IMAGE_STORAGE_PORT)
+    private readonly clipImageStoragePort: ClipImageStoragePort,
   ) {}
 
   async execute(
@@ -38,7 +46,9 @@ export class UpdateClipUseCase {
             colorHex: clip.colorHex,
             imageUrl: clip.imageUrl,
           }
-        : resolveClipData(input.text, file);
+        : file
+          ? await this.uploadImageAndResolveClipData(userId, file)
+          : resolveClipData(input.text);
 
     return this.clipsRepository.updateClip(clip.id, {
       ...clipData,
@@ -69,5 +79,19 @@ export class UpdateClipUseCase {
       id: clip!.folderId,
       workspaceId: clip!.workspaceId,
     };
+  }
+
+  private async uploadImageAndResolveClipData(
+    userId: string,
+    file: MulterFile,
+  ) {
+    validateClipImageFile(file);
+
+    const uploadedImage = await this.clipImageStoragePort.uploadImage({
+      userId,
+      file,
+    });
+
+    return toImageClipData(file, uploadedImage.url);
   }
 }
