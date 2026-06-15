@@ -1,8 +1,13 @@
 import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './app.module';
+import { ApplicationExceptionFilter } from './shared/presentation/filters/application-exception.filter';
+import {
+  isHttpLoggingEnabled,
+  registerHttpLoggingMiddleware,
+} from './shared/presentation/logging/http-logging.helper';
 
 const parseAllowedCorsPorts = (raw?: string) =>
   new Set(
@@ -53,6 +58,11 @@ async function bootstrap() {
   };
 
   app.enableCors(corsOptions);
+  app.useGlobalFilters(new ApplicationExceptionFilter());
+
+  if (isHttpLoggingEnabled(process.env)) {
+    app.use(registerHttpLoggingMiddleware);
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({
