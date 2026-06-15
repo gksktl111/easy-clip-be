@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { AuthContext } from 'src/shared/types/auth-context.type';
 import { AuthPlatform } from 'src/shared/types/auth-platform.type';
+import { extractAccessToken } from '../helpers/auth-cookie.helper';
 
 type JwtClaims = {
   sub: string;
@@ -25,7 +26,7 @@ export class JwtAccessGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractTokenFromHeader(request);
+    const token = extractAccessToken(request);
 
     if (!token) {
       throw new UnauthorizedException('Access token이 없습니다.');
@@ -50,10 +51,5 @@ export class JwtAccessGuard implements CanActivate {
     }
 
     return true;
-  }
-
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
   }
 }

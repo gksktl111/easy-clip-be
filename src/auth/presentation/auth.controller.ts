@@ -4,20 +4,24 @@ import {
   Get,
   Post,
   Request,
+  Res,
   UseGuards,
   UseFilters,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
   ApiBody,
   ApiForbiddenResponse,
+  ApiFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
+import type { Response } from 'express';
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { AuthContext } from 'src/shared/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
@@ -37,6 +41,12 @@ import { TestAdminLoginUseCase } from '../application/usecases/test-admin-login.
 import { OAuthUser } from '../domain/auth.types';
 import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 import { TestAdminLoginDto } from './dtos/test-admin-login.dto';
+import {
+  clearAuthCookies,
+  resolveOAuthSuccessRedirectUrl,
+  setAccessTokenCookie,
+  setAuthCookies,
+} from 'src/shared/presentation/helpers/auth-cookie.helper';
 
 interface OAuthRequest extends ExpressRequest {
   user: OAuthUser;
@@ -47,6 +57,7 @@ interface OAuthRequest extends ExpressRequest {
 @ApiTags('Auth')
 export class AuthController {
   constructor(
+    private readonly configService: ConfigService,
     private readonly signInUseCase: SignInUseCase,
     private readonly linkAccountUseCase: LinkAccountUseCase,
     private readonly switchUserUseCase: SwitchUserUseCase,
@@ -83,16 +94,19 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(PassportAuthGuard('google'))
   @ApiOperation({ summary: 'Google OAuth 콜백 처리' })
-  @ApiOkResponse({
-    description: '로그인 또는 계정 연결 후 토큰과 사용자 정보를 반환합니다.',
-    type: AuthSignInResponseDto,
+  @ApiFoundResponse({
+    description:
+      '로그인 또는 계정 연결 후 인증 쿠키를 저장하고 프론트엔드로 리다이렉트합니다.',
   })
   @ApiForbiddenResponse({
     description: '계정 연결 요청이 올바르지 않습니다.',
     type: ErrorResponseDto,
   })
-  googleCallback(@Request() req: OAuthRequest) {
-    return this.handleOAuthCallback(req.user);
+  async googleCallback(
+    @Request() req: OAuthRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    await this.completeOAuthCallback(req.user, response);
   }
 
   /* ======================================================
@@ -123,16 +137,19 @@ export class AuthController {
   @Get('github/callback')
   @UseGuards(PassportAuthGuard('github'))
   @ApiOperation({ summary: 'GitHub OAuth 콜백 처리' })
-  @ApiOkResponse({
-    description: '로그인 또는 계정 연결 후 토큰과 사용자 정보를 반환합니다.',
-    type: AuthSignInResponseDto,
+  @ApiFoundResponse({
+    description:
+      '로그인 또는 계정 연결 후 인증 쿠키를 저장하고 프론트엔드로 리다이렉트합니다.',
   })
   @ApiForbiddenResponse({
     description: '계정 연결 요청이 올바르지 않습니다.',
     type: ErrorResponseDto,
   })
-  githubCallback(@Request() req: OAuthRequest) {
-    return this.handleOAuthCallback(req.user);
+  async githubCallback(
+    @Request() req: OAuthRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    await this.completeOAuthCallback(req.user, response);
   }
 
   @Post('test/admin-login')
@@ -142,13 +159,20 @@ export class AuthController {
     description: '테스트 관리자 계정으로 토큰과 사용자 정보를 발급합니다.',
     type: AuthSignInResponseDto,
   })
-  testAdminLogin(@Body() dto: TestAdminLoginDto = {}) {
-    return this.testAdminLoginUseCase.execute({
+  async testAdminLogin(
+    @Body() dto: TestAdminLoginDto = {},
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const authSession = await this.testAdminLoginUseCase.execute({
       email: 'admin@easyclip.local',
       displayName: 'Test Admin',
       avatarUrl: null,
       platform: dto.platform ?? 'WEB',
     });
+
+    setAuthCookies(response, this.configService, authSession);
+
+    return authSession;
   }
 
   /* ======================================================
@@ -168,15 +192,20 @@ export class AuthController {
     description: '액세스 토큰이 없거나 유효하지 않습니다.',
     type: ErrorResponseDto,
   })
-  switchUser(
+  async switchUser(
     @Request() req: { user: AuthContext },
     @Body() switchUserDto: SwitchUserDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.switchUserUseCase.execute(
+    const authSession = await this.switchUserUseCase.execute(
       req.user.userId,
       switchUserDto.authAccountId,
       req.user.platform,
     );
+
+    setAuthCookies(response, this.configService, authSession);
+
+    return authSession;
   }
 
   @UseGuards(JwtRefreshGuard)
@@ -191,14 +220,22 @@ export class AuthController {
     description: '리프레시 토큰이 없거나 유효하지 않습니다.',
     type: ErrorResponseDto,
   })
-  refresh(
+  async refresh(
     @Request()
     req: {
       user: AuthContext;
       refreshToken: string;
     },
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.refreshAccessTokenUseCase.execute(req.user, req.refreshToken);
+    const result = await this.refreshAccessTokenUseCase.execute(
+      req.user,
+      req.refreshToken,
+    );
+
+    setAccessTokenCookie(response, this.configService, result.access_token);
+
+    return result;
   }
 
   @UseGuards(JwtAccessGuard)
@@ -213,8 +250,18 @@ export class AuthController {
     description: '액세스 토큰이 없거나 유효하지 않습니다.',
     type: ErrorResponseDto,
   })
-  logout(@Request() req: { user: AuthContext }) {
-    return this.logoutUseCase.execute(req.user.accountId, req.user.platform);
+  async logout(
+    @Request() req: { user: AuthContext },
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.logoutUseCase.execute(
+      req.user.accountId,
+      req.user.platform,
+    );
+
+    clearAuthCookies(response, this.configService);
+
+    return result;
   }
 
   private handleOAuthCallback(oauthUser: OAuthUser) {
@@ -223,5 +270,17 @@ export class AuthController {
     }
 
     return this.signInUseCase.execute(oauthUser);
+  }
+
+  private async completeOAuthCallback(
+    oauthUser: OAuthUser,
+    response: Response,
+  ): Promise<void> {
+    const authSession = await this.handleOAuthCallback(oauthUser);
+
+    setAuthCookies(response, this.configService, authSession);
+    response.redirect(
+      resolveOAuthSuccessRedirectUrl(this.configService, authSession.user.id),
+    );
   }
 }
