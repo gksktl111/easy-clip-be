@@ -19,15 +19,17 @@ const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   revokeRefreshTokens: jest.fn(),
 });
 
-const createAccount = (overrides: Partial<{
-  id: string;
-  userId: string;
-  provider: 'GITHUB';
-  providerUserId: string;
-  email: string;
-  displayName: string;
-  profileImageUrl: string | null;
-}> = {}) => ({
+const createAccount = (
+  overrides: Partial<{
+    id: string;
+    userId: string;
+    provider: 'GITHUB';
+    providerUserId: string;
+    email: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  }> = {},
+) => ({
   id: 'account-id',
   userId: 'user-id',
   provider: 'GITHUB' as const,

@@ -29,7 +29,9 @@ describe('PrismaAuthRepository', () => {
     };
 
     const prisma = {
-      $transaction: jest.fn(async (callback: typeof tx) => callback(tx)),
+      $transaction: jest.fn((callback: (args: typeof tx) => unknown) =>
+        Promise.resolve(callback(tx)),
+      ),
     } as never;
 
     const repository = new PrismaAuthRepository(prisma);
