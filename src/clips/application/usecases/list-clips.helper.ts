@@ -186,6 +186,7 @@ export const listClipsWithLikedPriority = async ({
   if (likedResult.hasMore) {
     return {
       items: likedResult.items,
+      hasMore: true,
       nextCursor: likedResult.nextCursor,
     };
   }
@@ -203,6 +204,7 @@ export const listClipsWithLikedPriority = async ({
 
     return {
       items: combinedResult.items,
+      hasMore: combinedResult.hasMore,
       nextCursor: combinedResult.nextCursor,
     };
   }
@@ -218,6 +220,7 @@ export const listClipsWithLikedPriority = async ({
 
   return {
     items: likedResult.items,
+    hasMore: hasNonLiked,
     nextCursor:
       hasNonLiked && likedResult.items.length > 0
         ? likedResult.items[likedResult.items.length - 1].id
@@ -264,6 +267,7 @@ export const listRecentClipsWithLikedPriority = async ({
 
     return {
       items: stripRecentViewId(page.items),
+      hasMore: page.hasMore,
       nextCursor: page.nextCursor,
     };
   }
@@ -278,6 +282,7 @@ export const listRecentClipsWithLikedPriority = async ({
   if (likedResult.hasMore) {
     return {
       items: stripRecentViewId(likedResult.items),
+      hasMore: true,
       nextCursor: likedResult.nextCursor,
     };
   }
@@ -295,6 +300,7 @@ export const listRecentClipsWithLikedPriority = async ({
 
     return {
       items: stripRecentViewId(combinedResult.items),
+      hasMore: combinedResult.hasMore,
       nextCursor: combinedResult.nextCursor,
     };
   }
@@ -310,6 +316,7 @@ export const listRecentClipsWithLikedPriority = async ({
 
   return {
     items: stripRecentViewId(likedResult.items),
+    hasMore: hasNonLiked,
     nextCursor:
       hasNonLiked && likedResult.items.length > 0
         ? likedResult.items[likedResult.items.length - 1].viewId
