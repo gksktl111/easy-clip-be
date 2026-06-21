@@ -60,6 +60,7 @@ describe('ListFolderClipsUseCase', () => {
 
     expect(repo.findClips).toHaveBeenCalledTimes(1);
     expect(result.items).toHaveLength(20);
+    expect(result.hasMore).toBe(true);
     expect(result.nextCursor).toBe('clip-20');
   });
 
@@ -106,6 +107,7 @@ describe('ListFolderClipsUseCase', () => {
       'normal-1',
       'normal-2',
     ]);
+    expect(result.hasMore).toBe(false);
     expect(result.nextCursor).toBeNull();
   });
 
@@ -143,6 +145,7 @@ describe('ListFolderClipsUseCase', () => {
       cursor: 'cursor-id',
     });
     expect(result.items).toHaveLength(20);
+    expect(result.hasMore).toBe(true);
     expect(result.nextCursor).toBe('liked-20');
   });
 
@@ -180,6 +183,7 @@ describe('ListFolderClipsUseCase', () => {
       cursor: 'cursor-id',
     });
     expect(result.items.map((item) => item.id)).toEqual(['normal-1']);
+    expect(result.hasMore).toBe(false);
     expect(result.nextCursor).toBeNull();
   });
 
