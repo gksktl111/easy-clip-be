@@ -15,6 +15,7 @@ type JwtClaims = {
   sub: string;
   accountId: string;
   platform: AuthPlatform;
+  sid?: string;
 };
 
 @Injectable()
@@ -43,6 +44,7 @@ export class JwtRefreshGuard implements CanActivate {
         userId: payload.sub,
         accountId: payload.accountId,
         platform: payload.platform,
+        sessionId: payload.sid,
       };
 
       request['user'] = authContext;

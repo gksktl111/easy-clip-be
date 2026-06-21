@@ -3,6 +3,7 @@ import { AUTH_REPOSITORY } from '../../domain/auth.repository';
 import type { AuthRepository } from '../../domain/auth.repository';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
+import type { AuthSessionMetadata } from 'src/shared/types/auth-session-metadata.type';
 import { AuthError } from '../errors/auth.error';
 import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 import { AuthPlatform } from 'src/shared/types/auth-platform.type';
@@ -21,6 +22,7 @@ export class SwitchUserUseCase {
     currentUserId: string,
     targetAuthAccountId: string,
     platform: AuthPlatform,
+    metadata?: AuthSessionMetadata,
   ): Promise<AuthSessionOutput> {
     const targetAccount =
       await this.authRepository.findAccountById(targetAuthAccountId);
@@ -37,6 +39,7 @@ export class SwitchUserUseCase {
       userId: targetAccount.userId,
       account: targetAccount,
       platform,
+      metadata,
     });
   }
 }

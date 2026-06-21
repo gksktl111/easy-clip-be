@@ -3,6 +3,7 @@ import { AUTH_REPOSITORY } from '../../domain/auth.repository';
 import type { AuthRepository } from '../../domain/auth.repository';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
+import type { AuthSessionMetadata } from 'src/shared/types/auth-session-metadata.type';
 import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 import { TestAdminLoginInput } from '../dtos/test-admin-login-input.dto';
 import { issueAuthResult } from '../helpers/auth-result.helper';
@@ -19,7 +20,10 @@ export class TestAdminLoginUseCase {
     private readonly authSessionPort: AuthSessionPort,
   ) {}
 
-  async execute(input: TestAdminLoginInput): Promise<AuthSessionOutput> {
+  async execute(
+    input: TestAdminLoginInput,
+    metadata?: AuthSessionMetadata,
+  ): Promise<AuthSessionOutput> {
     const existingAccount = await this.authRepository.findAccountByProvider(
       TEST_ADMIN_PROVIDER,
       TEST_ADMIN_PROVIDER_USER_ID,
@@ -30,6 +34,7 @@ export class TestAdminLoginUseCase {
         userId: existingAccount.userId,
         account: existingAccount,
         platform: input.platform,
+        metadata,
       });
     }
 
@@ -58,6 +63,7 @@ export class TestAdminLoginUseCase {
       userId: account.userId,
       account,
       platform: input.platform,
+      metadata,
     });
   }
 }
