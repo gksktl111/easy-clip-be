@@ -91,6 +91,16 @@ async function bootstrap() {
       },
       'access-token',
     )
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description:
+          'JWT refresh token을 입력하세요. 쿠키 인증 환경에서는 easy_clip_refresh_token 쿠키가 우선 사용됩니다.',
+      },
+      'refresh-token',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

@@ -4,4 +4,5 @@ export type AuthContext = {
   userId: string;
   accountId: string;
   platform: AuthPlatform;
+  sessionId?: string;
 };

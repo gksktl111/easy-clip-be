@@ -3,6 +3,7 @@ import { AUTH_REPOSITORY } from '../../domain/auth.repository';
 import type { AuthRepository } from '../../domain/auth.repository';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
+import type { AuthSessionMetadata } from 'src/shared/types/auth-session-metadata.type';
 import { AuthError } from '../errors/auth.error';
 import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 import { OAuthUser } from '../../domain/auth.types';
@@ -21,7 +22,10 @@ export class LinkAccountUseCase {
     private readonly authSessionPort: AuthSessionPort,
   ) {}
 
-  async execute(oauthUser: OAuthUser): Promise<AuthSessionOutput> {
+  async execute(
+    oauthUser: OAuthUser,
+    metadata?: AuthSessionMetadata,
+  ): Promise<AuthSessionOutput> {
     if (!oauthUser.currentUserId) {
       throw new AuthError('FORBIDDEN', '로그인이 필요합니다.');
     }
@@ -54,6 +58,7 @@ export class LinkAccountUseCase {
       userId: newAccount.userId,
       account: newAccount,
       platform: oauthUser.platform,
+      metadata,
     });
   }
 }

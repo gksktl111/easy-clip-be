@@ -17,6 +17,9 @@ const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
   signAccessToken: jest.fn(),
   findRefreshTokenSession: jest.fn(),
+  rotateRefreshToken: jest.fn(),
+  touchRefreshTokenSession: jest.fn(),
+  revokeRefreshTokenSession: jest.fn(),
   revokeRefreshTokens: jest.fn(),
 });
 

@@ -1,5 +1,6 @@
 import type { CookieOptions, Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import type { AuthSessionMetadata } from 'src/shared/types/auth-session-metadata.type';
 
 const ACCESS_TOKEN_COOKIE_NAME = 'easy_clip_access_token';
 const REFRESH_TOKEN_COOKIE_NAME = 'easy_clip_refresh_token';
@@ -60,6 +61,15 @@ export function extractRefreshToken(request: Request): string | undefined {
   return extractCookieToken(request, 'refresh') ?? extractBearerToken(request);
 }
 
+export function extractAuthSessionMetadata(
+  request: Request,
+): AuthSessionMetadata {
+  return {
+    userAgent: request.headers['user-agent'],
+    ipAddress: resolveClientIp(request),
+  };
+}
+
 export function resolveOAuthSuccessRedirectUrl(
   config: ConfigService,
   userId: string,
@@ -72,6 +82,16 @@ export function resolveOAuthSuccessRedirectUrl(
 function extractBearerToken(request: Request): string | undefined {
   const [type, token] = request.headers.authorization?.split(' ') ?? [];
   return type === 'Bearer' ? token : undefined;
+}
+
+function resolveClientIp(request: Request): string | undefined {
+  const forwardedFor = request.headers['x-forwarded-for'];
+
+  if (Array.isArray(forwardedFor)) {
+    return forwardedFor[0]?.split(',')[0]?.trim();
+  }
+
+  return forwardedFor?.split(',')[0]?.trim() || request.ip;
 }
 
 function extractCookieToken(
