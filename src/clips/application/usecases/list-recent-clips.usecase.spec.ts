@@ -57,6 +57,7 @@ describe('ListRecentClipsUseCase', () => {
       likedOnly: false,
     });
     expect(result.items).toHaveLength(3);
+    expect(result.hasMore).toBe(false);
     expect(result.nextCursor).toBeNull();
   });
 

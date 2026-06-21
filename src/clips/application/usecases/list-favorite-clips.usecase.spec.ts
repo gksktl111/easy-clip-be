@@ -47,6 +47,8 @@ describe('ListFavoriteClipsUseCase', () => {
       likedOnly: true,
     });
     expect(result.items).toHaveLength(3);
+    expect(result.hasMore).toBe(false);
+    expect(result.nextCursor).toBeNull();
   });
 
   it('커서가 좋아요된 클립이 아니면 NOT_FOUND를 반환한다', async () => {
