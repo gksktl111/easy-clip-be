@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Platform } from '@prisma/client';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import type { AuthContext } from 'src/shared/types/auth-context.type';
+import type { AuthSessionMetadata } from 'src/shared/types/auth-session-metadata.type';
 import type {
   AuthSessionPort,
   IssuedTokens,
@@ -20,40 +21,28 @@ export class JwtAuthSessionPort implements AuthSessionPort {
     private readonly config: ConfigService,
   ) {}
 
-  async issueTokens(context: AuthContext): Promise<IssuedTokens> {
-    const accessToken = this.signAccessToken(context);
-    const refreshToken = this.signRefreshToken(context);
+  async issueTokens(
+    context: AuthContext,
+    metadata?: AuthSessionMetadata,
+  ): Promise<IssuedTokens> {
+    const sessionContext = {
+      ...context,
+      sessionId: randomUUID(),
+    };
+    const accessToken = this.signAccessToken(sessionContext);
+    const refreshToken = this.signRefreshToken(sessionContext);
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
-    const verified = await this.jwtService.verifyAsync<{ exp: number }>(
-      refreshToken,
-      {
-        secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
-        audience: 'refresh',
-        issuer: 'easy-clip',
-      },
-    );
-
-    const expiresAt = new Date(verified.exp * 1000);
-
-    await this.prisma.refreshToken.upsert({
-      where: {
-        authAccountId_platform: {
-          authAccountId: context.accountId,
-          platform: context.platform as Platform,
-        },
-      },
-      update: {
+    await this.prisma.refreshToken.create({
+      data: {
+        id: sessionContext.sessionId,
+        userId: sessionContext.userId,
+        authAccountId: sessionContext.accountId,
+        platform: sessionContext.platform as Platform,
         tokenHash,
-        revokedAt: null,
-        expiresAt,
-      },
-      create: {
-        userId: context.userId,
-        authAccountId: context.accountId,
-        platform: context.platform as Platform,
-        tokenHash,
-        expiresAt,
+        expiresAt: await this.resolveRefreshTokenExpiresAt(refreshToken),
+        lastUsedAt: new Date(),
+        ...this.toSessionMetadataUpdate(metadata),
       },
     });
 
@@ -70,24 +59,86 @@ export class JwtAuthSessionPort implements AuthSessionPort {
   }
 
   async findRefreshTokenSession(
-    authAccountId: string,
-    platform: AuthPlatform,
+    sessionId: string,
   ): Promise<RefreshTokenSession | null> {
     const session = await this.prisma.refreshToken.findUnique({
-      where: {
-        authAccountId_platform: {
-          authAccountId,
-          platform: platform as Platform,
-        },
-      },
+      where: { id: sessionId },
       select: {
+        id: true,
         tokenHash: true,
         revokedAt: true,
         expiresAt: true,
       },
     });
 
-    return session ?? null;
+    if (!session) {
+      return null;
+    }
+
+    return {
+      sessionId: session.id,
+      tokenHash: session.tokenHash,
+      revokedAt: session.revokedAt,
+      expiresAt: session.expiresAt,
+    };
+  }
+
+  async rotateRefreshToken(
+    context: AuthContext & { sessionId: string },
+    expectedTokenHash: string,
+    metadata?: AuthSessionMetadata,
+  ): Promise<IssuedTokens | null> {
+    const accessToken = this.signAccessToken(context);
+    const refreshToken = this.signRefreshToken(context);
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+
+    const result = await this.prisma.refreshToken.updateMany({
+      where: {
+        id: context.sessionId,
+        tokenHash: expectedTokenHash,
+        revokedAt: null,
+      },
+      data: {
+        tokenHash,
+        expiresAt: await this.resolveRefreshTokenExpiresAt(refreshToken),
+        lastUsedAt: new Date(),
+        ...this.toSessionMetadataUpdate(metadata),
+      },
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return { accessToken, refreshToken };
+  }
+
+  async touchRefreshTokenSession(
+    sessionId: string,
+    metadata?: AuthSessionMetadata,
+  ): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        id: sessionId,
+        revokedAt: null,
+      },
+      data: {
+        lastUsedAt: new Date(),
+        ...this.toSessionMetadataUpdate(metadata),
+      },
+    });
+  }
+
+  async revokeRefreshTokenSession(sessionId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        id: sessionId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
   }
 
   async revokeRefreshTokens(
@@ -120,6 +171,29 @@ export class JwtAuthSessionPort implements AuthSessionPort {
       sub: context.userId,
       accountId: context.accountId,
       platform: context.platform,
+      ...(context.sessionId ? { sid: context.sessionId } : {}),
+    };
+  }
+
+  private async resolveRefreshTokenExpiresAt(
+    refreshToken: string,
+  ): Promise<Date> {
+    const verified = await this.jwtService.verifyAsync<{ exp: number }>(
+      refreshToken,
+      {
+        secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
+        audience: 'refresh',
+        issuer: 'easy-clip',
+      },
+    );
+
+    return new Date(verified.exp * 1000);
+  }
+
+  private toSessionMetadataUpdate(metadata?: AuthSessionMetadata) {
+    return {
+      ...(metadata?.userAgent ? { userAgent: metadata.userAgent } : {}),
+      ...(metadata?.ipAddress ? { ipAddress: metadata.ipAddress } : {}),
     };
   }
 }

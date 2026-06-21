@@ -3,6 +3,7 @@ import { AUTH_REPOSITORY } from '../../domain/auth.repository';
 import type { AuthRepository } from '../../domain/auth.repository';
 import { AUTH_SESSION_PORT } from '../ports/auth-session.port';
 import type { AuthSessionPort } from '../ports/auth-session.port';
+import type { AuthSessionMetadata } from 'src/shared/types/auth-session-metadata.type';
 import { AuthError } from '../errors/auth.error';
 import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
 import { OAuthUser } from '../../domain/auth.types';
@@ -21,7 +22,10 @@ export class SignInUseCase {
     private readonly authSessionPort: AuthSessionPort,
   ) {}
 
-  async execute(oauthUser: OAuthUser): Promise<AuthSessionOutput> {
+  async execute(
+    oauthUser: OAuthUser,
+    metadata?: AuthSessionMetadata,
+  ): Promise<AuthSessionOutput> {
     const email = requireOAuthEmail(oauthUser);
 
     const existingAccount = await this.authRepository.findAccountByProvider(
@@ -34,6 +38,7 @@ export class SignInUseCase {
         userId: existingAccount.userId,
         account: existingAccount,
         platform: oauthUser.platform,
+        metadata,
       });
     }
 
@@ -55,6 +60,7 @@ export class SignInUseCase {
       userId: newAccount.userId,
       account: newAccount,
       platform: oauthUser.platform,
+      metadata,
     });
   }
 }

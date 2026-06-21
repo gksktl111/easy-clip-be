@@ -1,6 +1,7 @@
 import { AuthContext } from 'src/shared/types/auth-context.type';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { AuthSessionOutput } from '../dtos/auth-session-output.dto';
+import type { AuthSessionMetadata } from 'src/shared/types/auth-session-metadata.type';
 
 export async function issueAuthResult(
   authSessionPort: AuthSessionPort,
@@ -13,6 +14,7 @@ export async function issueAuthResult(
       profileImageUrl: string | null;
     };
     platform: AuthContext['platform'];
+    metadata?: AuthSessionMetadata;
   },
 ): Promise<AuthSessionOutput> {
   const context: AuthContext = {
@@ -21,7 +23,9 @@ export async function issueAuthResult(
     platform: params.platform,
   };
 
-  const tokens = await authSessionPort.issueTokens(context);
+  const tokens = params.metadata
+    ? await authSessionPort.issueTokens(context, params.metadata)
+    : await authSessionPort.issueTokens(context);
 
   return {
     access_token: tokens.accessToken,
