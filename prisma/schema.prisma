@@ -33,6 +33,16 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum PaymentProvider {
+  TOSS_PAYMENTS
+}
+
+enum SubscriptionPaymentStatus {
+  DONE
+  FAILED
+  CANCELED
+}
+
 enum Platform {
   WEB
   APP
@@ -133,9 +143,45 @@ model Subscription {
 
   startedAt DateTime @default(now())
   currentPeriodEnd DateTime?
+  nextBillingAt DateTime?
+
+  provider PaymentProvider?
+  externalBillingKey String?
+  externalCustomerKey String? @unique
 
   workspaceId String @unique
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payments    SubscriptionPayment[]
+}
+
+model SubscriptionPayment {
+  id String @id @default(cuid())
+
+  provider PaymentProvider
+  status   SubscriptionPaymentStatus
+
+  externalPaymentKey String? @unique
+  externalOrderId    String  @unique
+  externalEventId    String? @unique
+
+  amount   Int
+  currency String @default("KRW")
+
+  approvedAt DateTime?
+  failedAt   DateTime?
+
+  failureCode    String?
+  failureMessage String?
+  rawData        Json?
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subscriptionId, status])
+  @@index([provider])
 }
 
 
