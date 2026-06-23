@@ -178,6 +178,64 @@ describe('ConfirmBillingAuthUseCase', () => {
     );
   });
 
+  it('남은 기간이 있는 해지 구독은 즉시 결제 없이 자동갱신만 재개한다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    const currentPeriodEnd = new Date('2099-04-01T00:00:00.000Z');
+
+    repo.getOrCreatePersonalSubscription.mockResolvedValue(
+      createSubscription({
+        plan: SubscriptionPlan.PRO,
+        status: SubscriptionStatus.CANCELED,
+        autoRenew: false,
+        startedAt: new Date('2026-02-01T00:00:00.000Z'),
+        currentPeriodEnd,
+        nextBillingAt: null,
+        externalBillingKey: 'billing-key',
+        externalCustomerKey: 'customer-key',
+      }),
+    );
+    repo.updateSubscription.mockResolvedValue(
+      createSubscription({
+        plan: SubscriptionPlan.PRO,
+        status: SubscriptionStatus.ACTIVE,
+        autoRenew: true,
+        startedAt: new Date('2026-02-01T00:00:00.000Z'),
+        currentPeriodEnd,
+        nextBillingAt: currentPeriodEnd,
+        externalBillingKey: 'billing-key',
+        externalCustomerKey: 'customer-key',
+      }),
+    );
+
+    const usecase = new ConfirmBillingAuthUseCase(
+      repo,
+      gateway,
+      createConfig(),
+    );
+    const result = await usecase.execute('user-id', {
+      authKey: 'auth-key',
+      customerKey: 'customer-key',
+    });
+
+    expect(gateway.issueBillingKey).not.toHaveBeenCalled();
+    expect(gateway.chargeBilling).not.toHaveBeenCalled();
+    expect(repo.activateByPayment).not.toHaveBeenCalled();
+    expect(repo.recordPaymentFailure).not.toHaveBeenCalled();
+    expect(repo.updateSubscription).toHaveBeenCalledWith('subscription-id', {
+      status: SubscriptionStatus.ACTIVE,
+      autoRenew: true,
+      nextBillingAt: currentPeriodEnd,
+    });
+    expect(result).toMatchObject({
+      plan: SubscriptionPlan.PRO,
+      status: SubscriptionStatus.ACTIVE,
+      autoRenew: true,
+      currentPeriodEnd,
+      nextBillingAt: currentPeriodEnd,
+    });
+  });
+
   it('결제 실패 시 구독을 변경하지 않고 실패 이력만 저장한다', async () => {
     const repo = createRepository();
     const gateway = createGateway();
