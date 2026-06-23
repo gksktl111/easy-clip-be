@@ -158,4 +158,80 @@ export class PrismaTrashRepository implements TrashRepository {
       });
     });
   }
+
+  async hardDeleteExpiredFoldersWithClips(
+    expiresBefore: Date,
+    limit: number,
+  ): Promise<number> {
+    const folders = await this.prisma.folder.findMany({
+      where: {
+        deletedAt: {
+          lte: expiresBefore,
+        },
+      },
+      orderBy: [{ deletedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: {
+        id: true,
+      },
+    });
+
+    if (folders.length === 0) {
+      return 0;
+    }
+
+    const result = await this.prisma.folder.deleteMany({
+      where: {
+        id: {
+          in: folders.map((folder) => folder.id),
+        },
+        deletedAt: {
+          lte: expiresBefore,
+        },
+      },
+    });
+
+    return result.count;
+  }
+
+  async hardDeleteExpiredClips(
+    expiresBefore: Date,
+    limit: number,
+  ): Promise<number> {
+    const clips = await this.prisma.clip.findMany({
+      where: {
+        deletedAt: {
+          lte: expiresBefore,
+        },
+        folder: {
+          deletedAt: null,
+        },
+      },
+      orderBy: [{ deletedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: {
+        id: true,
+      },
+    });
+
+    if (clips.length === 0) {
+      return 0;
+    }
+
+    const result = await this.prisma.clip.deleteMany({
+      where: {
+        id: {
+          in: clips.map((clip) => clip.id),
+        },
+        deletedAt: {
+          lte: expiresBefore,
+        },
+        folder: {
+          deletedAt: null,
+        },
+      },
+    });
+
+    return result.count;
+  }
 }
