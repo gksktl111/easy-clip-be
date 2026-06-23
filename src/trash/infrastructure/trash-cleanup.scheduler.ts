@@ -10,7 +10,7 @@ export class TrashCleanupScheduler {
     private readonly purgeExpiredTrashItemsUseCase: PurgeExpiredTrashItemsUseCase,
   ) {}
 
-  @Cron('0 3 * * *', {
+  @Cron('* * * * *', {
     name: 'trash-cleanup',
     timeZone: 'Asia/Seoul',
     waitForCompletion: true,
