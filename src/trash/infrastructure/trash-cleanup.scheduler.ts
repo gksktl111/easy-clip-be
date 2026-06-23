@@ -10,16 +10,14 @@ export class TrashCleanupScheduler {
     private readonly purgeExpiredTrashItemsUseCase: PurgeExpiredTrashItemsUseCase,
   ) {}
 
-  @Cron('* * * * *', {
+  @Cron('0 3 * * *', {
     name: 'trash-cleanup',
     timeZone: 'Asia/Seoul',
     waitForCompletion: true,
   })
   async handleTrashCleanup() {
     try {
-      const result = await this.purgeExpiredTrashItemsUseCase.execute({
-        retentionDays: 0,
-      });
+      const result = await this.purgeExpiredTrashItemsUseCase.execute();
 
       this.logger.log(
         `휴지통 자동 정리 완료: folders=${result.foldersDeleted}, clips=${result.clipsDeleted}, expiresBefore=${result.expiresBefore.toISOString()}`,
