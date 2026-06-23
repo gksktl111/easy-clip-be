@@ -23,6 +23,10 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
+  afterEach(async () => {
+    await app.close();
+  });
+
   it('/ (GET)', () => {
     const instance = app.getHttpAdapter().getInstance() as unknown as App;
 

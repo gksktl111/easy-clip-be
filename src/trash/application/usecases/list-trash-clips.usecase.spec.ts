@@ -11,6 +11,8 @@ const createRepository = (): jest.Mocked<TrashRepository> => ({
   findDeletedFolderById: jest.fn(),
   restoreFolderWithClips: jest.fn(),
   hardDeleteFolderWithClips: jest.fn(),
+  hardDeleteExpiredFoldersWithClips: jest.fn(),
+  hardDeleteExpiredClips: jest.fn(),
 });
 
 describe('ListTrashClipsUseCase', () => {
