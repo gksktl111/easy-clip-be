@@ -17,7 +17,9 @@ export class TrashCleanupScheduler {
   })
   async handleTrashCleanup() {
     try {
-      const result = await this.purgeExpiredTrashItemsUseCase.execute();
+      const result = await this.purgeExpiredTrashItemsUseCase.execute({
+        retentionDays: 0,
+      });
 
       this.logger.log(
         `휴지통 자동 정리 완료: folders=${result.foldersDeleted}, clips=${result.clipsDeleted}, expiresBefore=${result.expiresBefore.toISOString()}`,

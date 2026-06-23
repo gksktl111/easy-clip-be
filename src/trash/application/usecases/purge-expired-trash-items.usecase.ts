@@ -76,7 +76,15 @@ export class PurgeExpiredTrashItemsUseCase {
     configValue: string | undefined,
     defaultValue: number,
   ): number {
-    const value = overrideValue ?? (configValue ? Number(configValue) : NaN);
+    if (
+      overrideValue !== undefined &&
+      Number.isInteger(overrideValue) &&
+      overrideValue >= 0
+    ) {
+      return overrideValue;
+    }
+
+    const value = configValue ? Number(configValue) : NaN;
 
     if (Number.isInteger(value) && value > 0) {
       return value;

@@ -101,6 +101,32 @@ describe('PurgeExpiredTrashItemsUseCase', () => {
     expect(result.retentionDays).toBe(7);
   });
 
+  it('명시적으로 보관 기간 0일을 전달하면 현재 시각까지 삭제 대상으로 본다', async () => {
+    const repo = createRepository();
+    const configService = createConfigService();
+    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue(0);
+    repo.hardDeleteExpiredClips.mockResolvedValue(1);
+
+    const usecase = new PurgeExpiredTrashItemsUseCase(
+      repo,
+      configService as ConfigService,
+    );
+    const now = new Date('2026-02-01T00:00:00.000Z');
+    const result = await usecase.execute({
+      now,
+      retentionDays: 0,
+      limit: 10,
+    });
+
+    expect(repo.hardDeleteExpiredFoldersWithClips).toHaveBeenCalledWith(
+      now,
+      10,
+    );
+    expect(repo.hardDeleteExpiredClips).toHaveBeenCalledWith(now, 10);
+    expect(result.retentionDays).toBe(0);
+    expect(result.totalDeleted).toBe(1);
+  });
+
   it('환경변수가 유효하지 않으면 기본 보관 기간 30일과 기본 limit 100을 사용한다', async () => {
     const repo = createRepository();
     const configService = createConfigService({
