@@ -80,7 +80,8 @@ async function bootstrap() {
     .addTag('Clips', '클립 생성, 수정, 삭제, 목록, 좋아요, 최근 조회 API')
     .addTag('Folders', '개인 워크스페이스 폴더 관리 API')
     .addTag('Users', '내 프로필 및 사용자 설정 API')
-    .addTag('Workspaces', '개인 워크스페이스 구독 정보 API')
+    .addTag('Workspaces', '개인 워크스페이스 API')
+    .addTag('Subscriptions', '구독 조회, 자동결제 인증, 자동갱신 API')
     .addTag('Trash', '휴지통 조회, 복구, 영구 삭제 API')
     .addBearerAuth(
       {
