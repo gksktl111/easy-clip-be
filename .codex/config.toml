@@ -1,0 +1,6 @@
+[mcp_servers.tosspayments-integration-guide]
+command = "npx"
+args = ["-y", "@tosspayments/integration-guide-mcp@latest"]
+
+[mcp_servers.tosspayments-integration-guide.tools.get-v2-documents]
+approval_mode = "approve"
