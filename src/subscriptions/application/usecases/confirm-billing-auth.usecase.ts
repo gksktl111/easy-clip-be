@@ -43,6 +43,19 @@ export class ConfirmBillingAuthUseCase {
       );
     }
 
+    if (this.canResumeWithoutImmediatePayment(subscription)) {
+      const updated = await this.subscriptionsRepository.updateSubscription(
+        subscription.id,
+        {
+          status: SubscriptionStatus.ACTIVE,
+          autoRenew: true,
+          nextBillingAt: subscription.currentPeriodEnd,
+        },
+      );
+
+      return toMySubscriptionResponse(updated);
+    }
+
     const amount = this.getProPlanAmount();
     const currency = this.configService.get<string>(
       'TOSS_PAYMENTS_CURRENCY',
@@ -111,6 +124,23 @@ export class ConfirmBillingAuthUseCase {
     });
 
     return toMySubscriptionResponse(updated);
+  }
+
+  private canResumeWithoutImmediatePayment(subscription: {
+    plan: SubscriptionPlan;
+    status: SubscriptionStatus;
+    currentPeriodEnd: Date | null;
+    externalBillingKey: string | null;
+    externalCustomerKey: string | null;
+  }): boolean {
+    return (
+      subscription.plan === SubscriptionPlan.PRO &&
+      subscription.status === SubscriptionStatus.CANCELED &&
+      subscription.currentPeriodEnd !== null &&
+      subscription.currentPeriodEnd > new Date() &&
+      subscription.externalBillingKey !== null &&
+      subscription.externalCustomerKey !== null
+    );
   }
 
   private getProPlanAmount(): number {
