@@ -9,6 +9,8 @@ import { DeleteTrashClipUseCase } from './application/usecases/delete-trash-clip
 import { ListTrashFoldersUseCase } from './application/usecases/list-trash-folders.usecase';
 import { RestoreTrashFolderUseCase } from './application/usecases/restore-trash-folder.usecase';
 import { DeleteTrashFolderUseCase } from './application/usecases/delete-trash-folder.usecase';
+import { PurgeExpiredTrashItemsUseCase } from './application/usecases/purge-expired-trash-items.usecase';
+import { TrashCleanupScheduler } from './infrastructure/trash-cleanup.scheduler';
 
 @Module({
   controllers: [TrashController],
@@ -20,6 +22,8 @@ import { DeleteTrashFolderUseCase } from './application/usecases/delete-trash-fo
     ListTrashFoldersUseCase,
     RestoreTrashFolderUseCase,
     DeleteTrashFolderUseCase,
+    PurgeExpiredTrashItemsUseCase,
+    TrashCleanupScheduler,
     JwtAccessGuard,
   ],
 })

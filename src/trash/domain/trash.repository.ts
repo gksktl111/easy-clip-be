@@ -17,4 +17,9 @@ export interface TrashRepository {
   ): Promise<TrashFolderItem | null>;
   restoreFolderWithClips(folderId: string): Promise<TrashFolderItem>;
   hardDeleteFolderWithClips(folderId: string): Promise<void>;
+  hardDeleteExpiredFoldersWithClips(
+    expiresBefore: Date,
+    limit: number,
+  ): Promise<number>;
+  hardDeleteExpiredClips(expiresBefore: Date, limit: number): Promise<number>;
 }
