@@ -9,6 +9,7 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import {
+  ApiConflictResponse,
   ApiBearerAuth,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -74,6 +75,10 @@ export class TrashController {
   })
   @ApiNotFoundResponse({
     description: '휴지통 클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiConflictResponse({
+    description: '삭제된 폴더에 속한 클립은 단독으로 복구할 수 없습니다.',
     type: ErrorResponseDto,
   })
   restoreTrashClip(
