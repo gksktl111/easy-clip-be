@@ -129,6 +129,8 @@ R2_ENDPOINT=
 R2_IMAGE_PREFIX=clips
 R2_MAX_IMAGE_BYTES=10485760
 CORS_ALLOWED_PORTS=3000,3001,5173
+AUTO_RENEWALS_BATCH_ENABLED=false
+AUTO_RENEWALS_BATCH_SECRET=
 
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
@@ -150,6 +152,8 @@ OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠�
 - `R2_ENDPOINT`: 미설정 시 `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com` 사용
 - `R2_IMAGE_PREFIX`: 객체 key prefix, 기본값은 `clips`
 - `R2_MAX_IMAGE_BYTES`: 업로드 허용 최대 크기, 기본값은 `10485760`(10MB)
+- `AUTO_RENEWALS_BATCH_ENABLED`: 자동결제 배치 엔드포인트를 명시적으로 켤 때만 `true`로 설정
+- `AUTO_RENEWALS_BATCH_SECRET`: 자동결제 배치 엔드포인트 호출 시 `x-auto-renewals-secret` 헤더로 전달해야 하는 시크릿
 
 운영 환경에서 PostgreSQL(RDS)을 사용할 때는 필요에 따라 `sslmode=require`를 포함합니다.
 

@@ -53,7 +53,82 @@ const createSubscription = (
   ...overrides,
 });
 
+const createInput = (now = new Date('2026-02-01T00:00:00.000Z')) => ({
+  now,
+  accessPolicy: {
+    enabled: true,
+    expectedSecret: 'auto-renewals-secret',
+    providedSecret: 'auto-renewals-secret',
+  },
+});
+
 describe('ProcessDueAutoRenewalsUseCase', () => {
+  it('배치 실행이 비활성화되어 있으면 due 구독 조회 전에 거부한다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    const usecase = new ProcessDueAutoRenewalsUseCase(
+      repo,
+      gateway,
+      createConfig(),
+    );
+
+    await expect(
+      usecase.execute({
+        ...createInput(),
+        accessPolicy: {
+          ...createInput().accessPolicy,
+          enabled: false,
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(repo.findDueAutoRenewalSubscriptions).not.toHaveBeenCalled();
+    expect(gateway.chargeBilling).not.toHaveBeenCalled();
+  });
+
+  it('배치 실행 시크릿이 설정되어 있지 않으면 due 구독 조회 전에 거부한다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    const usecase = new ProcessDueAutoRenewalsUseCase(
+      repo,
+      gateway,
+      createConfig(),
+    );
+
+    await expect(
+      usecase.execute({
+        ...createInput(),
+        accessPolicy: {
+          ...createInput().accessPolicy,
+          expectedSecret: undefined,
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(repo.findDueAutoRenewalSubscriptions).not.toHaveBeenCalled();
+    expect(gateway.chargeBilling).not.toHaveBeenCalled();
+  });
+
+  it('요청 시크릿이 일치하지 않으면 due 구독 조회 전에 거부한다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    const usecase = new ProcessDueAutoRenewalsUseCase(
+      repo,
+      gateway,
+      createConfig(),
+    );
+
+    await expect(
+      usecase.execute({
+        ...createInput(),
+        accessPolicy: {
+          ...createInput().accessPolicy,
+          providedSecret: 'wrong-secret',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(repo.findDueAutoRenewalSubscriptions).not.toHaveBeenCalled();
+    expect(gateway.chargeBilling).not.toHaveBeenCalled();
+  });
+
   it('자동결제 성공 시 기존 기간 뒤로 1개월 연장한다', async () => {
     const repo = createRepository();
     const gateway = createGateway();
@@ -79,7 +154,7 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       gateway,
       createConfig(),
     );
-    const result = await usecase.execute(now);
+    const result = await usecase.execute(createInput(now));
 
     expect(repo.activateByPayment).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -119,7 +194,7 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       gateway,
       createConfig(),
     );
-    const result = await usecase.execute(now);
+    const result = await usecase.execute(createInput(now));
 
     expect(repo.recordPaymentFailure).toHaveBeenCalledWith(
       expect.objectContaining({
