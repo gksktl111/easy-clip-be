@@ -38,6 +38,7 @@ enum PaymentProvider {
 }
 
 enum SubscriptionPaymentStatus {
+  PENDING
   DONE
   FAILED
   CANCELED

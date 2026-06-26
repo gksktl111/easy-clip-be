@@ -8,14 +8,19 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiExcludeEndpoint,
+  ApiForbiddenResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { Request as ExpressRequest } from 'express';
 import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
@@ -43,6 +48,7 @@ import { UpdateMySubscriptionDto } from './dtos/update-my-subscription.dto';
 })
 export class SubscriptionsController {
   constructor(
+    private readonly configService: ConfigService,
     private readonly getMySubscriptionUseCase: GetMySubscriptionUseCase,
     private readonly updateMySubscriptionUseCase: UpdateMySubscriptionUseCase,
     private readonly createBillingAuthRequestUseCase: CreateBillingAuthRequestUseCase,
@@ -108,13 +114,37 @@ export class SubscriptionsController {
   }
 
   @Post('subscriptions/auto-renewals/due')
-  @UseGuards(JwtAccessGuard)
+  @ApiExcludeEndpoint()
   @ApiOperation({ summary: '기한이 도래한 자동결제 처리' })
+  @ApiHeader({
+    name: 'x-auto-renewals-secret',
+    required: true,
+    description: '자동결제 배치 실행 시크릿',
+  })
   @ApiOkResponse({
     description: '자동결제 처리 결과를 반환합니다.',
     type: ProcessDueAutoRenewalsResponseDto,
   })
-  processDueAutoRenewals() {
-    return this.processDueAutoRenewalsUseCase.execute();
+  @ApiForbiddenResponse({
+    description:
+      '자동결제 배치 실행이 비활성화되어 있거나 시크릿이 설정되지 않았습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: '자동결제 배치 실행 시크릿이 올바르지 않습니다.',
+    type: ErrorResponseDto,
+  })
+  processDueAutoRenewals(@Request() request: ExpressRequest) {
+    return this.processDueAutoRenewalsUseCase.execute({
+      accessPolicy: {
+        enabled:
+          this.configService.get<string>('AUTO_RENEWALS_BATCH_ENABLED') ===
+          'true',
+        expectedSecret: this.configService.get<string>(
+          'AUTO_RENEWALS_BATCH_SECRET',
+        ),
+        providedSecret: request.get('x-auto-renewals-secret'),
+      },
+    });
   }
 }
