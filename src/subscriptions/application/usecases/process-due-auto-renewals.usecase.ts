@@ -9,7 +9,7 @@ import {
 } from '../../domain/subscription.types';
 import { BILLING_PAYMENT_GATEWAY } from '../ports/billing-payment.gateway';
 import type { BillingPaymentGateway } from '../ports/billing-payment.gateway';
-import { createSubscriptionOrderId } from '../helpers/customer-key.helper';
+import { createAutoRenewalSubscriptionOrderId } from '../helpers/customer-key.helper';
 import { resolveNextPeriod } from '../helpers/subscription-period.helper';
 import { SubscriptionsError } from '../errors/subscriptions.error';
 
@@ -71,7 +71,23 @@ export class ProcessDueAutoRenewalsUseCase {
         'TOSS_PAYMENTS_CURRENCY',
         'KRW',
       );
-      const orderId = createSubscriptionOrderId(subscription.id);
+      const orderId = createAutoRenewalSubscriptionOrderId(
+        subscription.id,
+        subscription.nextBillingAt ?? now,
+      );
+
+      const claimed =
+        await this.subscriptionsRepository.claimAutoRenewalPayment({
+          subscriptionId: subscription.id,
+          provider: PaymentProvider.TOSS_PAYMENTS,
+          externalOrderId: orderId,
+          amount,
+          currency,
+        });
+
+      if (!claimed) {
+        continue;
+      }
 
       const paymentResult = await this.billingPaymentGateway.chargeBilling({
         billingKey: subscription.externalBillingKey,
@@ -96,7 +112,7 @@ export class ProcessDueAutoRenewalsUseCase {
           externalBillingKey: subscription.externalBillingKey,
           externalCustomerKey: subscription.externalCustomerKey,
           externalPaymentKey: paymentResult.paymentKey,
-          externalOrderId: paymentResult.orderId,
+          externalOrderId: orderId,
           amount: paymentResult.totalAmount,
           currency: paymentResult.currency,
           approvedAt: paidAt,
@@ -114,7 +130,7 @@ export class ProcessDueAutoRenewalsUseCase {
         provider: PaymentProvider.TOSS_PAYMENTS,
         status: SubscriptionPaymentStatus.FAILED,
         externalPaymentKey: paymentResult.paymentKey,
-        externalOrderId: paymentResult.orderId,
+        externalOrderId: orderId,
         amount,
         currency,
         failedAt: now,
