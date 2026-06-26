@@ -262,6 +262,34 @@ describe('CreateClipUseCase', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
+  it('SVG 이미지는 업로드하지 않고 거부한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({
+      id: 'folder-id',
+      workspaceId: 'workspace-id',
+    });
+
+    const file = {
+      mimetype: 'image/svg+xml',
+      originalname: 'vector.svg',
+      size: 100,
+    } as MulterFile;
+    const imageStorage = createImageStorage();
+
+    const usecase = new CreateClipUseCase(repo, imageStorage);
+
+    await expect(
+      usecase.execute(
+        'user-id',
+        {
+          folderId: 'folder-id',
+        },
+        file,
+      ),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(imageStorage.uploadImage).not.toHaveBeenCalled();
+  });
+
   it('text와 file이 모두 없으면 실패한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({
