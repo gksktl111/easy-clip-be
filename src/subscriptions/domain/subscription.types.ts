@@ -23,6 +23,7 @@ export type PaymentProvider =
   (typeof PaymentProvider)[keyof typeof PaymentProvider];
 
 export const SubscriptionPaymentStatus = {
+  PENDING: 'PENDING',
   DONE: 'DONE',
   FAILED: 'FAILED',
   CANCELED: 'CANCELED',

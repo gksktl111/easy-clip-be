@@ -33,6 +33,7 @@ const createRepository = (): jest.Mocked<SubscriptionsRepository> => ({
   updateSubscription: jest.fn(),
   activateByPayment: jest.fn(),
   recordPaymentFailure: jest.fn(),
+  claimAutoRenewalPayment: jest.fn(),
   findDueAutoRenewalSubscriptions: jest.fn(),
 });
 

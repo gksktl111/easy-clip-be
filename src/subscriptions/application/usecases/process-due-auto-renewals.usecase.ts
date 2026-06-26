@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'crypto';
 import { SUBSCRIPTIONS_REPOSITORY } from '../../domain/subscriptions.repository';
 import type { SubscriptionsRepository } from '../../domain/subscriptions.repository';
 import {
@@ -8,13 +9,26 @@ import {
 } from '../../domain/subscription.types';
 import { BILLING_PAYMENT_GATEWAY } from '../ports/billing-payment.gateway';
 import type { BillingPaymentGateway } from '../ports/billing-payment.gateway';
-import { createSubscriptionOrderId } from '../helpers/customer-key.helper';
+import { createAutoRenewalSubscriptionOrderId } from '../helpers/customer-key.helper';
 import { resolveNextPeriod } from '../helpers/subscription-period.helper';
+import { SubscriptionsError } from '../errors/subscriptions.error';
 
 export type ProcessDueAutoRenewalsOutput = {
   processed: number;
   succeeded: number;
   failed: number;
+};
+
+export type ProcessDueAutoRenewalsInput = {
+  now?: Date;
+  limit?: number;
+  accessPolicy: ProcessDueAutoRenewalsAccessPolicyInput;
+};
+
+export type ProcessDueAutoRenewalsAccessPolicyInput = {
+  enabled: boolean;
+  expectedSecret?: string;
+  providedSecret?: string;
 };
 
 @Injectable()
@@ -28,9 +42,12 @@ export class ProcessDueAutoRenewalsUseCase {
   ) {}
 
   async execute(
-    now = new Date(),
-    limit = 50,
+    input: ProcessDueAutoRenewalsInput,
   ): Promise<ProcessDueAutoRenewalsOutput> {
+    this.assertAutoRenewalsBatchAllowed(input.accessPolicy);
+
+    const now = input.now ?? new Date();
+    const limit = input.limit ?? 50;
     const subscriptions =
       await this.subscriptionsRepository.findDueAutoRenewalSubscriptions(
         now,
@@ -54,7 +71,23 @@ export class ProcessDueAutoRenewalsUseCase {
         'TOSS_PAYMENTS_CURRENCY',
         'KRW',
       );
-      const orderId = createSubscriptionOrderId(subscription.id);
+      const orderId = createAutoRenewalSubscriptionOrderId(
+        subscription.id,
+        subscription.nextBillingAt ?? now,
+      );
+
+      const claimed =
+        await this.subscriptionsRepository.claimAutoRenewalPayment({
+          subscriptionId: subscription.id,
+          provider: PaymentProvider.TOSS_PAYMENTS,
+          externalOrderId: orderId,
+          amount,
+          currency,
+        });
+
+      if (!claimed) {
+        continue;
+      }
 
       const paymentResult = await this.billingPaymentGateway.chargeBilling({
         billingKey: subscription.externalBillingKey,
@@ -79,7 +112,7 @@ export class ProcessDueAutoRenewalsUseCase {
           externalBillingKey: subscription.externalBillingKey,
           externalCustomerKey: subscription.externalCustomerKey,
           externalPaymentKey: paymentResult.paymentKey,
-          externalOrderId: paymentResult.orderId,
+          externalOrderId: orderId,
           amount: paymentResult.totalAmount,
           currency: paymentResult.currency,
           approvedAt: paidAt,
@@ -97,7 +130,7 @@ export class ProcessDueAutoRenewalsUseCase {
         provider: PaymentProvider.TOSS_PAYMENTS,
         status: SubscriptionPaymentStatus.FAILED,
         externalPaymentKey: paymentResult.paymentKey,
-        externalOrderId: paymentResult.orderId,
+        externalOrderId: orderId,
         amount,
         currency,
         failedAt: now,
@@ -120,4 +153,41 @@ export class ProcessDueAutoRenewalsUseCase {
     const amount = raw ? Number(raw) : 4900;
     return Number.isInteger(amount) && amount > 0 ? amount : 4900;
   }
+
+  private assertAutoRenewalsBatchAllowed(
+    accessPolicy: ProcessDueAutoRenewalsAccessPolicyInput,
+  ): void {
+    const expectedSecret = accessPolicy.expectedSecret?.trim();
+    const providedSecret = accessPolicy.providedSecret?.trim();
+
+    if (!accessPolicy.enabled) {
+      throw new SubscriptionsError(
+        'FORBIDDEN',
+        '자동결제 배치 실행이 비활성화되어 있습니다.',
+      );
+    }
+
+    if (!expectedSecret) {
+      throw new SubscriptionsError(
+        'FORBIDDEN',
+        '자동결제 배치 실행 시크릿이 설정되어 있지 않습니다.',
+      );
+    }
+
+    if (!providedSecret || !isSameSecret(providedSecret, expectedSecret)) {
+      throw new SubscriptionsError(
+        'UNAUTHORIZED',
+        '자동결제 배치 실행 시크릿이 올바르지 않습니다.',
+      );
+    }
+  }
+}
+
+function isSameSecret(providedSecret: string, expectedSecret: string): boolean {
+  const provided = Buffer.from(providedSecret);
+  const expected = Buffer.from(expectedSecret);
+
+  return (
+    provided.length === expected.length && timingSafeEqual(provided, expected)
+  );
 }
