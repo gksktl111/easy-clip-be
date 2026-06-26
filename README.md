@@ -121,6 +121,8 @@ AUTH_COOKIE_DOMAIN=
 AUTH_COOKIE_SECURE=false
 AUTH_ACCESS_TOKEN_COOKIE_NAME=easy_clip_access_token
 AUTH_REFRESH_TOKEN_COOKIE_NAME=easy_clip_refresh_token
+TEST_ADMIN_LOGIN_ENABLED=false
+TEST_ADMIN_LOGIN_SECRET=
 R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
@@ -147,6 +149,8 @@ OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠�
 - `AUTH_COOKIE_DOMAIN`: 운영에서 쿠키를 공유할 도메인이 필요할 때만 설정
 - `AUTH_COOKIE_SECURE`: `true`면 `Secure` 쿠키로 발급, 미설정 시 `NODE_ENV=production`에서 자동 활성화
 - `AUTH_ACCESS_TOKEN_COOKIE_NAME`, `AUTH_REFRESH_TOKEN_COOKIE_NAME`: 쿠키 이름 커스터마이징
+- `TEST_ADMIN_LOGIN_ENABLED`: local/test에서 테스트 관리자 로그인을 명시적으로 켤 때만 `true`로 설정. production에서는 항상 차단됩니다.
+- `TEST_ADMIN_LOGIN_SECRET`: 테스트 관리자 로그인 호출 시 `x-test-admin-secret` 헤더로 전달해야 하는 시크릿
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`: Cloudflare R2 업로드 자격 증명
 - `R2_PUBLIC_BASE_URL`: 업로드된 이미지에 프론트가 직접 접근할 공개 base URL. 객체 경로까지 넣지 말고 도메인 루트만 넣습니다. 예: `https://cdn.example.com`
 - `R2_ENDPOINT`: 미설정 시 `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com` 사용
