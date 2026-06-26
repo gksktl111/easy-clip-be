@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
 import type { Clip } from '../../domain/clip.types';
 import type { ClipsRepository } from '../../domain/clips.repository';
@@ -10,11 +10,13 @@ import {
   toImageClipData,
   validateClipImageFile,
 } from '../helpers/clip-data.helper';
-import { CLIP_IMAGE_STORAGE_PORT } from '../ports/clip-image-storage.port';
-import type { ClipImageStoragePort } from '../ports/clip-image-storage.port';
+import { CLIP_IMAGE_STORAGE_PORT } from 'src/shared/application/ports/clip-image-storage.port';
+import type { ClipImageStoragePort } from 'src/shared/application/ports/clip-image-storage.port';
 
 @Injectable()
 export class UpdateClipUseCase {
+  private readonly logger = new Logger(UpdateClipUseCase.name);
+
   constructor(
     @Inject(CLIPS_REPOSITORY)
     private readonly clipsRepository: ClipsRepository,
@@ -50,11 +52,18 @@ export class UpdateClipUseCase {
           ? await this.uploadImageAndResolveClipData(userId, file)
           : resolveClipData(input.text);
 
-    return this.clipsRepository.updateClip(clip.id, {
+    const updatedClip = await this.clipsRepository.updateClip(clip.id, {
       ...clipData,
       folderId: folder.id,
       workspaceId: folder.workspaceId,
     });
+
+    await this.deletePreviousImageIfReplaced(
+      clip.imageUrl,
+      updatedClip.imageUrl,
+    );
+
+    return updatedClip;
   }
 
   private async resolveFolder(
@@ -93,5 +102,23 @@ export class UpdateClipUseCase {
     });
 
     return toImageClipData(file, uploadedImage.url);
+  }
+
+  private async deletePreviousImageIfReplaced(
+    previousImageUrl: string | null,
+    nextImageUrl: string | null,
+  ): Promise<void> {
+    if (!previousImageUrl || previousImageUrl === nextImageUrl) {
+      return;
+    }
+
+    try {
+      await this.clipImageStoragePort.deleteImage(previousImageUrl);
+    } catch (error) {
+      this.logger.warn(
+        `이전 클립 이미지 삭제에 실패했습니다. imageUrl=${previousImageUrl}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 }
