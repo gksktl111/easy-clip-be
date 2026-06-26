@@ -91,6 +91,12 @@ export class PrismaUsersRepository implements UsersRepository {
 
   async deleteUserAndOwnedPersonalWorkspaces(userId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await tx.refreshToken.deleteMany({
+        where: {
+          userId,
+        },
+      });
+
       const ownedPersonalWorkspaces = await tx.workspace.findMany({
         where: {
           ownerUserId: userId,
