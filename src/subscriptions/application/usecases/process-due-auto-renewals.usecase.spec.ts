@@ -16,6 +16,7 @@ const createRepository = (): jest.Mocked<SubscriptionsRepository> => ({
   updateSubscription: jest.fn(),
   activateByPayment: jest.fn(),
   recordPaymentFailure: jest.fn(),
+  claimAutoRenewalPayment: jest.fn(),
   findDueAutoRenewalSubscriptions: jest.fn(),
 });
 
@@ -137,9 +138,10 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
     repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
       createSubscription(),
     ]);
+    repo.claimAutoRenewalPayment.mockResolvedValue(true);
     gateway.chargeBilling.mockResolvedValue({
       paymentKey: 'payment-key',
-      orderId: 'order-id',
+      orderId: 'provider-order-id',
       status: SubscriptionPaymentStatus.DONE,
       totalAmount: 4900,
       currency: 'KRW',
@@ -156,8 +158,21 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
     );
     const result = await usecase.execute(createInput(now));
 
+    expect(repo.claimAutoRenewalPayment).toHaveBeenCalledWith({
+      subscriptionId: 'subscription-id',
+      provider: PaymentProvider.TOSS_PAYMENTS,
+      externalOrderId: 'sub_subscription-id_20260201000000',
+      amount: 4900,
+      currency: 'KRW',
+    });
+    expect(gateway.chargeBilling).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'sub_subscription-id_20260201000000',
+      }),
+    );
     expect(repo.activateByPayment).toHaveBeenCalledWith(
       expect.objectContaining({
+        externalOrderId: 'sub_subscription-id_20260201000000',
         currentPeriodEnd: new Date('2026-03-01T00:00:00.000Z'),
         nextBillingAt: new Date('2026-03-01T00:00:00.000Z'),
       }),
@@ -177,9 +192,10 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
     repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
       createSubscription(),
     ]);
+    repo.claimAutoRenewalPayment.mockResolvedValue(true);
     gateway.chargeBilling.mockResolvedValue({
       paymentKey: 'payment-key',
-      orderId: 'order-id',
+      orderId: 'provider-order-id',
       status: SubscriptionPaymentStatus.FAILED,
       totalAmount: 4900,
       currency: 'KRW',
@@ -198,6 +214,7 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
 
     expect(repo.recordPaymentFailure).toHaveBeenCalledWith(
       expect.objectContaining({
+        externalOrderId: 'sub_subscription-id_20260201000000',
         status: SubscriptionPaymentStatus.FAILED,
         failureCode: 'PAY_PROCESS_ABORTED',
       }),
@@ -207,6 +224,40 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       processed: 1,
       succeeded: 0,
       failed: 1,
+    });
+  });
+
+  it('동일 청구주기 결제가 이미 claim되어 있으면 외부 과금을 건너뛴다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    const now = new Date('2026-02-01T00:00:00.000Z');
+
+    repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
+      createSubscription(),
+    ]);
+    repo.claimAutoRenewalPayment.mockResolvedValue(false);
+
+    const usecase = new ProcessDueAutoRenewalsUseCase(
+      repo,
+      gateway,
+      createConfig(),
+    );
+    const result = await usecase.execute(createInput(now));
+
+    expect(repo.claimAutoRenewalPayment).toHaveBeenCalledWith({
+      subscriptionId: 'subscription-id',
+      provider: PaymentProvider.TOSS_PAYMENTS,
+      externalOrderId: 'sub_subscription-id_20260201000000',
+      amount: 4900,
+      currency: 'KRW',
+    });
+    expect(gateway.chargeBilling).not.toHaveBeenCalled();
+    expect(repo.activateByPayment).not.toHaveBeenCalled();
+    expect(repo.recordPaymentFailure).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      processed: 1,
+      succeeded: 0,
+      failed: 0,
     });
   });
 });

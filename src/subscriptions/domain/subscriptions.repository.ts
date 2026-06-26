@@ -46,6 +46,14 @@ export type ActivateSubscriptionPaymentParams =
 
 export type MarkPaymentFailedParams = RecordSubscriptionPaymentParams;
 
+export type ClaimAutoRenewalPaymentParams = {
+  subscriptionId: string;
+  provider: PaymentProvider;
+  externalOrderId: string;
+  amount: number;
+  currency: string;
+};
+
 export interface SubscriptionsRepository {
   getOrCreatePersonalSubscription(userId: string): Promise<Subscription>;
 
@@ -59,6 +67,10 @@ export interface SubscriptionsRepository {
   ): Promise<Subscription>;
 
   recordPaymentFailure(params: MarkPaymentFailedParams): Promise<void>;
+
+  claimAutoRenewalPayment(
+    params: ClaimAutoRenewalPaymentParams,
+  ): Promise<boolean>;
 
   findDueAutoRenewalSubscriptions(
     now: Date,
