@@ -2,6 +2,8 @@ import { UpdateAuthAccountProfileParams } from '../../domain/users.repository';
 import { UserAuthAccount, UserWithAuthAccounts } from '../../domain/user.types';
 import { UsersError } from '../errors/users.error';
 import { UpdateMeInput } from '../dtos/update-me-input.dto';
+import { normalizeBoundedName } from '../../../shared/application/name-normalization.helper';
+import { DISPLAY_NAME_MAX_LENGTH } from '../constants/user-profile.constants';
 
 export function resolveCurrentAuthAccount(
   user: UserWithAuthAccounts,
@@ -26,7 +28,19 @@ export function buildUpdateMeParams(
   const params: UpdateAuthAccountProfileParams = {};
 
   if (input.displayName !== undefined) {
-    params.displayName = input.displayName;
+    const result = normalizeBoundedName(
+      input.displayName,
+      DISPLAY_NAME_MAX_LENGTH,
+    );
+
+    if (!result.ok) {
+      throw new UsersError(
+        'BAD_REQUEST',
+        `displayName은 1자 이상 ${DISPLAY_NAME_MAX_LENGTH}자 이하여야 합니다.`,
+      );
+    }
+
+    params.displayName = result.value;
   }
 
   if (input.avatarUrl !== undefined) {

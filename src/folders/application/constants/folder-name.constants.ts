@@ -1,0 +1,2 @@
+export const FOLDER_NAME_MAX_LENGTH = 50;
+export const FOLDER_TAG_NAME_MAX_LENGTH = 30;

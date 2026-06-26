@@ -129,6 +129,88 @@ describe('UpdateMeUseCase', () => {
     expect(result.avatarUrl).toBeNull();
   });
 
+  it('displayName을 trim한 값으로 수정한다', async () => {
+    const repo = createRepository();
+    repo.findUserWithAuthAccounts.mockResolvedValue({
+      id: 'user-id',
+      authAccounts: [
+        {
+          id: 'account-id',
+          provider: 'GOOGLE',
+          email: 'test@example.com',
+          displayName: 'tester',
+          profileImageUrl: 'https://example.com/a.png',
+        },
+      ],
+    });
+    repo.updateAuthAccountProfile.mockResolvedValue({
+      id: 'account-id',
+      provider: 'GOOGLE',
+      email: 'test@example.com',
+      displayName: 'new-name',
+      profileImageUrl: 'https://example.com/a.png',
+    });
+
+    const usecase = new UpdateMeUseCase(repo);
+    await usecase.execute('user-id', 'account-id', {
+      displayName: '  new-name  ',
+    });
+
+    expect(repo.updateAuthAccountProfile).toHaveBeenCalledWith('account-id', {
+      displayName: 'new-name',
+    });
+  });
+
+  it('trim 후 displayName이 비어있으면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+    repo.findUserWithAuthAccounts.mockResolvedValue({
+      id: 'user-id',
+      authAccounts: [
+        {
+          id: 'account-id',
+          provider: 'GOOGLE',
+          email: 'test@example.com',
+          displayName: 'tester',
+          profileImageUrl: 'https://example.com/a.png',
+        },
+      ],
+    });
+
+    const usecase = new UpdateMeUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', 'account-id', { displayName: '   ' }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.updateAuthAccountProfile).not.toHaveBeenCalled();
+  });
+
+  it('displayName이 50자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+    repo.findUserWithAuthAccounts.mockResolvedValue({
+      id: 'user-id',
+      authAccounts: [
+        {
+          id: 'account-id',
+          provider: 'GOOGLE',
+          email: 'test@example.com',
+          displayName: 'tester',
+          profileImageUrl: 'https://example.com/a.png',
+        },
+      ],
+    });
+
+    const usecase = new UpdateMeUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', 'account-id', {
+        displayName: '가'.repeat(51),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.updateAuthAccountProfile).not.toHaveBeenCalled();
+  });
+
   it('avatarUrl만 수정하면 displayName은 변경하지 않는다', async () => {
     const repo = createRepository();
     repo.findUserWithAuthAccounts.mockResolvedValue({

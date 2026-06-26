@@ -48,6 +48,50 @@ describe('CreateFolderTagUseCase', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
+  it('정규화된 태그명 기준으로 중복을 검사한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.findTagByNameInFolder.mockResolvedValue({ id: 'tag-id' } as never);
+
+    const usecase = new CreateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', { folderId: 'folder-id', name: ' backend ' }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    expect(repo.findTagByNameInFolder).toHaveBeenCalledWith(
+      'folder-id',
+      'backend',
+    );
+  });
+
+  it('trim 후 태그명이 비어있으면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+
+    const usecase = new CreateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', { folderId: 'folder-id', name: '   ' }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
+  });
+
+  it('태그명이 30자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+
+    const usecase = new CreateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        folderId: 'folder-id',
+        name: 'a'.repeat(31),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
+  });
+
   it('폴더 태그를 생성한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
@@ -61,7 +105,7 @@ describe('CreateFolderTagUseCase', () => {
     const usecase = new CreateFolderTagUseCase(repo);
     const result = await usecase.execute('user-id', {
       folderId: 'folder-id',
-      name: 'backend',
+      name: ' backend ',
     });
 
     expect(repo.createFolderTag).toHaveBeenCalledWith({

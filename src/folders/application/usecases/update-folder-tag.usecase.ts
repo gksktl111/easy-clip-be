@@ -4,6 +4,7 @@ import type { FoldersRepository } from '../../domain/folders.repository';
 import type { FolderTagOutput } from '../dtos/folder-tag-output.dto';
 import { UpdateFolderTagInput } from '../dtos/update-folder-tag-input.dto';
 import { FoldersError } from '../errors/folders.error';
+import { normalizeFolderTagName } from '../helpers/folder-name.helper';
 
 @Injectable()
 export class UpdateFolderTagUseCase {
@@ -16,6 +17,7 @@ export class UpdateFolderTagUseCase {
     userId: string,
     input: UpdateFolderTagInput,
   ): Promise<FolderTagOutput> {
+    const name = normalizeFolderTagName(input.name);
     const folder = await this.foldersRepository.findPersonalFolderById(
       userId,
       input.folderId,
@@ -36,17 +38,17 @@ export class UpdateFolderTagUseCase {
 
     const duplicatedTag = await this.foldersRepository.findTagByNameInFolder(
       folder.id,
-      input.name,
+      name,
     );
 
     if (duplicatedTag && duplicatedTag.id !== tag.id) {
       throw new FoldersError('CONFLICT', '이미 존재하는 태그 이름입니다.');
     }
 
-    if (tag.name === input.name) {
+    if (tag.name === name) {
       return tag;
     }
 
-    return this.foldersRepository.updateFolderTagName(tag.id, input.name);
+    return this.foldersRepository.updateFolderTagName(tag.id, name);
   }
 }
