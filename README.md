@@ -128,6 +128,7 @@ R2_PUBLIC_BASE_URL=https://cdn.example.com
 R2_ENDPOINT=
 R2_IMAGE_PREFIX=clips
 R2_MAX_IMAGE_BYTES=10485760
+CORS_ALLOWED_ORIGINS=http://localhost:3001
 CORS_ALLOWED_PORTS=3000,3001,5173
 
 GOOGLE_CLIENT_ID=...
@@ -150,6 +151,8 @@ OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠�
 - `R2_ENDPOINT`: 미설정 시 `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com` 사용
 - `R2_IMAGE_PREFIX`: 객체 key prefix, 기본값은 `clips`
 - `R2_MAX_IMAGE_BYTES`: 업로드 허용 최대 크기, 기본값은 `10485760`(10MB)
+- `CORS_ALLOWED_ORIGINS`: API 호출을 허용할 전체 origin 목록. 운영에서는 배포된 프론트 도메인을 쉼표로 구분해 명시합니다. 예: `https://app.easy-clip.app,https://www.easy-clip.app`
+- `CORS_ALLOWED_PORTS`: local 개발에서만 허용할 `localhost`/`127.0.0.1` 포트 목록
 
 운영 환경에서 PostgreSQL(RDS)을 사용할 때는 필요에 따라 `sslmode=require`를 포함합니다.
 
