@@ -32,7 +32,7 @@ export class PrismaTrashRepository implements TrashRepository {
     userId: string,
     clipId: string,
   ): Promise<TrashClipItem | null> {
-    return this.prisma.clip.findFirst({
+    const clip = await this.prisma.clip.findFirst({
       where: {
         id: clipId,
         deletedAt: {
@@ -48,8 +48,26 @@ export class PrismaTrashRepository implements TrashRepository {
         type: true,
         folderId: true,
         deletedAt: true,
+        folder: {
+          select: {
+            deletedAt: true,
+          },
+        },
       },
-    }) as Promise<TrashClipItem | null>;
+    });
+
+    if (!clip) {
+      return null;
+    }
+
+    return {
+      id: clip.id,
+      title: clip.title,
+      type: clip.type,
+      folderId: clip.folderId,
+      deletedAt: clip.deletedAt,
+      folderDeletedAt: clip.folder.deletedAt,
+    } as TrashClipItem;
   }
 
   async restoreClip(clipId: string): Promise<TrashClipItem> {
