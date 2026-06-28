@@ -12,3 +12,15 @@ export type TrashClipItem = {
   deletedAt: Date | null;
   folderDeletedAt?: Date | null;
 };
+
+export type TrashCursorPage<T> = {
+  items: T[];
+  hasNextPage: boolean;
+  nextCursor: string | null;
+};
+
+export type FindTrashItemsParams = {
+  userId: string;
+  cursor?: string;
+  limit: number;
+};

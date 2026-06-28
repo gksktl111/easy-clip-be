@@ -20,6 +20,12 @@ export class TrashClipResponseDto {
 export class TrashClipListResponseDto {
   @ApiProperty({ type: [TrashClipResponseDto] })
   items: TrashClipResponseDto[];
+
+  @ApiProperty({ example: 'cmclip123', nullable: true })
+  nextCursor: string | null;
+
+  @ApiProperty({ example: true })
+  hasNextPage: boolean;
 }
 
 export class TrashFolderResponseDto {
@@ -36,6 +42,12 @@ export class TrashFolderResponseDto {
 export class TrashFolderListResponseDto {
   @ApiProperty({ type: [TrashFolderResponseDto] })
   items: TrashFolderResponseDto[];
+
+  @ApiProperty({ example: 'cmfolder123', nullable: true })
+  nextCursor: string | null;
+
+  @ApiProperty({ example: true })
+  hasNextPage: boolean;
 }
 
 export class TrashDeleteResponseDto {
