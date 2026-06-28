@@ -404,10 +404,16 @@ export class PrismaClipsRepository implements ClipsRepository {
         ? {
             folderId,
             ...(workspaceId ? { workspaceId } : {}),
+            folder: {
+              deletedAt: null,
+            },
           }
         : {
             workspace: {
               ownerUserId: userId,
+            },
+            folder: {
+              deletedAt: null,
             },
           }),
       ...(type ? { type } : {}),

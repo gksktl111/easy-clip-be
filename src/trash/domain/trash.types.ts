@@ -10,4 +10,5 @@ export type TrashClipItem = {
   type: 'TEXT' | 'COLOR' | 'IMAGE';
   folderId: string;
   deletedAt: Date | null;
+  folderDeletedAt?: Date | null;
 };
