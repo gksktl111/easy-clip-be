@@ -79,6 +79,66 @@ describe('UpdateFolderTagUseCase', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
+  it('정규화된 태그명 기준으로 중복을 검사한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.findTagByIdInFolder.mockResolvedValue({
+      id: 'tag-id',
+      name: 'backend',
+    } as never);
+    repo.findTagByNameInFolder.mockResolvedValue({
+      id: 'other-tag-id',
+      name: 'frontend',
+    } as never);
+
+    const usecase = new UpdateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        folderId: 'folder-id',
+        tagId: 'tag-id',
+        name: ' frontend ',
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    expect(repo.findTagByNameInFolder).toHaveBeenCalledWith(
+      'folder-id',
+      'frontend',
+    );
+  });
+
+  it('trim 후 태그명이 비어있으면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+
+    const usecase = new UpdateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        folderId: 'folder-id',
+        tagId: 'tag-id',
+        name: '   ',
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
+  });
+
+  it('태그명이 10자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+
+    const usecase = new UpdateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        folderId: 'folder-id',
+        tagId: 'tag-id',
+        name: 'a'.repeat(11),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
+  });
+
   it('이름이 같으면 기존 태그를 반환한다', async () => {
     const repo = createRepository();
     const tag = { id: 'tag-id', name: 'backend', folderId: 'folder-id' };
@@ -116,7 +176,7 @@ describe('UpdateFolderTagUseCase', () => {
     await usecase.execute('user-id', {
       folderId: 'folder-id',
       tagId: 'tag-id',
-      name: 'frontend',
+      name: ' frontend ',
     });
 
     expect(repo.updateFolderTagName).toHaveBeenCalledWith('tag-id', 'frontend');
