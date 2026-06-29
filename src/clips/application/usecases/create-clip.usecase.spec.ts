@@ -2,7 +2,7 @@
 import { CreateClipUseCase } from './create-clip.usecase';
 import { ClipsRepository } from '../../domain/clips.repository';
 import { MulterFile } from 'src/shared/types/multer-file.type';
-import { ClipImageStoragePort } from '../ports/clip-image-storage.port';
+import { ClipImageStoragePort } from 'src/shared/application/ports/clip-image-storage.port';
 
 const createRepository = (): jest.Mocked<ClipsRepository> => ({
   findPersonalFolderById: jest.fn(),
@@ -26,6 +26,7 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
 
 const createImageStorage = (): jest.Mocked<ClipImageStoragePort> => ({
   uploadImage: jest.fn(),
+  deleteImage: jest.fn(),
 });
 
 describe('CreateClipUseCase', () => {
