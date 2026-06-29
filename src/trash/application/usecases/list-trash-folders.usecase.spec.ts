@@ -13,6 +13,7 @@ const createRepository = (): jest.Mocked<TrashRepository> => ({
   hardDeleteFolderWithClips: jest.fn(),
   hardDeleteExpiredFoldersWithClips: jest.fn(),
   hardDeleteExpiredClips: jest.fn(),
+  hardDeleteAllTrashItemsForUser: jest.fn(),
 });
 
 describe('ListTrashFoldersUseCase', () => {

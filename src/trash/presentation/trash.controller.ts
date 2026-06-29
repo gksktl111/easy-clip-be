@@ -23,6 +23,7 @@ import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/appl
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 import { AuthContext } from 'src/shared/types/auth-context.type';
+import { DeleteAllTrashItemsUseCase } from '../application/usecases/delete-all-trash-items.usecase';
 import { DeleteTrashClipUseCase } from '../application/usecases/delete-trash-clip.usecase';
 import { DeleteTrashFolderUseCase } from '../application/usecases/delete-trash-folder.usecase';
 import { ListTrashClipsUseCase } from '../application/usecases/list-trash-clips.usecase';
@@ -33,6 +34,7 @@ import { ListTrashQueryDto } from './dtos/list-trash-query.dto';
 import {
   TrashClipListResponseDto,
   TrashClipResponseDto,
+  TrashDeleteAllResponseDto,
   TrashDeleteResponseDto,
   TrashFolderListResponseDto,
   TrashFolderResponseDto,
@@ -54,7 +56,19 @@ export class TrashController {
     private readonly listTrashFoldersUseCase: ListTrashFoldersUseCase,
     private readonly restoreTrashFolderUseCase: RestoreTrashFolderUseCase,
     private readonly deleteTrashFolderUseCase: DeleteTrashFolderUseCase,
+    private readonly deleteAllTrashItemsUseCase: DeleteAllTrashItemsUseCase,
   ) {}
+
+  @Delete()
+  @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '휴지통 전체 영구 삭제' })
+  @ApiOkResponse({
+    description: '휴지통 전체 삭제 결과를 반환합니다.',
+    type: TrashDeleteAllResponseDto,
+  })
+  deleteAllTrashItems(@Request() req: { user: AuthContext }) {
+    return this.deleteAllTrashItemsUseCase.execute(req.user.userId);
+  }
 
   @Get('clips')
   @UseGuards(JwtAccessGuard)

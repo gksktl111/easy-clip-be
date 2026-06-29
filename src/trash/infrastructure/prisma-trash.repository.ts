@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
+  HardDeleteAllTrashItemsResult,
   HardDeleteTrashItemsResult,
   TrashRepository,
 } from '../domain/trash.repository';
@@ -334,6 +335,123 @@ export class PrismaTrashRepository implements TrashRepository {
       deletedCount: result.count,
       imageUrls: this.compactImageUrls(clips.map((clip) => clip.imageUrl)),
     };
+  }
+
+  async hardDeleteAllTrashItemsForUser(
+    userId: string,
+  ): Promise<HardDeleteAllTrashItemsResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const folders = await tx.folder.findMany({
+        where: {
+          deletedAt: {
+            not: null,
+          },
+          workspace: {
+            ownerUserId: userId,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      const folderIds = folders.map((folder) => folder.id);
+      const folderImageClips =
+        folderIds.length > 0
+          ? await tx.clip.findMany({
+              where: {
+                folderId: {
+                  in: folderIds,
+                },
+                imageUrl: {
+                  not: null,
+                },
+              },
+              select: {
+                imageUrl: true,
+              },
+            })
+          : [];
+
+      const folderClipDeletion =
+        folderIds.length > 0
+          ? await tx.clip.deleteMany({
+              where: {
+                folderId: {
+                  in: folderIds,
+                },
+              },
+            })
+          : { count: 0 };
+
+      const folderDeletion =
+        folderIds.length > 0
+          ? await tx.folder.deleteMany({
+              where: {
+                id: {
+                  in: folderIds,
+                },
+                deletedAt: {
+                  not: null,
+                },
+                workspace: {
+                  ownerUserId: userId,
+                },
+              },
+            })
+          : { count: 0 };
+
+      const clips = await tx.clip.findMany({
+        where: {
+          deletedAt: {
+            not: null,
+          },
+          workspace: {
+            ownerUserId: userId,
+          },
+          folder: {
+            deletedAt: null,
+          },
+        },
+        select: {
+          id: true,
+          imageUrl: true,
+        },
+      });
+
+      const clipDeletion =
+        clips.length > 0
+          ? await tx.clip.deleteMany({
+              where: {
+                id: {
+                  in: clips.map((clip) => clip.id),
+                },
+                deletedAt: {
+                  not: null,
+                },
+                workspace: {
+                  ownerUserId: userId,
+                },
+                folder: {
+                  deletedAt: null,
+                },
+              },
+            })
+          : { count: 0 };
+
+      const clipsDeleted = folderClipDeletion.count + clipDeletion.count;
+      const foldersDeleted = folderDeletion.count;
+
+      return {
+        clipsDeleted,
+        foldersDeleted,
+        totalDeleted: clipsDeleted + foldersDeleted,
+        imageUrls: this.compactImageUrls([
+          ...folderImageClips.map((clip) => clip.imageUrl),
+          ...clips.map((clip) => clip.imageUrl),
+        ]),
+      };
+    });
   }
 
   private compactImageUrls(imageUrls: Array<string | null | undefined>) {

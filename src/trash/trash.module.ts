@@ -11,6 +11,7 @@ import { DeleteTrashClipUseCase } from './application/usecases/delete-trash-clip
 import { ListTrashFoldersUseCase } from './application/usecases/list-trash-folders.usecase';
 import { RestoreTrashFolderUseCase } from './application/usecases/restore-trash-folder.usecase';
 import { DeleteTrashFolderUseCase } from './application/usecases/delete-trash-folder.usecase';
+import { DeleteAllTrashItemsUseCase } from './application/usecases/delete-all-trash-items.usecase';
 import { PurgeExpiredTrashItemsUseCase } from './application/usecases/purge-expired-trash-items.usecase';
 import { TrashCleanupScheduler } from './infrastructure/trash-cleanup.scheduler';
 
@@ -25,6 +26,7 @@ import { TrashCleanupScheduler } from './infrastructure/trash-cleanup.scheduler'
     ListTrashFoldersUseCase,
     RestoreTrashFolderUseCase,
     DeleteTrashFolderUseCase,
+    DeleteAllTrashItemsUseCase,
     PurgeExpiredTrashItemsUseCase,
     TrashCleanupScheduler,
     JwtAccessGuard,

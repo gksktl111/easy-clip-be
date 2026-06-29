@@ -11,6 +11,13 @@ export type HardDeleteTrashItemsResult = {
   imageUrls: string[];
 };
 
+export type HardDeleteAllTrashItemsResult = {
+  clipsDeleted: number;
+  foldersDeleted: number;
+  totalDeleted: number;
+  imageUrls: string[];
+};
+
 export interface TrashRepository {
   findDeletedClips(params: FindTrashItemsParams): Promise<TrashClipItem[]>;
   findDeletedClipById(
@@ -36,4 +43,7 @@ export interface TrashRepository {
     expiresBefore: Date,
     limit: number,
   ): Promise<HardDeleteTrashItemsResult>;
+  hardDeleteAllTrashItemsForUser(
+    userId: string,
+  ): Promise<HardDeleteAllTrashItemsResult>;
 }

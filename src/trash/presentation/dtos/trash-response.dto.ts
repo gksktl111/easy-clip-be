@@ -54,3 +54,14 @@ export class TrashDeleteResponseDto {
   @ApiProperty({ example: true })
   success: true;
 }
+
+export class TrashDeleteAllResponseDto {
+  @ApiProperty({ example: 3 })
+  clipsDeleted: number;
+
+  @ApiProperty({ example: 2 })
+  foldersDeleted: number;
+
+  @ApiProperty({ example: 5 })
+  totalDeleted: number;
+}
