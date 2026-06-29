@@ -392,6 +392,34 @@ export class PrismaClipsRepository implements ClipsRepository {
     });
   }
 
+  async softDeleteClips(clipIds: string[]): Promise<number> {
+    const result = await this.prisma.clip.updateMany({
+      where: {
+        id: {
+          in: clipIds,
+        },
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    return result.count;
+  }
+
+  async softDeleteAllClipsForUser(userId: string): Promise<number> {
+    const result = await this.prisma.clip.updateMany({
+      where: {
+        deletedAt: null,
+        workspace: {
+          ownerUserId: userId,
+        },
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    return result.count;
+  }
+
   private buildWhere(
     params: Omit<FindClipsParams, 'cursor' | 'limit'>,
   ): Prisma.ClipWhereInput {
