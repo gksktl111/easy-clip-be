@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/unbound-method */
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TrashRepository } from '../../domain/trash.repository';
 import { PurgeExpiredTrashItemsUseCase } from './purge-expired-trash-items.usecase';
+import { ClipImageStoragePort } from 'src/shared/application/ports/clip-image-storage.port';
 
 const createRepository = (): jest.Mocked<TrashRepository> => ({
   findDeletedClips: jest.fn(),
@@ -22,15 +24,38 @@ const createConfigService = (
   get: jest.fn((key: string) => values[key]),
 });
 
+const createImageStorage = (): jest.Mocked<ClipImageStoragePort> => ({
+  uploadImage: jest.fn(),
+  deleteImage: jest.fn(),
+});
+
 describe('PurgeExpiredTrashItemsUseCase', () => {
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
   it('보관 기간이 지난 폴더를 먼저 삭제하고 남은 limit으로 클립을 삭제한다', async () => {
     const repo = createRepository();
     const configService = createConfigService();
-    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue(2);
-    repo.hardDeleteExpiredClips.mockResolvedValue(3);
+    const imageStorage = createImageStorage();
+    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue({
+      deletedCount: 2,
+      imageUrls: ['https://cdn.example.com/clips/user-1/folder.png'],
+    });
+    repo.hardDeleteExpiredClips.mockResolvedValue({
+      deletedCount: 3,
+      imageUrls: ['https://cdn.example.com/clips/user-1/clip.png'],
+    });
 
     const usecase = new PurgeExpiredTrashItemsUseCase(
       repo,
+      imageStorage,
       configService as ConfigService,
     );
     const now = new Date('2026-02-01T00:00:00.000Z');
@@ -53,15 +78,26 @@ describe('PurgeExpiredTrashItemsUseCase', () => {
       clipsDeleted: 3,
       totalDeleted: 5,
     });
+    expect(imageStorage.deleteImage).toHaveBeenCalledWith(
+      'https://cdn.example.com/clips/user-1/folder.png',
+    );
+    expect(imageStorage.deleteImage).toHaveBeenCalledWith(
+      'https://cdn.example.com/clips/user-1/clip.png',
+    );
   });
 
   it('폴더 삭제가 limit을 모두 사용하면 클립 삭제를 호출하지 않는다', async () => {
     const repo = createRepository();
     const configService = createConfigService();
-    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue(10);
+    const imageStorage = createImageStorage();
+    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue({
+      deletedCount: 10,
+      imageUrls: [],
+    });
 
     const usecase = new PurgeExpiredTrashItemsUseCase(
       repo,
+      imageStorage,
       configService as ConfigService,
     );
     const result = await usecase.execute({
@@ -81,11 +117,19 @@ describe('PurgeExpiredTrashItemsUseCase', () => {
       TRASH_RETENTION_DAYS: '7',
       TRASH_PURGE_LIMIT: '20',
     });
-    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue(0);
-    repo.hardDeleteExpiredClips.mockResolvedValue(4);
+    const imageStorage = createImageStorage();
+    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue({
+      deletedCount: 0,
+      imageUrls: [],
+    });
+    repo.hardDeleteExpiredClips.mockResolvedValue({
+      deletedCount: 4,
+      imageUrls: [],
+    });
 
     const usecase = new PurgeExpiredTrashItemsUseCase(
       repo,
+      imageStorage,
       configService as ConfigService,
     );
     const result = await usecase.execute({
@@ -104,11 +148,19 @@ describe('PurgeExpiredTrashItemsUseCase', () => {
   it('명시적으로 보관 기간 0일을 전달하면 현재 시각까지 삭제 대상으로 본다', async () => {
     const repo = createRepository();
     const configService = createConfigService();
-    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue(0);
-    repo.hardDeleteExpiredClips.mockResolvedValue(1);
+    const imageStorage = createImageStorage();
+    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue({
+      deletedCount: 0,
+      imageUrls: [],
+    });
+    repo.hardDeleteExpiredClips.mockResolvedValue({
+      deletedCount: 1,
+      imageUrls: [],
+    });
 
     const usecase = new PurgeExpiredTrashItemsUseCase(
       repo,
+      imageStorage,
       configService as ConfigService,
     );
     const now = new Date('2026-02-01T00:00:00.000Z');
@@ -133,11 +185,19 @@ describe('PurgeExpiredTrashItemsUseCase', () => {
       TRASH_RETENTION_DAYS: 'invalid',
       TRASH_PURGE_LIMIT: '0',
     });
-    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue(0);
-    repo.hardDeleteExpiredClips.mockResolvedValue(0);
+    const imageStorage = createImageStorage();
+    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue({
+      deletedCount: 0,
+      imageUrls: [],
+    });
+    repo.hardDeleteExpiredClips.mockResolvedValue({
+      deletedCount: 0,
+      imageUrls: [],
+    });
 
     const usecase = new PurgeExpiredTrashItemsUseCase(
       repo,
+      imageStorage,
       configService as ConfigService,
     );
     const result = await usecase.execute({
@@ -154,5 +214,33 @@ describe('PurgeExpiredTrashItemsUseCase', () => {
       100,
     );
     expect(result.retentionDays).toBe(30);
+  });
+
+  it('만료 이미지 삭제가 실패해도 purge 결과는 성공으로 반환한다', async () => {
+    const repo = createRepository();
+    const configService = createConfigService();
+    const imageStorage = createImageStorage();
+    repo.hardDeleteExpiredFoldersWithClips.mockResolvedValue({
+      deletedCount: 0,
+      imageUrls: [],
+    });
+    repo.hardDeleteExpiredClips.mockResolvedValue({
+      deletedCount: 1,
+      imageUrls: ['https://cdn.example.com/clips/user-1/clip.png'],
+    });
+    imageStorage.deleteImage.mockRejectedValue(new Error('r2 failed'));
+
+    const usecase = new PurgeExpiredTrashItemsUseCase(
+      repo,
+      imageStorage,
+      configService as ConfigService,
+    );
+    const result = await usecase.execute({
+      now: new Date('2026-02-01T00:00:00.000Z'),
+      retentionDays: 30,
+      limit: 10,
+    });
+
+    expect(result.totalDeleted).toBe(1);
   });
 });

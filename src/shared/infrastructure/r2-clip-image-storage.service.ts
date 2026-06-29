@@ -1,10 +1,14 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
-import { ClipsError } from '../application/errors/clips.error';
-import { isAllowedClipImageMimeType } from '../application/helpers/clip-data.helper';
+import { ImageStorageError } from '../application/errors/image-storage.error';
+import { isAllowedClipImageMimeType } from '../application/helpers/clip-image-mime-type.helper';
 import type {
   ClipImageStoragePort,
   UploadClipImageInput,
@@ -28,7 +32,7 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
 
   async uploadImage(input: UploadClipImageInput): Promise<UploadedClipImage> {
     if (!isAllowedClipImageMimeType(input.file.mimetype)) {
-      throw new ClipsError(
+      throw new ImageStorageError(
         'BAD_REQUEST',
         'jpeg, png, webp, gif, avif 이미지만 업로드할 수 있습니다.',
       );
@@ -37,7 +41,7 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
     const maxImageBytes = this.resolveMaxImageBytes();
 
     if (input.file.size > maxImageBytes) {
-      throw new ClipsError(
+      throw new ImageStorageError(
         'BAD_REQUEST',
         `이미지 파일은 ${maxImageBytes} bytes 이하여야 합니다.`,
       );
@@ -48,10 +52,7 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
     const key = `${imagePrefix}/${input.userId}/${randomUUID()}${this.resolveExtension(input.file)}`;
     const client = this.createClient();
     const bucketName = this.getRequired('R2_BUCKET_NAME');
-    const publicBaseUrl = this.getRequired('R2_PUBLIC_BASE_URL').replace(
-      /\/+$/,
-      '',
-    );
+    const publicBaseUrl = this.resolvePublicBaseUrl();
 
     try {
       await client.send(
@@ -63,13 +64,41 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
         }),
       );
     } catch {
-      throw new ClipsError('INTERNAL', '이미지 업로드 중 오류가 발생했습니다.');
+      throw new ImageStorageError(
+        'INTERNAL',
+        '이미지 업로드 중 오류가 발생했습니다.',
+      );
     }
 
     return {
       key,
       url: `${publicBaseUrl}/${key}`,
     };
+  }
+
+  async deleteImage(imageUrl: string): Promise<void> {
+    const key = this.resolveKeyFromImageUrl(imageUrl);
+
+    if (!key) {
+      return;
+    }
+
+    const client = this.createClient();
+    const bucketName = this.getRequired('R2_BUCKET_NAME');
+
+    try {
+      await client.send(
+        new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+        }),
+      );
+    } catch {
+      throw new ImageStorageError(
+        'INTERNAL',
+        '이미지 삭제 중 오류가 발생했습니다.',
+      );
+    }
   }
 
   private getRequired(key: string): string {
@@ -110,6 +139,23 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
     return Number.isFinite(parsedValue) && parsedValue > 0
       ? parsedValue
       : DEFAULT_MAX_IMAGE_BYTES;
+  }
+
+  private resolvePublicBaseUrl(): string {
+    return this.getRequired('R2_PUBLIC_BASE_URL').replace(/\/+$/, '');
+  }
+
+  private resolveKeyFromImageUrl(imageUrl: string): string | null {
+    const publicBaseUrl = this.resolvePublicBaseUrl();
+    const prefix = `${publicBaseUrl}/`;
+
+    if (!imageUrl.startsWith(prefix)) {
+      return null;
+    }
+
+    const key = imageUrl.slice(prefix.length);
+
+    return key.length > 0 ? decodeURIComponent(key) : null;
   }
 
   private createClient(): S3Client {

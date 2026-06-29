@@ -1,5 +1,6 @@
 import { ClipType } from '../../domain/clip.types';
 import { MulterFile } from 'src/shared/types/multer-file.type';
+import { isAllowedClipImageMimeType } from 'src/shared/application/helpers/clip-image-mime-type.helper';
 import { ClipsError } from '../errors/clips.error';
 import { DetectedClip, detectClipType } from './clip-type-detector';
 
@@ -10,18 +11,6 @@ export type ClipData = {
   colorHex: string | null;
   imageUrl: string | null;
 };
-
-export const ALLOWED_CLIP_IMAGE_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'image/avif',
-] as const;
-
-export function isAllowedClipImageMimeType(mimetype: string): boolean {
-  return ALLOWED_CLIP_IMAGE_MIME_TYPES.some((allowed) => allowed === mimetype);
-}
 
 export function resolveClipData(text: string | undefined): ClipData {
   if (!text) {

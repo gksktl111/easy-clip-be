@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
+import { CLIP_IMAGE_STORAGE_PORT } from 'src/shared/application/ports/clip-image-storage.port';
+import { R2ClipImageStorageService } from 'src/shared/infrastructure/r2-clip-image-storage.service';
 import { TRASH_REPOSITORY } from './domain/trash.repository';
 import { PrismaTrashRepository } from './infrastructure/prisma-trash.repository';
 import { TrashController } from './presentation/trash.controller';
@@ -16,6 +18,7 @@ import { TrashCleanupScheduler } from './infrastructure/trash-cleanup.scheduler'
   controllers: [TrashController],
   providers: [
     { provide: TRASH_REPOSITORY, useClass: PrismaTrashRepository },
+    { provide: CLIP_IMAGE_STORAGE_PORT, useClass: R2ClipImageStorageService },
     ListTrashClipsUseCase,
     RestoreTrashClipUseCase,
     DeleteTrashClipUseCase,

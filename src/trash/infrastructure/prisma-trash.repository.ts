@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { TrashRepository } from '../domain/trash.repository';
+import {
+  HardDeleteTrashItemsResult,
+  TrashRepository,
+} from '../domain/trash.repository';
 import {
   FindTrashItemsParams,
   TrashClipItem,
@@ -101,9 +104,21 @@ export class PrismaTrashRepository implements TrashRepository {
     }) as Promise<TrashClipItem>;
   }
 
-  async hardDeleteClip(clipId: string): Promise<void> {
-    await this.prisma.clip.delete({
-      where: { id: clipId },
+  async hardDeleteClip(clipId: string): Promise<HardDeleteTrashItemsResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const clip = await tx.clip.findUnique({
+        where: { id: clipId },
+        select: { imageUrl: true },
+      });
+
+      await tx.clip.delete({
+        where: { id: clipId },
+      });
+
+      return {
+        deletedCount: 1,
+        imageUrls: this.compactImageUrls([clip?.imageUrl]),
+      };
     });
   }
 
@@ -188,8 +203,22 @@ export class PrismaTrashRepository implements TrashRepository {
     });
   }
 
-  async hardDeleteFolderWithClips(folderId: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+  async hardDeleteFolderWithClips(
+    folderId: string,
+  ): Promise<HardDeleteTrashItemsResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const imageClips = await tx.clip.findMany({
+        where: {
+          folderId,
+          imageUrl: {
+            not: null,
+          },
+        },
+        select: {
+          imageUrl: true,
+        },
+      });
+
       await tx.clip.deleteMany({
         where: {
           folderId,
@@ -199,13 +228,20 @@ export class PrismaTrashRepository implements TrashRepository {
       await tx.folder.delete({
         where: { id: folderId },
       });
+
+      return {
+        deletedCount: 1,
+        imageUrls: this.compactImageUrls(
+          imageClips.map((clip) => clip.imageUrl),
+        ),
+      };
     });
   }
 
   async hardDeleteExpiredFoldersWithClips(
     expiresBefore: Date,
     limit: number,
-  ): Promise<number> {
+  ): Promise<HardDeleteTrashItemsResult> {
     const folders = await this.prisma.folder.findMany({
       where: {
         deletedAt: {
@@ -220,13 +256,28 @@ export class PrismaTrashRepository implements TrashRepository {
     });
 
     if (folders.length === 0) {
-      return 0;
+      return this.emptyHardDeleteResult();
     }
+
+    const folderIds = folders.map((folder) => folder.id);
+    const imageClips = await this.prisma.clip.findMany({
+      where: {
+        folderId: {
+          in: folderIds,
+        },
+        imageUrl: {
+          not: null,
+        },
+      },
+      select: {
+        imageUrl: true,
+      },
+    });
 
     const result = await this.prisma.folder.deleteMany({
       where: {
         id: {
-          in: folders.map((folder) => folder.id),
+          in: folderIds,
         },
         deletedAt: {
           lte: expiresBefore,
@@ -234,13 +285,16 @@ export class PrismaTrashRepository implements TrashRepository {
       },
     });
 
-    return result.count;
+    return {
+      deletedCount: result.count,
+      imageUrls: this.compactImageUrls(imageClips.map((clip) => clip.imageUrl)),
+    };
   }
 
   async hardDeleteExpiredClips(
     expiresBefore: Date,
     limit: number,
-  ): Promise<number> {
+  ): Promise<HardDeleteTrashItemsResult> {
     const clips = await this.prisma.clip.findMany({
       where: {
         deletedAt: {
@@ -254,11 +308,12 @@ export class PrismaTrashRepository implements TrashRepository {
       take: limit,
       select: {
         id: true,
+        imageUrl: true,
       },
     });
 
     if (clips.length === 0) {
-      return 0;
+      return this.emptyHardDeleteResult();
     }
 
     const result = await this.prisma.clip.deleteMany({
@@ -275,7 +330,23 @@ export class PrismaTrashRepository implements TrashRepository {
       },
     });
 
-    return result.count;
+    return {
+      deletedCount: result.count,
+      imageUrls: this.compactImageUrls(clips.map((clip) => clip.imageUrl)),
+    };
+  }
+
+  private compactImageUrls(imageUrls: Array<string | null | undefined>) {
+    return imageUrls.filter((imageUrl): imageUrl is string =>
+      Boolean(imageUrl),
+    );
+  }
+
+  private emptyHardDeleteResult(): HardDeleteTrashItemsResult {
+    return {
+      deletedCount: 0,
+      imageUrls: [],
+    };
   }
 
   private async findClipCursor(
