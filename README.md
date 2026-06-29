@@ -75,7 +75,7 @@ src/
 - `WorkspacesController` -> `/workspaces`
 - `TrashController` -> `/trash`
 
-Swagger 문서는 앱 실행 후 `/docs`에서 확인할 수 있습니다.
+Swagger 문서는 local 환경에서 앱 실행 후 `/docs`에서 확인할 수 있습니다. production 환경에서는 기본적으로 비활성화되며, 운영에서 필요할 때만 `ENABLE_SWAGGER=true`로 명시적으로 활성화합니다.
 
 ## Tech Stack
 
@@ -132,6 +132,7 @@ R2_ENDPOINT=
 R2_IMAGE_PREFIX=clips
 R2_MAX_IMAGE_BYTES=10485760
 CORS_ALLOWED_PORTS=3000,3001,5173
+ENABLE_SWAGGER=true
 AUTO_RENEWALS_BATCH_ENABLED=false
 AUTO_RENEWALS_BATCH_SECRET=
 
@@ -158,6 +159,7 @@ OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠�
 - `R2_ENDPOINT`: 미설정 시 `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com` 사용
 - `R2_IMAGE_PREFIX`: 객체 key prefix, 기본값은 `clips`
 - `R2_MAX_IMAGE_BYTES`: 업로드 허용 최대 크기, 기본값은 `10485760`(10MB)
+- `ENABLE_SWAGGER`: production에서는 기본 비활성화됩니다. 운영에서 문서 노출이 필요할 때만 `true`로 설정합니다.
 - `AUTO_RENEWALS_BATCH_ENABLED`: 자동결제 배치 엔드포인트를 명시적으로 켤 때만 `true`로 설정
 - `AUTO_RENEWALS_BATCH_SECRET`: 자동결제 배치 엔드포인트 호출 시 `x-auto-renewals-secret` 헤더로 전달해야 하는 시크릿
 
