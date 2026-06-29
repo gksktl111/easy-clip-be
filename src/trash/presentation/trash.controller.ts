@@ -4,11 +4,13 @@ import {
   Get,
   Param,
   Patch,
+  Query,
   Request,
   UseGuards,
   UseFilters,
 } from '@nestjs/common';
 import {
+  ApiConflictResponse,
   ApiBearerAuth,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -27,6 +29,7 @@ import { ListTrashClipsUseCase } from '../application/usecases/list-trash-clips.
 import { ListTrashFoldersUseCase } from '../application/usecases/list-trash-folders.usecase';
 import { RestoreTrashClipUseCase } from '../application/usecases/restore-trash-clip.usecase';
 import { RestoreTrashFolderUseCase } from '../application/usecases/restore-trash-folder.usecase';
+import { ListTrashQueryDto } from './dtos/list-trash-query.dto';
 import {
   TrashClipListResponseDto,
   TrashClipResponseDto,
@@ -60,8 +63,11 @@ export class TrashController {
     description: '삭제된 클립 목록을 반환합니다.',
     type: TrashClipListResponseDto,
   })
-  getTrashClips(@Request() req: { user: AuthContext }) {
-    return this.listTrashClipsUseCase.execute(req.user.userId);
+  getTrashClips(
+    @Request() req: { user: AuthContext },
+    @Query() query: ListTrashQueryDto,
+  ) {
+    return this.listTrashClipsUseCase.execute(req.user.userId, query);
   }
 
   @Patch('clips/:id/restore')
@@ -74,6 +80,10 @@ export class TrashController {
   })
   @ApiNotFoundResponse({
     description: '휴지통 클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiConflictResponse({
+    description: '삭제된 폴더에 속한 클립은 단독으로 복구할 수 없습니다.',
     type: ErrorResponseDto,
   })
   restoreTrashClip(
@@ -109,8 +119,11 @@ export class TrashController {
     description: '삭제된 폴더 목록을 반환합니다.',
     type: TrashFolderListResponseDto,
   })
-  getTrashFolders(@Request() req: { user: AuthContext }) {
-    return this.listTrashFoldersUseCase.execute(req.user.userId);
+  getTrashFolders(
+    @Request() req: { user: AuthContext },
+    @Query() query: ListTrashQueryDto,
+  ) {
+    return this.listTrashFoldersUseCase.execute(req.user.userId, query);
   }
 
   @Patch('folders/:id/restore')

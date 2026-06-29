@@ -1,23 +1,38 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TrashRepository } from '../domain/trash.repository';
-import { TrashClipItem, TrashFolderItem } from '../domain/trash.types';
+import {
+  FindTrashItemsParams,
+  TrashClipItem,
+  TrashFolderItem,
+} from '../domain/trash.types';
 
 @Injectable()
 export class PrismaTrashRepository implements TrashRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findDeletedClips(userId: string): Promise<TrashClipItem[]> {
+  async findDeletedClips(
+    params: FindTrashItemsParams,
+  ): Promise<TrashClipItem[]> {
+    const cursor = await this.findClipCursor(params);
+
+    if (params.cursor && !cursor) {
+      return [];
+    }
+
     return this.prisma.clip.findMany({
       where: {
         deletedAt: {
           not: null,
         },
+        ...(cursor ? { OR: buildClipDeletedAtCursorWhere(cursor) } : {}),
         workspace: {
-          ownerUserId: userId,
+          ownerUserId: params.userId,
         },
       },
       orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
+      take: params.limit,
       select: {
         id: true,
         title: true,
@@ -32,7 +47,7 @@ export class PrismaTrashRepository implements TrashRepository {
     userId: string,
     clipId: string,
   ): Promise<TrashClipItem | null> {
-    return this.prisma.clip.findFirst({
+    const clip = await this.prisma.clip.findFirst({
       where: {
         id: clipId,
         deletedAt: {
@@ -48,8 +63,26 @@ export class PrismaTrashRepository implements TrashRepository {
         type: true,
         folderId: true,
         deletedAt: true,
+        folder: {
+          select: {
+            deletedAt: true,
+          },
+        },
       },
-    }) as Promise<TrashClipItem | null>;
+    });
+
+    if (!clip) {
+      return null;
+    }
+
+    return {
+      id: clip.id,
+      title: clip.title,
+      type: clip.type,
+      folderId: clip.folderId,
+      deletedAt: clip.deletedAt,
+      folderDeletedAt: clip.folder.deletedAt,
+    } as TrashClipItem;
   }
 
   async restoreClip(clipId: string): Promise<TrashClipItem> {
@@ -74,17 +107,27 @@ export class PrismaTrashRepository implements TrashRepository {
     });
   }
 
-  async findDeletedFolders(userId: string): Promise<TrashFolderItem[]> {
+  async findDeletedFolders(
+    params: FindTrashItemsParams,
+  ): Promise<TrashFolderItem[]> {
+    const cursor = await this.findFolderCursor(params);
+
+    if (params.cursor && !cursor) {
+      return [];
+    }
+
     return this.prisma.folder.findMany({
       where: {
         deletedAt: {
           not: null,
         },
+        ...(cursor ? { OR: buildFolderDeletedAtCursorWhere(cursor) } : {}),
         workspace: {
-          ownerUserId: userId,
+          ownerUserId: params.userId,
         },
       },
       orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
+      take: params.limit,
       select: {
         id: true,
         name: true,
@@ -234,4 +277,101 @@ export class PrismaTrashRepository implements TrashRepository {
 
     return result.count;
   }
+
+  private async findClipCursor(
+    params: FindTrashItemsParams,
+  ): Promise<TrashCursor | null> {
+    if (!params.cursor) {
+      return null;
+    }
+
+    return this.prisma.clip.findFirst({
+      where: {
+        id: params.cursor,
+        deletedAt: {
+          not: null,
+        },
+        workspace: {
+          ownerUserId: params.userId,
+        },
+      },
+      select: {
+        id: true,
+        deletedAt: true,
+      },
+    });
+  }
+
+  private async findFolderCursor(
+    params: FindTrashItemsParams,
+  ): Promise<TrashCursor | null> {
+    if (!params.cursor) {
+      return null;
+    }
+
+    return this.prisma.folder.findFirst({
+      where: {
+        id: params.cursor,
+        deletedAt: {
+          not: null,
+        },
+        workspace: {
+          ownerUserId: params.userId,
+        },
+      },
+      select: {
+        id: true,
+        deletedAt: true,
+      },
+    });
+  }
+}
+
+type TrashCursor = {
+  id: string;
+  deletedAt: Date | null;
+};
+
+function buildClipDeletedAtCursorWhere(
+  cursor: TrashCursor,
+): Prisma.ClipWhereInput[] {
+  if (!cursor.deletedAt) {
+    return [];
+  }
+
+  return [
+    {
+      deletedAt: {
+        lt: cursor.deletedAt,
+      },
+    },
+    {
+      deletedAt: cursor.deletedAt,
+      id: {
+        lt: cursor.id,
+      },
+    },
+  ];
+}
+
+function buildFolderDeletedAtCursorWhere(
+  cursor: TrashCursor,
+): Prisma.FolderWhereInput[] {
+  if (!cursor.deletedAt) {
+    return [];
+  }
+
+  return [
+    {
+      deletedAt: {
+        lt: cursor.deletedAt,
+      },
+    },
+    {
+      deletedAt: cursor.deletedAt,
+      id: {
+        lt: cursor.id,
+      },
+    },
+  ];
 }

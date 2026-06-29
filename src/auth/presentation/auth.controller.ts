@@ -13,8 +13,10 @@ import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiExcludeEndpoint,
   ApiForbiddenResponse,
   ApiFoundResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -153,7 +155,13 @@ export class AuthController {
   }
 
   @Post('test/admin-login')
+  @ApiExcludeEndpoint()
   @ApiOperation({ summary: '테스트용 관리자 로그인' })
+  @ApiHeader({
+    name: 'x-test-admin-secret',
+    required: true,
+    description: '테스트 관리자 로그인 실행 시크릿',
+  })
   @ApiBody({ type: TestAdminLoginDto, required: false })
   @ApiOkResponse({
     description: '테스트 관리자 계정으로 토큰과 사용자 정보를 발급합니다.',
@@ -170,6 +178,16 @@ export class AuthController {
         displayName: 'Test Admin',
         avatarUrl: null,
         platform: dto.platform ?? 'WEB',
+        accessPolicy: {
+          nodeEnv: this.configService.get<string>('NODE_ENV'),
+          enabled:
+            this.configService.get<string>('TEST_ADMIN_LOGIN_ENABLED') ===
+            'true',
+          expectedSecret: this.configService.get<string>(
+            'TEST_ADMIN_LOGIN_SECRET',
+          ),
+          providedSecret: request.get('x-test-admin-secret'),
+        },
       },
       extractAuthSessionMetadata(request),
     );

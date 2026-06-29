@@ -209,4 +209,40 @@ describe('UpdateClipUseCase', () => {
       imageUrl: 'https://cdn.example.com/clips/user-id/file.png',
     });
   });
+
+  it('SVG 이미지는 업로드하지 않고 거부한다', async () => {
+    const repo = createRepository();
+    repo.findClipByIdForUser.mockResolvedValue({
+      id: 'clip-id',
+      type: 'TEXT',
+      folderId: 'folder-id',
+      workspaceId: 'workspace-id',
+      title: 'old-text',
+      textContent: 'old-text',
+      colorHex: null,
+      imageUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+    const imageStorage = createImageStorage();
+    const file = {
+      mimetype: 'image/svg+xml',
+      originalname: 'vector.svg',
+      size: 100,
+    } as MulterFile;
+
+    const usecase = new UpdateClipUseCase(repo, imageStorage);
+
+    await expect(
+      usecase.execute(
+        'user-id',
+        {
+          clipId: 'clip-id',
+        },
+        file,
+      ),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(imageStorage.uploadImage).not.toHaveBeenCalled();
+  });
 });
