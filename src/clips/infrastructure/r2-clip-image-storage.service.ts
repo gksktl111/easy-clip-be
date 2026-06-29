@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { ClipsError } from '../application/errors/clips.error';
+import { isAllowedClipImageMimeType } from '../application/helpers/clip-data.helper';
 import type {
   ClipImageStoragePort,
   UploadClipImageInput,
@@ -18,7 +19,6 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   'image/png': '.png',
   'image/webp': '.webp',
   'image/gif': '.gif',
-  'image/svg+xml': '.svg',
   'image/avif': '.avif',
 };
 
@@ -27,6 +27,13 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
   constructor(private readonly configService: ConfigService) {}
 
   async uploadImage(input: UploadClipImageInput): Promise<UploadedClipImage> {
+    if (!isAllowedClipImageMimeType(input.file.mimetype)) {
+      throw new ClipsError(
+        'BAD_REQUEST',
+        'jpeg, png, webp, gif, avif 이미지만 업로드할 수 있습니다.',
+      );
+    }
+
     const maxImageBytes = this.resolveMaxImageBytes();
 
     if (input.file.size > maxImageBytes) {
@@ -76,13 +83,19 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
   }
 
   private resolveExtension(file: UploadClipImageInput['file']): string {
+    const mimeExtension = MIME_EXTENSION_MAP[file.mimetype];
+
+    if (mimeExtension) {
+      return mimeExtension;
+    }
+
     const originalExtension = extname(file.originalname).toLowerCase();
 
     if (originalExtension) {
       return originalExtension;
     }
 
-    return MIME_EXTENSION_MAP[file.mimetype] ?? '';
+    return '';
   }
 
   private resolveMaxImageBytes(): number {

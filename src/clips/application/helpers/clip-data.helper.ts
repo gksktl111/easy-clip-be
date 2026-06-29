@@ -11,6 +11,18 @@ export type ClipData = {
   imageUrl: string | null;
 };
 
+export const ALLOWED_CLIP_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+] as const;
+
+export function isAllowedClipImageMimeType(mimetype: string): boolean {
+  return ALLOWED_CLIP_IMAGE_MIME_TYPES.some((allowed) => allowed === mimetype);
+}
+
 export function resolveClipData(text: string | undefined): ClipData {
   if (!text) {
     throw new ClipsError('BAD_REQUEST', 'text 또는 file 중 하나는 필요합니다.');
@@ -20,8 +32,11 @@ export function resolveClipData(text: string | undefined): ClipData {
 }
 
 export function validateClipImageFile(file: MulterFile): void {
-  if (!file.mimetype.startsWith('image/')) {
-    throw new ClipsError('BAD_REQUEST', '이미지 파일만 업로드할 수 있습니다.');
+  if (!isAllowedClipImageMimeType(file.mimetype)) {
+    throw new ClipsError(
+      'BAD_REQUEST',
+      'jpeg, png, webp, gif, avif 이미지만 업로드할 수 있습니다.',
+    );
   }
 }
 
