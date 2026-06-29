@@ -89,7 +89,7 @@ describe('UpdateFolderUseCase', () => {
     expect(repo.updateFolderName).not.toHaveBeenCalled();
   });
 
-  it('폴더명이 50자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+  it('폴더명이 10자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
 
@@ -98,7 +98,7 @@ describe('UpdateFolderUseCase', () => {
     await expect(
       usecase.execute('user-id', {
         folderId: 'folder-id',
-        name: '가'.repeat(51),
+        name: '가'.repeat(11),
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 

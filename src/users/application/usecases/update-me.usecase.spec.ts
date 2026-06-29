@@ -185,7 +185,7 @@ describe('UpdateMeUseCase', () => {
     expect(repo.updateAuthAccountProfile).not.toHaveBeenCalled();
   });
 
-  it('displayName이 50자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+  it('displayName이 30자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
     const repo = createRepository();
     repo.findUserWithAuthAccounts.mockResolvedValue({
       id: 'user-id',
@@ -204,7 +204,7 @@ describe('UpdateMeUseCase', () => {
 
     await expect(
       usecase.execute('user-id', 'account-id', {
-        displayName: '가'.repeat(51),
+        displayName: '가'.repeat(31),
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 

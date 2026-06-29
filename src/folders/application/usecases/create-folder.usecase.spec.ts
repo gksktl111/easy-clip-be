@@ -70,13 +70,13 @@ describe('CreateFolderUseCase', () => {
     expect(repo.getOrCreatePersonalWorkspaceId).not.toHaveBeenCalled();
   });
 
-  it('폴더명이 50자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+  it('폴더명이 10자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
     const repo = createRepository();
 
     const usecase = new CreateFolderUseCase(repo);
 
     await expect(
-      usecase.execute('user-id', { name: '가'.repeat(51) }),
+      usecase.execute('user-id', { name: '가'.repeat(11) }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
     expect(repo.getOrCreatePersonalWorkspaceId).not.toHaveBeenCalled();

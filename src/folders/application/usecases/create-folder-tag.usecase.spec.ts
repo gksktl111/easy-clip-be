@@ -77,7 +77,7 @@ describe('CreateFolderTagUseCase', () => {
     expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
   });
 
-  it('태그명이 30자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+  it('태그명이 10자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
     const repo = createRepository();
 
     const usecase = new CreateFolderTagUseCase(repo);
@@ -85,7 +85,7 @@ describe('CreateFolderTagUseCase', () => {
     await expect(
       usecase.execute('user-id', {
         folderId: 'folder-id',
-        name: 'a'.repeat(31),
+        name: 'a'.repeat(11),
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
