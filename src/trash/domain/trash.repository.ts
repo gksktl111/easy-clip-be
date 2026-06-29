@@ -1,4 +1,8 @@
-import { TrashClipItem, TrashFolderItem } from './trash.types';
+import {
+  FindTrashItemsParams,
+  TrashClipItem,
+  TrashFolderItem,
+} from './trash.types';
 
 export const TRASH_REPOSITORY = Symbol('TRASH_REPOSITORY');
 
@@ -8,14 +12,14 @@ export type HardDeleteTrashItemsResult = {
 };
 
 export interface TrashRepository {
-  findDeletedClips(userId: string): Promise<TrashClipItem[]>;
+  findDeletedClips(params: FindTrashItemsParams): Promise<TrashClipItem[]>;
   findDeletedClipById(
     userId: string,
     clipId: string,
   ): Promise<TrashClipItem | null>;
   restoreClip(clipId: string): Promise<TrashClipItem>;
   hardDeleteClip(clipId: string): Promise<HardDeleteTrashItemsResult>;
-  findDeletedFolders(userId: string): Promise<TrashFolderItem[]>;
+  findDeletedFolders(params: FindTrashItemsParams): Promise<TrashFolderItem[]>;
   findDeletedFolderById(
     userId: string,
     folderId: string,

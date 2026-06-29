@@ -9,6 +9,7 @@ import { OAuthUser } from '../../domain/auth.types';
 import {
   buildOAuthState,
   parseOAuthState,
+  resolveOAuthStateSecret,
 } from '../helpers/oauth-state.helper';
 
 @Injectable()
@@ -26,7 +27,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   authenticate(req: Request, options?: AuthenticateOptions): void {
     super.authenticate(req, {
       ...options,
-      state: buildOAuthState(req),
+      state: buildOAuthState(req, {
+        secret: resolveOAuthStateSecret(this.config),
+      }),
     });
   }
 
@@ -36,7 +39,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     refreshToken: string,
     profile: Profile,
   ): OAuthUser {
-    const state = parseOAuthState(req.query.state as string | undefined);
+    const state = parseOAuthState(req.query.state as string | undefined, {
+      secret: resolveOAuthStateSecret(this.config),
+    });
 
     return {
       provider: AuthProvider.GOOGLE,

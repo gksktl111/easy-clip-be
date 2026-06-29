@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:3000
 # 액세스 토큰을 입력하세요
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWt3OXh1YzAwMDAwZ2RmaGNpeGZ0YmVvIiwiYWNjb3VudElkIjoiY21rdzl4dWMwMDAwMWdkZmg2Z2R0bzc0cyIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzY5Njc2OTQ5LCJleHAiOjE3Njk2Nzc4NDksImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.2-sOtRCqsri6-QsYhj_JazXhm3fuK2mfmfn3lehxpBw
+@accessToken = REPLACE_WITH_ACCESS_TOKEN
 
 ### 폴더 A 생성
 # @name createFolderA

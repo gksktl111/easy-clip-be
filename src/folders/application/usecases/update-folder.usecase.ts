@@ -4,6 +4,7 @@ import type { FoldersRepository } from '../../domain/folders.repository';
 import { FolderOutput } from '../dtos/folder-output.dto';
 import { UpdateFolderInput } from '../dtos/update-folder-input.dto';
 import { FoldersError } from '../errors/folders.error';
+import { normalizeFolderName } from '../helpers/folder-name.helper';
 
 @Injectable()
 export class UpdateFolderUseCase {
@@ -25,10 +26,12 @@ export class UpdateFolderUseCase {
       throw new FoldersError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
     }
 
-    if (!input.name) {
+    if (input.name === undefined) {
       return folder;
     }
 
-    return this.foldersRepository.updateFolderName(folder.id, input.name);
+    const name = normalizeFolderName(input.name);
+
+    return this.foldersRepository.updateFolderName(folder.id, name);
   }
 }

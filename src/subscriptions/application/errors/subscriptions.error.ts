@@ -5,7 +5,12 @@ import {
 
 export type SubscriptionsErrorCode = Extract<
   ApplicationErrorCode,
-  'BAD_REQUEST' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL'
+  | 'BAD_REQUEST'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'INTERNAL'
 >;
 
 export class SubscriptionsError extends ApplicationError {
