@@ -14,4 +14,5 @@ export type UploadedClipImage = {
 
 export interface ClipImageStoragePort {
   uploadImage(input: UploadClipImageInput): Promise<UploadedClipImage>;
+  deleteImage(imageUrl: string): Promise<void>;
 }

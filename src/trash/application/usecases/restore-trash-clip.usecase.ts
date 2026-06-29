@@ -19,6 +19,13 @@ export class RestoreTrashClipUseCase {
       throw new TrashError('NOT_FOUND', '휴지통 클립을 찾을 수 없습니다.');
     }
 
+    if (clip.folderDeletedAt) {
+      throw new TrashError(
+        'CONFLICT',
+        '삭제된 폴더에 속한 클립은 단독으로 복구할 수 없습니다.',
+      );
+    }
+
     return this.trashRepository.restoreClip(clip.id);
   }
 }

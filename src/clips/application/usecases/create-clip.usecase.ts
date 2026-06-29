@@ -10,8 +10,8 @@ import {
   toImageClipData,
   validateClipImageFile,
 } from '../helpers/clip-data.helper';
-import { CLIP_IMAGE_STORAGE_PORT } from '../ports/clip-image-storage.port';
-import type { ClipImageStoragePort } from '../ports/clip-image-storage.port';
+import { CLIP_IMAGE_STORAGE_PORT } from 'src/shared/application/ports/clip-image-storage.port';
+import type { ClipImageStoragePort } from 'src/shared/application/ports/clip-image-storage.port';
 
 @Injectable()
 export class CreateClipUseCase {

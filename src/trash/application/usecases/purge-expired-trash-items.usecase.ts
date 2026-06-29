@@ -1,5 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  CLIP_IMAGE_STORAGE_PORT,
+  type ClipImageStoragePort,
+} from 'src/shared/application/ports/clip-image-storage.port';
 import {
   TRASH_REPOSITORY,
   type TrashRepository,
@@ -25,9 +29,13 @@ export type PurgeExpiredTrashItemsOutput = {
 
 @Injectable()
 export class PurgeExpiredTrashItemsUseCase {
+  private readonly logger = new Logger(PurgeExpiredTrashItemsUseCase.name);
+
   constructor(
     @Inject(TRASH_REPOSITORY)
     private readonly trashRepository: TrashRepository,
+    @Inject(CLIP_IMAGE_STORAGE_PORT)
+    private readonly clipImageStoragePort: ClipImageStoragePort,
     private readonly configService: ConfigService,
   ) {}
 
@@ -47,27 +55,29 @@ export class PurgeExpiredTrashItemsUseCase {
     );
     const expiresBefore = new Date(now.getTime() - retentionDays * DAY_IN_MS);
 
-    const foldersDeleted =
+    const folderDeletion =
       await this.trashRepository.hardDeleteExpiredFoldersWithClips(
         expiresBefore,
         limit,
       );
+    await this.deleteImagesBestEffort(folderDeletion.imageUrls);
 
-    const remainingLimit = Math.max(limit - foldersDeleted, 0);
-    const clipsDeleted =
+    const remainingLimit = Math.max(limit - folderDeletion.deletedCount, 0);
+    const clipDeletion =
       remainingLimit > 0
         ? await this.trashRepository.hardDeleteExpiredClips(
             expiresBefore,
             remainingLimit,
           )
-        : 0;
+        : { deletedCount: 0, imageUrls: [] };
+    await this.deleteImagesBestEffort(clipDeletion.imageUrls);
 
     return {
       expiresBefore,
       retentionDays,
-      foldersDeleted,
-      clipsDeleted,
-      totalDeleted: foldersDeleted + clipsDeleted,
+      foldersDeleted: folderDeletion.deletedCount,
+      clipsDeleted: clipDeletion.deletedCount,
+      totalDeleted: folderDeletion.deletedCount + clipDeletion.deletedCount,
     };
   }
 
@@ -91,5 +101,20 @@ export class PurgeExpiredTrashItemsUseCase {
     }
 
     return defaultValue;
+  }
+
+  private async deleteImagesBestEffort(imageUrls: string[]): Promise<void> {
+    await Promise.all(
+      imageUrls.map(async (imageUrl) => {
+        try {
+          await this.clipImageStoragePort.deleteImage(imageUrl);
+        } catch (error) {
+          this.logger.warn(
+            `만료 휴지통 이미지 삭제에 실패했습니다. imageUrl=${imageUrl}`,
+            error instanceof Error ? error.stack : undefined,
+          );
+        }
+      }),
+    );
   }
 }

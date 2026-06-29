@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:3000
 # 액세스 토큰을 입력하세요
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxyb2IzZW4wMDAwZ2RheXNzaHY0ZTFxIiwiYWNjb3VudElkIjoiY21scm9iM2VuMDAwMWdkYXl2OGtmYTM1MSIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzcxMzk3NDU0LCJleHAiOjE3NzEzOTgzNTQsImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.SIdlhVjqDe0qTqpCn-7KAI9uFWh4mh3aNqMdRoeHxpo
+@accessToken = REPLACE_WITH_ACCESS_TOKEN
 
 
 ############################################################

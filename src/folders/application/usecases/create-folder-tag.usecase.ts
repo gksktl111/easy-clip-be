@@ -4,6 +4,7 @@ import type { FoldersRepository } from '../../domain/folders.repository';
 import type { FolderTagOutput } from '../dtos/folder-tag-output.dto';
 import { CreateFolderTagInput } from '../dtos/create-folder-tag-input.dto';
 import { FoldersError } from '../errors/folders.error';
+import { normalizeFolderTagName } from '../helpers/folder-name.helper';
 
 @Injectable()
 export class CreateFolderTagUseCase {
@@ -16,6 +17,7 @@ export class CreateFolderTagUseCase {
     userId: string,
     input: CreateFolderTagInput,
   ): Promise<FolderTagOutput> {
+    const name = normalizeFolderTagName(input.name);
     const folder = await this.foldersRepository.findPersonalFolderById(
       userId,
       input.folderId,
@@ -27,7 +29,7 @@ export class CreateFolderTagUseCase {
 
     const existingTag = await this.foldersRepository.findTagByNameInFolder(
       folder.id,
-      input.name,
+      name,
     );
 
     if (existingTag) {
@@ -36,7 +38,7 @@ export class CreateFolderTagUseCase {
 
     return this.foldersRepository.createFolderTag({
       folderId: folder.id,
-      name: input.name,
+      name,
     });
   }
 }

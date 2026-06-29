@@ -1,25 +1,39 @@
-import { TrashClipItem, TrashFolderItem } from './trash.types';
+import {
+  FindTrashItemsParams,
+  TrashClipItem,
+  TrashFolderItem,
+} from './trash.types';
 
 export const TRASH_REPOSITORY = Symbol('TRASH_REPOSITORY');
 
+export type HardDeleteTrashItemsResult = {
+  deletedCount: number;
+  imageUrls: string[];
+};
+
 export interface TrashRepository {
-  findDeletedClips(userId: string): Promise<TrashClipItem[]>;
+  findDeletedClips(params: FindTrashItemsParams): Promise<TrashClipItem[]>;
   findDeletedClipById(
     userId: string,
     clipId: string,
   ): Promise<TrashClipItem | null>;
   restoreClip(clipId: string): Promise<TrashClipItem>;
-  hardDeleteClip(clipId: string): Promise<void>;
-  findDeletedFolders(userId: string): Promise<TrashFolderItem[]>;
+  hardDeleteClip(clipId: string): Promise<HardDeleteTrashItemsResult>;
+  findDeletedFolders(params: FindTrashItemsParams): Promise<TrashFolderItem[]>;
   findDeletedFolderById(
     userId: string,
     folderId: string,
   ): Promise<TrashFolderItem | null>;
   restoreFolderWithClips(folderId: string): Promise<TrashFolderItem>;
-  hardDeleteFolderWithClips(folderId: string): Promise<void>;
+  hardDeleteFolderWithClips(
+    folderId: string,
+  ): Promise<HardDeleteTrashItemsResult>;
   hardDeleteExpiredFoldersWithClips(
     expiresBefore: Date,
     limit: number,
-  ): Promise<number>;
-  hardDeleteExpiredClips(expiresBefore: Date, limit: number): Promise<number>;
+  ): Promise<HardDeleteTrashItemsResult>;
+  hardDeleteExpiredClips(
+    expiresBefore: Date,
+    limit: number,
+  ): Promise<HardDeleteTrashItemsResult>;
 }

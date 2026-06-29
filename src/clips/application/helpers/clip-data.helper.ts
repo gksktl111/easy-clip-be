@@ -1,5 +1,6 @@
 import { ClipType } from '../../domain/clip.types';
 import { MulterFile } from 'src/shared/types/multer-file.type';
+import { isAllowedClipImageMimeType } from 'src/shared/application/helpers/clip-image-mime-type.helper';
 import { ClipsError } from '../errors/clips.error';
 import { DetectedClip, detectClipType } from './clip-type-detector';
 
@@ -20,8 +21,11 @@ export function resolveClipData(text: string | undefined): ClipData {
 }
 
 export function validateClipImageFile(file: MulterFile): void {
-  if (!file.mimetype.startsWith('image/')) {
-    throw new ClipsError('BAD_REQUEST', '이미지 파일만 업로드할 수 있습니다.');
+  if (!isAllowedClipImageMimeType(file.mimetype)) {
+    throw new ClipsError(
+      'BAD_REQUEST',
+      'jpeg, png, webp, gif, avif 이미지만 업로드할 수 있습니다.',
+    );
   }
 }
 

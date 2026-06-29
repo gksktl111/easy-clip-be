@@ -9,11 +9,15 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   ActivateSubscriptionPaymentParams,
+  ClaimAutoRenewalPaymentParams,
   MarkPaymentFailedParams,
   SubscriptionsRepository,
   UpdateSubscriptionParams,
 } from '../domain/subscriptions.repository';
-import { Subscription } from '../domain/subscription.types';
+import {
+  Subscription,
+  SubscriptionPaymentStatus,
+} from '../domain/subscription.types';
 
 const subscriptionSelect = {
   id: true,
@@ -88,7 +92,7 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
         where: {
           externalOrderId: params.externalOrderId,
         },
-        update: {},
+        update: this.toPaymentUpdateData(params),
         create: this.toPaymentCreateData(params),
       });
 
@@ -117,9 +121,42 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
       where: {
         externalOrderId: params.externalOrderId,
       },
-      update: {},
+      update: this.toPaymentUpdateData(params),
       create: this.toPaymentCreateData(params),
     });
+  }
+
+  async claimAutoRenewalPayment(
+    params: ClaimAutoRenewalPaymentParams,
+  ): Promise<boolean> {
+    try {
+      await this.prisma.subscriptionPayment.create({
+        data: {
+          provider: params.provider as PrismaPaymentProvider,
+          status:
+            SubscriptionPaymentStatus.PENDING as PrismaSubscriptionPaymentStatus,
+          externalOrderId: params.externalOrderId,
+          amount: params.amount,
+          currency: params.currency,
+          subscription: {
+            connect: {
+              id: params.subscriptionId,
+            },
+          },
+        },
+      });
+
+      return true;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        return false;
+      }
+
+      throw error;
+    }
   }
 
   async findDueAutoRenewalSubscriptions(
@@ -182,6 +219,31 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
       status: params.status as PrismaSubscriptionPaymentStatus,
       externalPaymentKey: params.externalPaymentKey ?? null,
       externalOrderId: params.externalOrderId,
+      externalEventId: params.externalEventId ?? null,
+      amount: params.amount,
+      currency: params.currency,
+      approvedAt: params.approvedAt ?? null,
+      failedAt: params.failedAt ?? null,
+      failureCode: params.failureCode ?? null,
+      failureMessage: params.failureMessage ?? null,
+      ...(params.rawData !== undefined
+        ? { rawData: params.rawData as Prisma.InputJsonValue }
+        : {}),
+      subscription: {
+        connect: {
+          id: params.subscriptionId,
+        },
+      },
+    };
+  }
+
+  private toPaymentUpdateData(
+    params: MarkPaymentFailedParams,
+  ): Prisma.SubscriptionPaymentUpdateInput {
+    return {
+      provider: params.provider as PrismaPaymentProvider,
+      status: params.status as PrismaSubscriptionPaymentStatus,
+      externalPaymentKey: params.externalPaymentKey ?? null,
       externalEventId: params.externalEventId ?? null,
       amount: params.amount,
       currency: params.currency,
