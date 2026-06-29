@@ -1,5 +1,4 @@
-import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ApplicationExceptionFilter } from './shared/presentation/filters/application-exception.filter';
@@ -7,57 +6,23 @@ import {
   isHttpLoggingEnabled,
   registerHttpLoggingMiddleware,
 } from './shared/presentation/logging/http-logging.helper';
+import {
+  createCorsOptions,
+  shouldWarnMissingProductionCorsOrigins,
+} from './shared/presentation/helpers/cors.helper';
 import { setupSwagger } from './shared/presentation/swagger/swagger.helper';
-
-const parseAllowedCorsPorts = (raw?: string) =>
-  new Set(
-    (raw ?? '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean),
-  );
-
-const isAllowedCorsOrigin = (origin: string, allowedPorts: Set<string>) => {
-  try {
-    const url = new URL(origin);
-    const isLocalHost =
-      url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-
-    if (!isLocalHost) {
-      return false;
-    }
-
-    return allowedPorts.has(url.port);
-  } catch {
-    return false;
-  }
-};
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const allowedCorsPorts = parseAllowedCorsPorts(
-    process.env.CORS_ALLOWED_PORTS,
-  );
+  const logger = new Logger('Bootstrap');
 
-  const corsOptions: CorsOptions = {
-    origin(origin, callback) {
-      // 브라우저가 아닌 서버 간 요청/헬스체크는 Origin 헤더가 없을 수 있다.
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
+  if (shouldWarnMissingProductionCorsOrigins(process.env)) {
+    logger.warn(
+      'production 환경에서 CORS_ALLOWED_ORIGINS가 비어 있습니다. 배포 프론트 origin을 명시하세요.',
+    );
+  }
 
-      if (isAllowedCorsOrigin(origin, allowedCorsPorts)) {
-        callback(null, true);
-        return;
-      }
-
-      callback(null, false);
-    },
-    credentials: true,
-  };
-
-  app.enableCors(corsOptions);
+  app.enableCors(createCorsOptions(process.env));
   app.useGlobalFilters(new ApplicationExceptionFilter());
 
   if (isHttpLoggingEnabled(process.env)) {
