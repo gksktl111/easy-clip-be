@@ -1,5 +1,5 @@
 @baseUrl = http://localhost:3000
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxxb2JhOHYwMDAwZ2RraXgza3EzaG43IiwiYWNjb3VudElkIjoiY21scW9iYTh2MDAwMWdka2lrd2gxOTkxMSIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzcxMzM2OTk3LCJleHAiOjE3NzEzMzc4OTcsImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.fdAgsZBpHDTgUkwBSAlLeDwP3X-4lxdMq1grN81Egg0
+@accessToken = REPLACE_WITH_ACCESS_TOKEN
 
 ############################################################
 # User API Test (#33)

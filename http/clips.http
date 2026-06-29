@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:3000
 # 액세스 토큰을 입력하세요
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxpM3l2eTQwMDAwZ2RkNmp5dDVseGFlIiwiYWNjb3VudElkIjoiY21saTN5dnk0MDAwMWdkZDZuc3I0NWo2eSIsInBsYXRmb3JtIjoiV0VCIiwiaWF0IjoxNzcwOTA1MTAxLCJleHAiOjE3NzA5MDYwMDEsImF1ZCI6ImFwaSIsImlzcyI6ImVhc3ktY2xpcCJ9.82ZBjJX58iQrRnpPXX64M1ipmKm0x_JGezOS_ALZb5Y
+@accessToken = REPLACE_WITH_ACCESS_TOKEN
 
 
 # 테스트에 사용할 폴더 ID를 입력하세요
