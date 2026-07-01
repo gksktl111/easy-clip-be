@@ -3,7 +3,6 @@ import {
   Delete,
   Get,
   Body,
-  Param,
   Patch,
   Query,
   Request,
@@ -16,7 +15,6 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -25,15 +23,14 @@ import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard'
 import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 import { AuthContext } from 'src/shared/types/auth-context.type';
 import { DeleteAllTrashItemsUseCase } from '../application/usecases/delete-all-trash-items.usecase';
-import { DeleteTrashClipUseCase } from '../application/usecases/delete-trash-clip.usecase';
-import { DeleteTrashFolderUseCase } from '../application/usecases/delete-trash-folder.usecase';
+import { DeleteTrashItemsUseCase } from '../application/usecases/delete-trash-items.usecase';
 import { ListTrashItemsUseCase } from '../application/usecases/list-trash-items.usecase';
 import { RestoreTrashItemsUseCase } from '../application/usecases/restore-trash-items.usecase';
 import { ListTrashQueryDto } from './dtos/list-trash-query.dto';
+import { DeleteTrashItemsDto } from './dtos/delete-trash-items.dto';
 import { RestoreTrashItemsDto } from './dtos/restore-trash-items.dto';
 import {
   TrashDeleteAllResponseDto,
-  TrashDeleteResponseDto,
   TrashListResponseDto,
   TrashRestoreResponseDto,
 } from './dtos/trash-response.dto';
@@ -50,8 +47,7 @@ export class TrashController {
   constructor(
     private readonly listTrashItemsUseCase: ListTrashItemsUseCase,
     private readonly restoreTrashItemsUseCase: RestoreTrashItemsUseCase,
-    private readonly deleteTrashClipUseCase: DeleteTrashClipUseCase,
-    private readonly deleteTrashFolderUseCase: DeleteTrashFolderUseCase,
+    private readonly deleteTrashItemsUseCase: DeleteTrashItemsUseCase,
     private readonly deleteAllTrashItemsUseCase: DeleteAllTrashItemsUseCase,
   ) {}
 
@@ -102,41 +98,21 @@ export class TrashController {
     return this.restoreTrashItemsUseCase.execute(req.user.userId, body);
   }
 
-  @Delete('clips/:id')
+  @Delete('items')
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '휴지통 클립 영구 삭제' })
-  @ApiParam({ name: 'id', description: '클립 ID' })
+  @ApiOperation({ summary: '휴지통 항목 영구 삭제' })
   @ApiOkResponse({
-    description: '영구 삭제 결과를 반환합니다.',
-    type: TrashDeleteResponseDto,
+    description: '영구 삭제된 휴지통 항목 수를 반환합니다.',
+    type: TrashDeleteAllResponseDto,
   })
   @ApiNotFoundResponse({
-    description: '휴지통 클립을 찾을 수 없습니다.',
+    description: '휴지통 항목을 찾을 수 없습니다.',
     type: ErrorResponseDto,
   })
-  deleteTrashClip(
+  deleteTrashItems(
     @Request() req: { user: AuthContext },
-    @Param('id') id: string,
+    @Body() body: DeleteTrashItemsDto,
   ) {
-    return this.deleteTrashClipUseCase.execute(req.user.userId, id);
-  }
-
-  @Delete('folders/:id')
-  @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '휴지통 폴더 영구 삭제' })
-  @ApiParam({ name: 'id', description: '폴더 ID' })
-  @ApiOkResponse({
-    description: '영구 삭제 결과를 반환합니다.',
-    type: TrashDeleteResponseDto,
-  })
-  @ApiNotFoundResponse({
-    description: '휴지통 폴더를 찾을 수 없습니다.',
-    type: ErrorResponseDto,
-  })
-  deleteTrashFolder(
-    @Request() req: { user: AuthContext },
-    @Param('id') id: string,
-  ) {
-    return this.deleteTrashFolderUseCase.execute(req.user.userId, id);
+    return this.deleteTrashItemsUseCase.execute(req.user.userId, body);
   }
 }

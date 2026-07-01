@@ -7,8 +7,7 @@ import { PrismaTrashRepository } from './infrastructure/prisma-trash.repository'
 import { TrashController } from './presentation/trash.controller';
 import { ListTrashItemsUseCase } from './application/usecases/list-trash-items.usecase';
 import { RestoreTrashItemsUseCase } from './application/usecases/restore-trash-items.usecase';
-import { DeleteTrashClipUseCase } from './application/usecases/delete-trash-clip.usecase';
-import { DeleteTrashFolderUseCase } from './application/usecases/delete-trash-folder.usecase';
+import { DeleteTrashItemsUseCase } from './application/usecases/delete-trash-items.usecase';
 import { DeleteAllTrashItemsUseCase } from './application/usecases/delete-all-trash-items.usecase';
 import { PurgeExpiredTrashItemsUseCase } from './application/usecases/purge-expired-trash-items.usecase';
 import { TrashCleanupScheduler } from './infrastructure/trash-cleanup.scheduler';
@@ -20,8 +19,7 @@ import { TrashCleanupScheduler } from './infrastructure/trash-cleanup.scheduler'
     { provide: CLIP_IMAGE_STORAGE_PORT, useClass: R2ClipImageStorageService },
     ListTrashItemsUseCase,
     RestoreTrashItemsUseCase,
-    DeleteTrashClipUseCase,
-    DeleteTrashFolderUseCase,
+    DeleteTrashItemsUseCase,
     DeleteAllTrashItemsUseCase,
     PurgeExpiredTrashItemsUseCase,
     TrashCleanupScheduler,

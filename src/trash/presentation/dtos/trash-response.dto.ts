@@ -67,11 +67,6 @@ export class TrashRestoreResponseDto {
   restoredCount: number;
 }
 
-export class TrashDeleteResponseDto {
-  @ApiProperty({ example: true })
-  success: true;
-}
-
 export class TrashDeleteAllResponseDto {
   @ApiProperty({ example: 3 })
   clipsDeleted: number;

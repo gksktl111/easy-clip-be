@@ -36,6 +36,12 @@ export type RestoreTrashItemsParams = {
   folderIds: string[];
 };
 
+export type DeleteTrashItemsParams = {
+  userId: string;
+  clipIds: string[];
+  folderIds: string[];
+};
+
 export type TrashCursorPage<T> = {
   items: T[];
   hasNextPage: boolean;

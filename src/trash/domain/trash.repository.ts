@@ -1,4 +1,5 @@
 import {
+  DeleteTrashItemsParams,
   FindTrashItemsParams,
   RestoreTrashItemsParams,
   TrashClipItem,
@@ -10,6 +11,13 @@ export const TRASH_REPOSITORY = Symbol('TRASH_REPOSITORY');
 
 export type HardDeleteTrashItemsResult = {
   deletedCount: number;
+  imageUrls: string[];
+};
+
+export type HardDeleteSelectedTrashItemsResult = {
+  clipsDeleted: number;
+  foldersDeleted: number;
+  totalDeleted: number;
   imageUrls: string[];
 };
 
@@ -31,7 +39,9 @@ export interface TrashRepository {
     clipId: string,
   ): Promise<TrashClipItem | null>;
   restoreItems(params: RestoreTrashItemsParams): Promise<void>;
-  hardDeleteClip(clipId: string): Promise<HardDeleteTrashItemsResult>;
+  hardDeleteItems(
+    params: DeleteTrashItemsParams,
+  ): Promise<HardDeleteSelectedTrashItemsResult>;
   findDeletedFoldersByIds(
     userId: string,
     folderIds: string[],
@@ -40,9 +50,6 @@ export interface TrashRepository {
     userId: string,
     folderId: string,
   ): Promise<TrashFolderItem | null>;
-  hardDeleteFolderWithClips(
-    folderId: string,
-  ): Promise<HardDeleteTrashItemsResult>;
   hardDeleteExpiredFoldersWithClips(
     expiresBefore: Date,
     limit: number,
