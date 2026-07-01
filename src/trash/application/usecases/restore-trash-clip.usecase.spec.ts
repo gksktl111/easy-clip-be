@@ -3,11 +3,10 @@ import { RestoreTrashClipUseCase } from './restore-trash-clip.usecase';
 import { TrashRepository } from '../../domain/trash.repository';
 
 const createRepository = (): jest.Mocked<TrashRepository> => ({
-  findDeletedClips: jest.fn(),
+  findDeletedItems: jest.fn(),
   findDeletedClipById: jest.fn(),
   restoreClip: jest.fn(),
   hardDeleteClip: jest.fn(),
-  findDeletedFolders: jest.fn(),
   findDeletedFolderById: jest.fn(),
   restoreFolderWithClips: jest.fn(),
   hardDeleteFolderWithClips: jest.fn(),

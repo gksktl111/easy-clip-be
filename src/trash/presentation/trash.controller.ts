@@ -26,18 +26,16 @@ import { AuthContext } from 'src/shared/types/auth-context.type';
 import { DeleteAllTrashItemsUseCase } from '../application/usecases/delete-all-trash-items.usecase';
 import { DeleteTrashClipUseCase } from '../application/usecases/delete-trash-clip.usecase';
 import { DeleteTrashFolderUseCase } from '../application/usecases/delete-trash-folder.usecase';
-import { ListTrashClipsUseCase } from '../application/usecases/list-trash-clips.usecase';
-import { ListTrashFoldersUseCase } from '../application/usecases/list-trash-folders.usecase';
+import { ListTrashItemsUseCase } from '../application/usecases/list-trash-items.usecase';
 import { RestoreTrashClipUseCase } from '../application/usecases/restore-trash-clip.usecase';
 import { RestoreTrashFolderUseCase } from '../application/usecases/restore-trash-folder.usecase';
 import { ListTrashQueryDto } from './dtos/list-trash-query.dto';
 import {
-  TrashClipListResponseDto,
   TrashClipResponseDto,
   TrashDeleteAllResponseDto,
   TrashDeleteResponseDto,
-  TrashFolderListResponseDto,
   TrashFolderResponseDto,
+  TrashListResponseDto,
 } from './dtos/trash-response.dto';
 
 @Controller('trash')
@@ -50,10 +48,9 @@ import {
 })
 export class TrashController {
   constructor(
-    private readonly listTrashClipsUseCase: ListTrashClipsUseCase,
+    private readonly listTrashItemsUseCase: ListTrashItemsUseCase,
     private readonly restoreTrashClipUseCase: RestoreTrashClipUseCase,
     private readonly deleteTrashClipUseCase: DeleteTrashClipUseCase,
-    private readonly listTrashFoldersUseCase: ListTrashFoldersUseCase,
     private readonly restoreTrashFolderUseCase: RestoreTrashFolderUseCase,
     private readonly deleteTrashFolderUseCase: DeleteTrashFolderUseCase,
     private readonly deleteAllTrashItemsUseCase: DeleteAllTrashItemsUseCase,
@@ -70,18 +67,18 @@ export class TrashController {
     return this.deleteAllTrashItemsUseCase.execute(req.user.userId);
   }
 
-  @Get('clips')
+  @Get()
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '휴지통 클립 목록 조회' })
+  @ApiOperation({ summary: '휴지통 전체 목록 조회' })
   @ApiOkResponse({
-    description: '삭제된 클립 목록을 반환합니다.',
-    type: TrashClipListResponseDto,
+    description: '삭제된 클립과 폴더 목록을 함께 반환합니다.',
+    type: TrashListResponseDto,
   })
-  getTrashClips(
+  getTrashItems(
     @Request() req: { user: AuthContext },
     @Query() query: ListTrashQueryDto,
   ) {
-    return this.listTrashClipsUseCase.execute(req.user.userId, query);
+    return this.listTrashItemsUseCase.execute(req.user.userId, query);
   }
 
   @Patch('clips/:id/restore')
@@ -124,20 +121,6 @@ export class TrashController {
     @Param('id') id: string,
   ) {
     return this.deleteTrashClipUseCase.execute(req.user.userId, id);
-  }
-
-  @Get('folders')
-  @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '휴지통 폴더 목록 조회' })
-  @ApiOkResponse({
-    description: '삭제된 폴더 목록을 반환합니다.',
-    type: TrashFolderListResponseDto,
-  })
-  getTrashFolders(
-    @Request() req: { user: AuthContext },
-    @Query() query: ListTrashQueryDto,
-  ) {
-    return this.listTrashFoldersUseCase.execute(req.user.userId, query);
   }
 
   @Patch('folders/:id/restore')

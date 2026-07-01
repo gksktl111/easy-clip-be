@@ -1,3 +1,5 @@
+export type TrashItemType = 'CLIP' | 'FOLDER';
+
 export type TrashFolderItem = {
   id: string;
   name: string;
@@ -12,6 +14,16 @@ export type TrashClipItem = {
   deletedAt: Date | null;
   folderDeletedAt?: Date | null;
 };
+
+export type TrashListFolderItem = TrashFolderItem & {
+  itemType: 'FOLDER';
+};
+
+export type TrashListClipItem = TrashClipItem & {
+  itemType: 'CLIP';
+};
+
+export type TrashItem = TrashListClipItem | TrashListFolderItem;
 
 export type TrashCursorPage<T> = {
   items: T[];

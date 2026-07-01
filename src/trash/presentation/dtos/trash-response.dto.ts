@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class TrashClipResponseDto {
   @ApiProperty({ example: 'cmclip123' })
@@ -17,17 +17,6 @@ export class TrashClipResponseDto {
   deletedAt: Date | null;
 }
 
-export class TrashClipListResponseDto {
-  @ApiProperty({ type: [TrashClipResponseDto] })
-  items: TrashClipResponseDto[];
-
-  @ApiProperty({ example: 'cmclip123', nullable: true })
-  nextCursor: string | null;
-
-  @ApiProperty({ example: true })
-  hasNextPage: boolean;
-}
-
 export class TrashFolderResponseDto {
   @ApiProperty({ example: 'cmfolder123' })
   id: string;
@@ -39,11 +28,34 @@ export class TrashFolderResponseDto {
   deletedAt: Date | null;
 }
 
-export class TrashFolderListResponseDto {
-  @ApiProperty({ type: [TrashFolderResponseDto] })
-  items: TrashFolderResponseDto[];
+export class TrashItemResponseDto {
+  @ApiProperty({ enum: ['CLIP', 'FOLDER'], example: 'CLIP' })
+  itemType: 'CLIP' | 'FOLDER';
 
-  @ApiProperty({ example: 'cmfolder123', nullable: true })
+  @ApiProperty({ example: 'cmitem123' })
+  id: string;
+
+  @ApiProperty({ example: '2026-06-05T09:00:00.000Z', nullable: true })
+  deletedAt: Date | null;
+
+  @ApiPropertyOptional({ example: '삭제된 클립' })
+  title?: string;
+
+  @ApiPropertyOptional({ enum: ['TEXT', 'COLOR', 'IMAGE'], example: 'TEXT' })
+  type?: 'TEXT' | 'COLOR' | 'IMAGE';
+
+  @ApiPropertyOptional({ example: 'cmfolder123' })
+  folderId?: string;
+
+  @ApiPropertyOptional({ example: '삭제된 폴더' })
+  name?: string;
+}
+
+export class TrashListResponseDto {
+  @ApiProperty({ type: [TrashItemResponseDto] })
+  items: TrashItemResponseDto[];
+
+  @ApiProperty({ example: 'CLIP:cmclip123', nullable: true })
   nextCursor: string | null;
 
   @ApiProperty({ example: true })

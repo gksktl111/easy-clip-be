@@ -10,41 +10,73 @@ import {
   FindTrashItemsParams,
   TrashClipItem,
   TrashFolderItem,
+  TrashItem,
+  TrashItemType,
 } from '../domain/trash.types';
 
 @Injectable()
 export class PrismaTrashRepository implements TrashRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findDeletedClips(
-    params: FindTrashItemsParams,
-  ): Promise<TrashClipItem[]> {
-    const cursor = await this.findClipCursor(params);
+  async findDeletedItems(params: FindTrashItemsParams): Promise<TrashItem[]> {
+    const cursor = await this.findTrashItemCursor(params);
 
     if (params.cursor && !cursor) {
       return [];
     }
 
-    return this.prisma.clip.findMany({
-      where: {
-        deletedAt: {
-          not: null,
+    const [clips, folders] = await Promise.all([
+      this.prisma.clip.findMany({
+        where: {
+          deletedAt: {
+            not: null,
+          },
+          ...(cursor ? { OR: buildClipTrashCursorWhere(cursor) } : {}),
+          workspace: {
+            ownerUserId: params.userId,
+          },
         },
-        ...(cursor ? { OR: buildClipDeletedAtCursorWhere(cursor) } : {}),
-        workspace: {
-          ownerUserId: params.userId,
+        orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
+        take: params.limit,
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          folderId: true,
+          deletedAt: true,
         },
-      },
-      orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
-      take: params.limit,
-      select: {
-        id: true,
-        title: true,
-        type: true,
-        folderId: true,
-        deletedAt: true,
-      },
-    }) as Promise<TrashClipItem[]>;
+      }) as Promise<TrashClipItem[]>,
+      this.prisma.folder.findMany({
+        where: {
+          deletedAt: {
+            not: null,
+          },
+          ...(cursor ? { OR: buildFolderTrashCursorWhere(cursor) } : {}),
+          workspace: {
+            ownerUserId: params.userId,
+          },
+        },
+        orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
+        take: params.limit,
+        select: {
+          id: true,
+          name: true,
+          deletedAt: true,
+        },
+      }) as Promise<TrashFolderItem[]>,
+    ]);
+
+    return [
+      ...clips.map((clip): TrashItem => ({ ...clip, itemType: 'CLIP' })),
+      ...folders.map(
+        (folder): TrashItem => ({
+          ...folder,
+          itemType: 'FOLDER',
+        }),
+      ),
+    ]
+      .sort(compareTrashItems)
+      .slice(0, params.limit);
   }
 
   async findDeletedClipById(
@@ -121,35 +153,6 @@ export class PrismaTrashRepository implements TrashRepository {
         imageUrls: this.compactImageUrls([clip?.imageUrl]),
       };
     });
-  }
-
-  async findDeletedFolders(
-    params: FindTrashItemsParams,
-  ): Promise<TrashFolderItem[]> {
-    const cursor = await this.findFolderCursor(params);
-
-    if (params.cursor && !cursor) {
-      return [];
-    }
-
-    return this.prisma.folder.findMany({
-      where: {
-        deletedAt: {
-          not: null,
-        },
-        ...(cursor ? { OR: buildFolderDeletedAtCursorWhere(cursor) } : {}),
-        workspace: {
-          ownerUserId: params.userId,
-        },
-      },
-      orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
-      take: params.limit,
-      select: {
-        id: true,
-        name: true,
-        deletedAt: true,
-      },
-    }) as Promise<TrashFolderItem[]>;
   }
 
   async findDeletedFolderById(
@@ -467,16 +470,42 @@ export class PrismaTrashRepository implements TrashRepository {
     };
   }
 
-  private async findClipCursor(
+  private async findTrashItemCursor(
     params: FindTrashItemsParams,
-  ): Promise<TrashCursor | null> {
+  ): Promise<TrashItemCursor | null> {
     if (!params.cursor) {
       return null;
     }
 
-    return this.prisma.clip.findFirst({
+    const parsedCursor = parseTrashItemCursor(params.cursor);
+
+    if (!parsedCursor) {
+      return null;
+    }
+
+    if (parsedCursor.itemType === 'CLIP') {
+      const clip = await this.prisma.clip.findFirst({
+        where: {
+          id: parsedCursor.id,
+          deletedAt: {
+            not: null,
+          },
+          workspace: {
+            ownerUserId: params.userId,
+          },
+        },
+        select: {
+          id: true,
+          deletedAt: true,
+        },
+      });
+
+      return clip ? { ...clip, itemType: 'CLIP' } : null;
+    }
+
+    const folder = await this.prisma.folder.findFirst({
       where: {
-        id: params.cursor,
+        id: parsedCursor.id,
         deletedAt: {
           not: null,
         },
@@ -489,30 +518,8 @@ export class PrismaTrashRepository implements TrashRepository {
         deletedAt: true,
       },
     });
-  }
 
-  private async findFolderCursor(
-    params: FindTrashItemsParams,
-  ): Promise<TrashCursor | null> {
-    if (!params.cursor) {
-      return null;
-    }
-
-    return this.prisma.folder.findFirst({
-      where: {
-        id: params.cursor,
-        deletedAt: {
-          not: null,
-        },
-        workspace: {
-          ownerUserId: params.userId,
-        },
-      },
-      select: {
-        id: true,
-        deletedAt: true,
-      },
-    });
+    return folder ? { ...folder, itemType: 'FOLDER' } : null;
   }
 }
 
@@ -521,33 +528,71 @@ type TrashCursor = {
   deletedAt: Date | null;
 };
 
-function buildClipDeletedAtCursorWhere(
-  cursor: TrashCursor,
+type TrashItemCursor = TrashCursor & {
+  itemType: TrashItemType;
+};
+
+const TRASH_ITEM_TYPE_ORDER: Record<TrashItemType, number> = {
+  CLIP: 0,
+  FOLDER: 1,
+};
+
+function parseTrashItemCursor(
+  cursor: string,
+): { itemType: TrashItemType; id: string } | null {
+  const [itemType, id] = cursor.split(':');
+
+  if ((itemType !== 'CLIP' && itemType !== 'FOLDER') || !id) {
+    return null;
+  }
+
+  return { itemType, id };
+}
+
+function compareTrashItems(a: TrashItem, b: TrashItem): number {
+  const deletedAtDiff =
+    (b.deletedAt?.getTime() ?? 0) - (a.deletedAt?.getTime() ?? 0);
+
+  if (deletedAtDiff !== 0) {
+    return deletedAtDiff;
+  }
+
+  const itemTypeDiff =
+    TRASH_ITEM_TYPE_ORDER[a.itemType] - TRASH_ITEM_TYPE_ORDER[b.itemType];
+
+  if (itemTypeDiff !== 0) {
+    return itemTypeDiff;
+  }
+
+  if (a.id === b.id) {
+    return 0;
+  }
+
+  return a.id < b.id ? 1 : -1;
+}
+
+function buildClipTrashCursorWhere(
+  cursor: TrashItemCursor,
 ): Prisma.ClipWhereInput[] {
   if (!cursor.deletedAt) {
     return [];
   }
 
-  return [
-    {
-      deletedAt: {
-        lt: cursor.deletedAt,
-      },
-    },
-    {
+  const sameDeletedAtWhere: Prisma.ClipWhereInput[] = [];
+
+  if (TRASH_ITEM_TYPE_ORDER.CLIP > TRASH_ITEM_TYPE_ORDER[cursor.itemType]) {
+    sameDeletedAtWhere.push({
+      deletedAt: cursor.deletedAt,
+    });
+  }
+
+  if (cursor.itemType === 'CLIP') {
+    sameDeletedAtWhere.push({
       deletedAt: cursor.deletedAt,
       id: {
         lt: cursor.id,
       },
-    },
-  ];
-}
-
-function buildFolderDeletedAtCursorWhere(
-  cursor: TrashCursor,
-): Prisma.FolderWhereInput[] {
-  if (!cursor.deletedAt) {
-    return [];
+    });
   }
 
   return [
@@ -556,11 +601,40 @@ function buildFolderDeletedAtCursorWhere(
         lt: cursor.deletedAt,
       },
     },
-    {
+    ...sameDeletedAtWhere,
+  ];
+}
+
+function buildFolderTrashCursorWhere(
+  cursor: TrashItemCursor,
+): Prisma.FolderWhereInput[] {
+  if (!cursor.deletedAt) {
+    return [];
+  }
+
+  const sameDeletedAtWhere: Prisma.FolderWhereInput[] = [];
+
+  if (TRASH_ITEM_TYPE_ORDER.FOLDER > TRASH_ITEM_TYPE_ORDER[cursor.itemType]) {
+    sameDeletedAtWhere.push({
+      deletedAt: cursor.deletedAt,
+    });
+  }
+
+  if (cursor.itemType === 'FOLDER') {
+    sameDeletedAtWhere.push({
       deletedAt: cursor.deletedAt,
       id: {
         lt: cursor.id,
       },
+    });
+  }
+
+  return [
+    {
+      deletedAt: {
+        lt: cursor.deletedAt,
+      },
     },
+    ...sameDeletedAtWhere,
   ];
 }
