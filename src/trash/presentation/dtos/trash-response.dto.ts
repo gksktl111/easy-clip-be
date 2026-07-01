@@ -62,6 +62,11 @@ export class TrashListResponseDto {
   hasNextPage: boolean;
 }
 
+export class TrashRestoreResponseDto {
+  @ApiProperty({ example: 2 })
+  restoredCount: number;
+}
+
 export class TrashDeleteResponseDto {
   @ApiProperty({ example: true })
   success: true;

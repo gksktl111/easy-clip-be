@@ -6,11 +6,12 @@ import { DeleteAllTrashItemsUseCase } from './delete-all-trash-items.usecase';
 
 const createRepository = (): jest.Mocked<TrashRepository> => ({
   findDeletedItems: jest.fn(),
+  findDeletedClipsByIds: jest.fn(),
   findDeletedClipById: jest.fn(),
-  restoreClip: jest.fn(),
+  restoreItems: jest.fn(),
   hardDeleteClip: jest.fn(),
+  findDeletedFoldersByIds: jest.fn(),
   findDeletedFolderById: jest.fn(),
-  restoreFolderWithClips: jest.fn(),
   hardDeleteFolderWithClips: jest.fn(),
   hardDeleteExpiredFoldersWithClips: jest.fn(),
   hardDeleteExpiredClips: jest.fn(),

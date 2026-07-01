@@ -25,6 +25,17 @@ export type TrashListClipItem = TrashClipItem & {
 
 export type TrashItem = TrashListClipItem | TrashListFolderItem;
 
+export type RestoreTrashItem = {
+  itemType: TrashItemType;
+  id: string;
+};
+
+export type RestoreTrashItemsParams = {
+  userId: string;
+  clipIds: string[];
+  folderIds: string[];
+};
+
 export type TrashCursorPage<T> = {
   items: T[];
   hasNextPage: boolean;

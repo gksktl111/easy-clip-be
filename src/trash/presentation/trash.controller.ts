@@ -2,6 +2,7 @@ import {
   Controller,
   Delete,
   Get,
+  Body,
   Param,
   Patch,
   Query,
@@ -27,15 +28,14 @@ import { DeleteAllTrashItemsUseCase } from '../application/usecases/delete-all-t
 import { DeleteTrashClipUseCase } from '../application/usecases/delete-trash-clip.usecase';
 import { DeleteTrashFolderUseCase } from '../application/usecases/delete-trash-folder.usecase';
 import { ListTrashItemsUseCase } from '../application/usecases/list-trash-items.usecase';
-import { RestoreTrashClipUseCase } from '../application/usecases/restore-trash-clip.usecase';
-import { RestoreTrashFolderUseCase } from '../application/usecases/restore-trash-folder.usecase';
+import { RestoreTrashItemsUseCase } from '../application/usecases/restore-trash-items.usecase';
 import { ListTrashQueryDto } from './dtos/list-trash-query.dto';
+import { RestoreTrashItemsDto } from './dtos/restore-trash-items.dto';
 import {
-  TrashClipResponseDto,
   TrashDeleteAllResponseDto,
   TrashDeleteResponseDto,
-  TrashFolderResponseDto,
   TrashListResponseDto,
+  TrashRestoreResponseDto,
 } from './dtos/trash-response.dto';
 
 @Controller('trash')
@@ -49,9 +49,8 @@ import {
 export class TrashController {
   constructor(
     private readonly listTrashItemsUseCase: ListTrashItemsUseCase,
-    private readonly restoreTrashClipUseCase: RestoreTrashClipUseCase,
+    private readonly restoreTrashItemsUseCase: RestoreTrashItemsUseCase,
     private readonly deleteTrashClipUseCase: DeleteTrashClipUseCase,
-    private readonly restoreTrashFolderUseCase: RestoreTrashFolderUseCase,
     private readonly deleteTrashFolderUseCase: DeleteTrashFolderUseCase,
     private readonly deleteAllTrashItemsUseCase: DeleteAllTrashItemsUseCase,
   ) {}
@@ -81,27 +80,26 @@ export class TrashController {
     return this.listTrashItemsUseCase.execute(req.user.userId, query);
   }
 
-  @Patch('clips/:id/restore')
+  @Patch('restore')
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '휴지통 클립 복구' })
-  @ApiParam({ name: 'id', description: '클립 ID' })
+  @ApiOperation({ summary: '휴지통 항목 복구' })
   @ApiOkResponse({
-    description: '복구된 클립 메타데이터를 반환합니다.',
-    type: TrashClipResponseDto,
+    description: '복구된 휴지통 항목 수를 반환합니다.',
+    type: TrashRestoreResponseDto,
   })
   @ApiNotFoundResponse({
-    description: '휴지통 클립을 찾을 수 없습니다.',
+    description: '휴지통 항목을 찾을 수 없습니다.',
     type: ErrorResponseDto,
   })
   @ApiConflictResponse({
     description: '삭제된 폴더에 속한 클립은 단독으로 복구할 수 없습니다.',
     type: ErrorResponseDto,
   })
-  restoreTrashClip(
+  restoreTrashItems(
     @Request() req: { user: AuthContext },
-    @Param('id') id: string,
+    @Body() body: RestoreTrashItemsDto,
   ) {
-    return this.restoreTrashClipUseCase.execute(req.user.userId, id);
+    return this.restoreTrashItemsUseCase.execute(req.user.userId, body);
   }
 
   @Delete('clips/:id')
@@ -121,25 +119,6 @@ export class TrashController {
     @Param('id') id: string,
   ) {
     return this.deleteTrashClipUseCase.execute(req.user.userId, id);
-  }
-
-  @Patch('folders/:id/restore')
-  @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '휴지통 폴더 복구' })
-  @ApiParam({ name: 'id', description: '폴더 ID' })
-  @ApiOkResponse({
-    description: '복구된 폴더 메타데이터를 반환합니다.',
-    type: TrashFolderResponseDto,
-  })
-  @ApiNotFoundResponse({
-    description: '휴지통 폴더를 찾을 수 없습니다.',
-    type: ErrorResponseDto,
-  })
-  restoreTrashFolder(
-    @Request() req: { user: AuthContext },
-    @Param('id') id: string,
-  ) {
-    return this.restoreTrashFolderUseCase.execute(req.user.userId, id);
   }
 
   @Delete('folders/:id')

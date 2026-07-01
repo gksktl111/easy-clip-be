@@ -8,6 +8,7 @@ import {
 } from '../domain/trash.repository';
 import {
   FindTrashItemsParams,
+  RestoreTrashItemsParams,
   TrashClipItem,
   TrashFolderItem,
   TrashItem,
@@ -79,6 +80,52 @@ export class PrismaTrashRepository implements TrashRepository {
       .slice(0, params.limit);
   }
 
+  async findDeletedClipsByIds(
+    userId: string,
+    clipIds: string[],
+  ): Promise<TrashClipItem[]> {
+    if (clipIds.length === 0) {
+      return [];
+    }
+
+    const clips = await this.prisma.clip.findMany({
+      where: {
+        id: {
+          in: clipIds,
+        },
+        deletedAt: {
+          not: null,
+        },
+        workspace: {
+          ownerUserId: userId,
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        folderId: true,
+        deletedAt: true,
+        folder: {
+          select: {
+            deletedAt: true,
+          },
+        },
+      },
+    });
+
+    return clips.map(
+      (clip): TrashClipItem => ({
+        id: clip.id,
+        title: clip.title,
+        type: clip.type,
+        folderId: clip.folderId,
+        deletedAt: clip.deletedAt,
+        folderDeletedAt: clip.folder.deletedAt,
+      }),
+    );
+  }
+
   async findDeletedClipById(
     userId: string,
     clipId: string,
@@ -121,20 +168,63 @@ export class PrismaTrashRepository implements TrashRepository {
     } as TrashClipItem;
   }
 
-  async restoreClip(clipId: string): Promise<TrashClipItem> {
-    return this.prisma.clip.update({
-      where: { id: clipId },
-      data: {
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        title: true,
-        type: true,
-        folderId: true,
-        deletedAt: true,
-      },
-    }) as Promise<TrashClipItem>;
+  async restoreItems(params: RestoreTrashItemsParams): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      if (params.folderIds.length > 0) {
+        await tx.clip.updateMany({
+          where: {
+            folderId: {
+              in: params.folderIds,
+            },
+            deletedAt: {
+              not: null,
+            },
+            workspace: {
+              ownerUserId: params.userId,
+            },
+          },
+          data: {
+            deletedAt: null,
+          },
+        });
+
+        await tx.folder.updateMany({
+          where: {
+            id: {
+              in: params.folderIds,
+            },
+            deletedAt: {
+              not: null,
+            },
+            workspace: {
+              ownerUserId: params.userId,
+            },
+          },
+          data: {
+            deletedAt: null,
+          },
+        });
+      }
+
+      if (params.clipIds.length > 0) {
+        await tx.clip.updateMany({
+          where: {
+            id: {
+              in: params.clipIds,
+            },
+            deletedAt: {
+              not: null,
+            },
+            workspace: {
+              ownerUserId: params.userId,
+            },
+          },
+          data: {
+            deletedAt: null,
+          },
+        });
+      }
+    });
   }
 
   async hardDeleteClip(clipId: string): Promise<HardDeleteTrashItemsResult> {
@@ -153,6 +243,34 @@ export class PrismaTrashRepository implements TrashRepository {
         imageUrls: this.compactImageUrls([clip?.imageUrl]),
       };
     });
+  }
+
+  async findDeletedFoldersByIds(
+    userId: string,
+    folderIds: string[],
+  ): Promise<TrashFolderItem[]> {
+    if (folderIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.folder.findMany({
+      where: {
+        id: {
+          in: folderIds,
+        },
+        deletedAt: {
+          not: null,
+        },
+        workspace: {
+          ownerUserId: userId,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        deletedAt: true,
+      },
+    }) as Promise<TrashFolderItem[]>;
   }
 
   async findDeletedFolderById(
@@ -175,36 +293,6 @@ export class PrismaTrashRepository implements TrashRepository {
         deletedAt: true,
       },
     }) as Promise<TrashFolderItem | null>;
-  }
-
-  async restoreFolderWithClips(folderId: string): Promise<TrashFolderItem> {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.clip.updateMany({
-        where: {
-          folderId,
-          deletedAt: {
-            not: null,
-          },
-        },
-        data: {
-          deletedAt: null,
-        },
-      });
-
-      const folder = await tx.folder.update({
-        where: { id: folderId },
-        data: {
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          name: true,
-          deletedAt: true,
-        },
-      });
-
-      return folder as TrashFolderItem;
-    });
   }
 
   async hardDeleteFolderWithClips(
