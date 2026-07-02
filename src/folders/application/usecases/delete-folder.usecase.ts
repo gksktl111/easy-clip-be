@@ -21,6 +21,6 @@ export class DeleteFolderUseCase {
       throw new FoldersError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
     }
 
-    return this.foldersRepository.softDeleteFolderWithClips(folder.id);
+    return this.foldersRepository.softDeleteFolder(folder.id);
   }
 }

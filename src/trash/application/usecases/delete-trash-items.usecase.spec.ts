@@ -164,6 +164,34 @@ describe('DeleteTrashItemsUseCase', () => {
     });
   });
 
+  it('삭제된 폴더 하위 클립만 단독 영구 삭제하면 에러를 던진다', async () => {
+    const repo = createRepository();
+    const imageStorage = createImageStorage();
+    const deletedAt = new Date();
+    repo.findDeletedClipsByIds.mockResolvedValue([
+      {
+        id: 'clip-1',
+        title: '삭제된 클립',
+        type: 'TEXT',
+        folderId: 'folder-1',
+        deletedAt,
+        folderDeletedAt: deletedAt,
+      },
+    ]);
+    repo.findDeletedFoldersByIds.mockResolvedValue([]);
+
+    const usecase = new DeleteTrashItemsUseCase(repo, imageStorage);
+
+    await expect(
+      usecase.execute('user-1', {
+        items: [{ itemType: 'CLIP', id: 'clip-1' }],
+      }),
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
+    expect(repo.hardDeleteItems).not.toHaveBeenCalled();
+  });
+
   it('요청한 휴지통 항목이 없으면 에러를 던진다', async () => {
     const repo = createRepository();
     const imageStorage = createImageStorage();

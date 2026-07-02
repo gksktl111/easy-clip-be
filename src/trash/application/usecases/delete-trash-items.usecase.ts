@@ -56,6 +56,17 @@ export class DeleteTrashItemsUseCase {
     }
 
     const deleteFolderIds = new Set(folderIds);
+    const blockedClip = clips.find(
+      (clip) => clip.folderDeletedAt && !deleteFolderIds.has(clip.folderId),
+    );
+
+    if (blockedClip) {
+      throw new TrashError(
+        'CONFLICT',
+        '삭제된 폴더에 속한 클립은 단독으로 영구 삭제할 수 없습니다.',
+      );
+    }
+
     const deleteClipIds = clips
       .filter((clip) => !deleteFolderIds.has(clip.folderId))
       .map((clip) => clip.id);

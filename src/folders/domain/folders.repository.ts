@@ -49,7 +49,7 @@ export interface FoldersRepository {
   updateFolderTagName(tagId: string, name: string): Promise<FolderTag>;
   updateFolderOrder(folderId: string, order: number): Promise<Folder>;
   deleteFolderTag(tagId: string): Promise<void>;
-  softDeleteFolderWithClips(folderId: string): Promise<Folder>;
+  softDeleteFolder(folderId: string): Promise<Folder>;
   findPreviousFolderOrder(params: FolderOrderParams): Promise<number | null>;
   findNextFolderOrder(params: FolderOrderParams): Promise<number | null>;
 }
