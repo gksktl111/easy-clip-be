@@ -6,16 +6,16 @@ import { PurgeExpiredTrashItemsUseCase } from './purge-expired-trash-items.useca
 import { ClipImageStoragePort } from 'src/shared/application/ports/clip-image-storage.port';
 
 const createRepository = (): jest.Mocked<TrashRepository> => ({
-  findDeletedClips: jest.fn(),
+  findDeletedItems: jest.fn(),
+  findDeletedClipsByIds: jest.fn(),
   findDeletedClipById: jest.fn(),
-  restoreClip: jest.fn(),
-  hardDeleteClip: jest.fn(),
-  findDeletedFolders: jest.fn(),
+  restoreItems: jest.fn(),
+  hardDeleteItems: jest.fn(),
+  findDeletedFoldersByIds: jest.fn(),
   findDeletedFolderById: jest.fn(),
-  restoreFolderWithClips: jest.fn(),
-  hardDeleteFolderWithClips: jest.fn(),
   hardDeleteExpiredFoldersWithClips: jest.fn(),
   hardDeleteExpiredClips: jest.fn(),
+  hardDeleteAllTrashItemsForUser: jest.fn(),
 });
 
 const createConfigService = (

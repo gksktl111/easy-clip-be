@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { UnlikeClipUseCase } from './unlike-clip.usecase';
+import { DeleteAllClipsUseCase } from './delete-all-clips.usecase';
 import { ClipsRepository } from '../../domain/clips.repository';
 
 const createRepository = (): jest.Mocked<ClipsRepository> => ({
@@ -24,26 +24,25 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   softDeleteAllClipsForUser: jest.fn(),
 });
 
-describe('UnlikeClipUseCase', () => {
-  it('클립이 없으면 NOT_FOUND 오류를 반환한다', async () => {
+describe('DeleteAllClipsUseCase', () => {
+  it('사용자 소유 클립을 전체 소프트 삭제한다', async () => {
     const repo = createRepository();
-    repo.findClipByIdForUser.mockResolvedValue(null);
+    repo.softDeleteAllClipsForUser.mockResolvedValue(3);
 
-    const usecase = new UnlikeClipUseCase(repo);
+    const usecase = new DeleteAllClipsUseCase(repo);
+    const result = await usecase.execute('user-id');
 
-    await expect(usecase.execute('user-id', 'clip-id')).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-    });
+    expect(repo.softDeleteAllClipsForUser).toHaveBeenCalledWith('user-id');
+    expect(result).toEqual({ deletedCount: 3 });
   });
 
-  it('좋아요를 취소하고 likeByMe를 반환한다', async () => {
+  it('삭제할 클립이 없어도 0개 삭제 결과를 반환한다', async () => {
     const repo = createRepository();
-    repo.findClipByIdForUser.mockResolvedValue({ id: 'clip-id' } as never);
+    repo.softDeleteAllClipsForUser.mockResolvedValue(0);
 
-    const usecase = new UnlikeClipUseCase(repo);
-    const result = await usecase.execute('user-id', 'clip-id');
+    const usecase = new DeleteAllClipsUseCase(repo);
+    const result = await usecase.execute('user-id');
 
-    expect(repo.deleteClipLike).toHaveBeenCalledWith('user-id', 'clip-id');
-    expect(result).toEqual({ likeByMe: false });
+    expect(result).toEqual({ deletedCount: 0 });
   });
 });

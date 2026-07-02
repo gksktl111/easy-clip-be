@@ -20,6 +20,8 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   createClip: jest.fn(),
   updateClip: jest.fn(),
   softDeleteClip: jest.fn(),
+  softDeleteClips: jest.fn(),
+  softDeleteAllClipsForUser: jest.fn(),
 });
 
 describe('LikeClipUseCase', () => {

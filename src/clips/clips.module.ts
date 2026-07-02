@@ -4,6 +4,8 @@ import { ClipsController } from './presentation/clips.controller';
 import { CLIPS_REPOSITORY } from './domain/clips.repository';
 import { PrismaClipsRepository } from './infrastructure/prisma-clips.repository';
 import { DeleteClipUseCase } from './application/usecases/delete-clip.usecase';
+import { DeleteAllClipsUseCase } from './application/usecases/delete-all-clips.usecase';
+import { DeleteClipsUseCase } from './application/usecases/delete-clips.usecase';
 import { CreateClipUseCase } from './application/usecases/create-clip.usecase';
 import { UpdateClipUseCase } from './application/usecases/update-clip.usecase';
 import { ListFavoriteClipsUseCase } from './application/usecases/list-favorite-clips.usecase';
@@ -27,6 +29,8 @@ import { R2ClipImageStorageService } from 'src/shared/infrastructure/r2-clip-ima
     ListFavoriteClipsUseCase,
     ListRecentClipsUseCase,
     DeleteClipUseCase,
+    DeleteAllClipsUseCase,
+    DeleteClipsUseCase,
     LikeClipUseCase,
     UnlikeClipUseCase,
     RecordClipViewUseCase,

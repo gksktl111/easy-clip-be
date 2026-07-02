@@ -7,11 +7,10 @@ import {
   TRASH_REPOSITORY,
   type TrashRepository,
 } from '../../domain/trash.repository';
-import { TrashError } from '../errors/trash.error';
 
 @Injectable()
-export class DeleteTrashClipUseCase {
-  private readonly logger = new Logger(DeleteTrashClipUseCase.name);
+export class DeleteAllTrashItemsUseCase {
+  private readonly logger = new Logger(DeleteAllTrashItemsUseCase.name);
 
   constructor(
     @Inject(TRASH_REPOSITORY)
@@ -20,18 +19,15 @@ export class DeleteTrashClipUseCase {
     private readonly clipImageStoragePort: ClipImageStoragePort,
   ) {}
 
-  async execute(userId: string, clipId: string) {
-    const clip = await this.trashRepository.findDeletedClipById(userId, clipId);
-
-    if (!clip) {
-      throw new TrashError('NOT_FOUND', '휴지통 클립을 찾을 수 없습니다.');
-    }
-
-    const result = await this.trashRepository.hardDeleteClip(clip.id);
+  async execute(userId: string) {
+    const result =
+      await this.trashRepository.hardDeleteAllTrashItemsForUser(userId);
     await this.deleteImagesBestEffort(result.imageUrls);
 
     return {
-      success: true as const,
+      clipsDeleted: result.clipsDeleted,
+      foldersDeleted: result.foldersDeleted,
+      totalDeleted: result.totalDeleted,
     };
   }
 
@@ -42,7 +38,7 @@ export class DeleteTrashClipUseCase {
           await this.clipImageStoragePort.deleteImage(imageUrl);
         } catch (error) {
           this.logger.warn(
-            `휴지통 클립 이미지 삭제에 실패했습니다. imageUrl=${imageUrl}`,
+            `휴지통 전체 삭제 중 이미지 삭제에 실패했습니다. imageUrl=${imageUrl}`,
             error instanceof Error ? error.stack : undefined,
           );
         }
