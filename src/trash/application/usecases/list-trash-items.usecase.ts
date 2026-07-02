@@ -3,7 +3,7 @@ import {
   TRASH_REPOSITORY,
   type TrashRepository,
 } from '../../domain/trash.repository';
-import { TrashClipItem, TrashCursorPage } from '../../domain/trash.types';
+import { TrashCursorPage, TrashItem } from '../../domain/trash.types';
 import {
   ListTrashItemsInput,
   normalizeLimit,
@@ -11,7 +11,7 @@ import {
 } from '../helpers/trash-pagination.helper';
 
 @Injectable()
-export class ListTrashClipsUseCase {
+export class ListTrashItemsUseCase {
   constructor(
     @Inject(TRASH_REPOSITORY)
     private readonly trashRepository: TrashRepository,
@@ -20,14 +20,14 @@ export class ListTrashClipsUseCase {
   async execute(
     userId: string,
     input: ListTrashItemsInput = {},
-  ): Promise<TrashCursorPage<TrashClipItem>> {
+  ): Promise<TrashCursorPage<TrashItem>> {
     const limit = normalizeLimit(input.limit);
-    const items = await this.trashRepository.findDeletedClips({
+    const items = await this.trashRepository.findDeletedItems({
       userId,
       cursor: input.cursor,
       limit: limit + 1,
     });
 
-    return toCursorPage(items, limit);
+    return toCursorPage(items, limit, (item) => `${item.itemType}:${item.id}`);
   }
 }

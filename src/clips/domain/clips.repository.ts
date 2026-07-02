@@ -85,4 +85,6 @@ export interface ClipsRepository {
   createClip(params: CreateClipParams): Promise<Clip>;
   updateClip(clipId: string, params: UpdateClipParams): Promise<Clip>;
   softDeleteClip(clipId: string): Promise<Clip>;
+  softDeleteClips(clipIds: string[]): Promise<number>;
+  softDeleteAllClipsForUser(userId: string): Promise<number>;
 }

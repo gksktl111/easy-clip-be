@@ -19,6 +19,7 @@ export function normalizeLimit(limit?: number): number {
 export function toCursorPage<T extends { id: string }>(
   items: T[],
   limit: number,
+  getCursor: (item: T) => string = (item) => item.id,
 ): TrashCursorPage<T> {
   const hasNextPage = items.length > limit;
   const pageItems = hasNextPage ? items.slice(0, limit) : items;
@@ -27,7 +28,9 @@ export function toCursorPage<T extends { id: string }>(
     items: pageItems,
     hasNextPage,
     nextCursor: hasNextPage
-      ? (pageItems[pageItems.length - 1]?.id ?? null)
+      ? pageItems[pageItems.length - 1]
+        ? getCursor(pageItems[pageItems.length - 1])
+        : null
       : null,
   };
 }

@@ -32,16 +32,20 @@ import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard'
 import { AuthContext } from 'src/shared/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
 import { CreateClipDto } from './dtos/create-clip.dto';
+import { DeleteClipsDto } from './dtos/delete-clips.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
 import type { MulterFile } from 'src/shared/types/multer-file.type';
 import {
   ClipCursorPageResponseDto,
   ClipResponseDto,
+  DeleteClipsResponseDto,
   LikeClipResponseDto,
   RecentViewedClipListResponseDto,
 } from './dtos/clip-response.dto';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
+import { DeleteAllClipsUseCase } from '../application/usecases/delete-all-clips.usecase';
+import { DeleteClipsUseCase } from '../application/usecases/delete-clips.usecase';
 import { CreateClipUseCase } from '../application/usecases/create-clip.usecase';
 import { UpdateClipUseCase } from '../application/usecases/update-clip.usecase';
 import { ListFolderClipsUseCase } from '../application/usecases/list-folder-clips.usecase';
@@ -67,6 +71,8 @@ export class ClipsController {
     private readonly createClipUseCase: CreateClipUseCase,
     private readonly updateClipUseCase: UpdateClipUseCase,
     private readonly deleteClipUseCase: DeleteClipUseCase,
+    private readonly deleteAllClipsUseCase: DeleteAllClipsUseCase,
+    private readonly deleteClipsUseCase: DeleteClipsUseCase,
     private readonly listFolderClipsUseCase: ListFolderClipsUseCase,
     private readonly listFavoriteClipsUseCase: ListFavoriteClipsUseCase,
     private readonly listRecentClipsUseCase: ListRecentClipsUseCase,
@@ -207,6 +213,17 @@ export class ClipsController {
     );
   }
 
+  @Delete('all')
+  @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 전체 삭제' })
+  @ApiOkResponse({
+    description: '소프트 삭제된 클립 개수를 반환합니다.',
+    type: DeleteClipsResponseDto,
+  })
+  deleteAllClips(@Request() req: { user: AuthContext }) {
+    return this.deleteAllClipsUseCase.execute(req.user.userId);
+  }
+
   @Delete(':id')
   @UseGuards(JwtAccessGuard)
   @ApiOperation({ summary: '클립 삭제' })
@@ -221,6 +238,25 @@ export class ClipsController {
   })
   deleteClip(@Request() req: { user: AuthContext }, @Param('id') id: string) {
     return this.deleteClipUseCase.execute(req.user.userId, id);
+  }
+
+  @Delete()
+  @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 다중 삭제' })
+  @ApiBody({ type: DeleteClipsDto })
+  @ApiOkResponse({
+    description: '소프트 삭제된 클립 개수를 반환합니다.',
+    type: DeleteClipsResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: '클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
+  deleteClips(
+    @Request() req: { user: AuthContext },
+    @Body() dto: DeleteClipsDto,
+  ) {
+    return this.deleteClipsUseCase.execute(req.user.userId, dto);
   }
 
   @Post(':id/views')

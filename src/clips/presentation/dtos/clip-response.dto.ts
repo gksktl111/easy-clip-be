@@ -76,3 +76,8 @@ export class LikeClipResponseDto {
   @ApiProperty({ example: true })
   likeByMe: boolean;
 }
+
+export class DeleteClipsResponseDto {
+  @ApiProperty({ example: 2 })
+  deletedCount: number;
+}
