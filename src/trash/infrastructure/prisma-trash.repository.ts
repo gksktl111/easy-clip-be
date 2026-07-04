@@ -34,6 +34,9 @@ export class PrismaTrashRepository implements TrashRepository {
           deletedAt: {
             not: null,
           },
+          folder: {
+            deletedAt: null,
+          },
           ...(cursor ? { OR: buildClipTrashCursorWhere(cursor) } : {}),
           workspace: {
             ownerUserId: params.userId,
@@ -173,23 +176,6 @@ export class PrismaTrashRepository implements TrashRepository {
   async restoreItems(params: RestoreTrashItemsParams): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       if (params.folderIds.length > 0) {
-        await tx.clip.updateMany({
-          where: {
-            folderId: {
-              in: params.folderIds,
-            },
-            deletedAt: {
-              not: null,
-            },
-            workspace: {
-              ownerUserId: params.userId,
-            },
-          },
-          data: {
-            deletedAt: null,
-          },
-        });
-
         await tx.folder.updateMany({
           where: {
             id: {
@@ -219,6 +205,9 @@ export class PrismaTrashRepository implements TrashRepository {
             },
             workspace: {
               ownerUserId: params.userId,
+            },
+            folder: {
+              deletedAt: null,
             },
           },
           data: {
@@ -634,6 +623,9 @@ export class PrismaTrashRepository implements TrashRepository {
           id: parsedCursor.id,
           deletedAt: {
             not: null,
+          },
+          folder: {
+            deletedAt: null,
           },
           workspace: {
             ownerUserId: params.userId,

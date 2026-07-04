@@ -207,24 +207,10 @@ export class PrismaFoldersRepository implements FoldersRepository {
     });
   }
 
-  async softDeleteFolderWithClips(folderId: string): Promise<Folder> {
-    return this.prisma.$transaction(async (tx) => {
-      const deletedAt = new Date();
-
-      await tx.clip.updateMany({
-        where: {
-          folderId,
-          deletedAt: null,
-        },
-        data: {
-          deletedAt,
-        },
-      });
-
-      return tx.folder.update({
-        where: { id: folderId },
-        data: { deletedAt },
-      });
+  async softDeleteFolder(folderId: string): Promise<Folder> {
+    return this.prisma.folder.update({
+      where: { id: folderId },
+      data: { deletedAt: new Date() },
     });
   }
 
