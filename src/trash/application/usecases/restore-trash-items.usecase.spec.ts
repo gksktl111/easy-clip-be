@@ -84,7 +84,7 @@ describe('RestoreTrashItemsUseCase', () => {
     expect(result).toEqual({ restoredCount: 2 });
   });
 
-  it('같은 요청의 폴더에 속한 클립은 폴더 복구로 함께 처리한다', async () => {
+  it('같은 요청의 폴더에 속한 클립은 폴더와 함께 명시적으로 복구한다', async () => {
     const repo = createRepository();
     const deletedAt = new Date();
     repo.findDeletedClipsByIds.mockResolvedValue([
@@ -115,7 +115,7 @@ describe('RestoreTrashItemsUseCase', () => {
 
     expect(repo.restoreItems).toHaveBeenCalledWith({
       userId: 'user-1',
-      clipIds: [],
+      clipIds: ['clip-1'],
       folderIds: ['folder-1'],
     });
     expect(result).toEqual({ restoredCount: 2 });

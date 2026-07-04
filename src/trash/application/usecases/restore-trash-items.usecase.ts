@@ -59,9 +59,7 @@ export class RestoreTrashItemsUseCase {
       );
     }
 
-    const restoreClipIds = clips
-      .filter((clip) => !restoreFolderIds.has(clip.folderId))
-      .map((clip) => clip.id);
+    const restoreClipIds = clips.map((clip) => clip.id);
 
     await this.trashRepository.restoreItems({
       userId,

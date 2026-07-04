@@ -47,6 +47,9 @@ export class PrismaClipsRepository implements ClipsRepository {
       where: {
         id: clipId,
         deletedAt: null,
+        folder: {
+          deletedAt: null,
+        },
         workspace: {
           ownerUserId: userId,
         },
@@ -157,6 +160,9 @@ export class PrismaClipsRepository implements ClipsRepository {
         userId,
         clip: {
           deletedAt: null,
+          folder: {
+            deletedAt: null,
+          },
           workspace: {
             ownerUserId: userId,
           },
@@ -186,6 +192,9 @@ export class PrismaClipsRepository implements ClipsRepository {
           in: clipIds,
         },
         deletedAt: null,
+        folder: {
+          deletedAt: null,
+        },
         workspace: {
           ownerUserId: userId,
         },
@@ -399,6 +408,9 @@ export class PrismaClipsRepository implements ClipsRepository {
           in: clipIds,
         },
         deletedAt: null,
+        folder: {
+          deletedAt: null,
+        },
       },
       data: { deletedAt: new Date() },
     });
@@ -410,6 +422,9 @@ export class PrismaClipsRepository implements ClipsRepository {
     const result = await this.prisma.clip.updateMany({
       where: {
         deletedAt: null,
+        folder: {
+          deletedAt: null,
+        },
         workspace: {
           ownerUserId: userId,
         },
