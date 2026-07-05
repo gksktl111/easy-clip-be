@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual } from 'crypto';
 import { SUBSCRIPTIONS_REPOSITORY } from '../../domain/subscriptions.repository';
@@ -6,9 +6,12 @@ import type { SubscriptionsRepository } from '../../domain/subscriptions.reposit
 import {
   PaymentProvider,
   SubscriptionPaymentStatus,
+  SubscriptionPlan,
 } from '../../domain/subscription.types';
 import { BILLING_PAYMENT_GATEWAY } from '../ports/billing-payment.gateway';
 import type { BillingPaymentGateway } from '../ports/billing-payment.gateway';
+import { SUBSCRIPTION_PAYMENT_MAIL_PORT } from '../ports/subscription-payment-mail.port';
+import type { SubscriptionPaymentMailPort } from '../ports/subscription-payment-mail.port';
 import { createAutoRenewalSubscriptionOrderId } from '../helpers/customer-key.helper';
 import { resolveNextPeriod } from '../helpers/subscription-period.helper';
 import { SubscriptionsError } from '../errors/subscriptions.error';
@@ -33,11 +36,15 @@ export type ProcessDueAutoRenewalsAccessPolicyInput = {
 
 @Injectable()
 export class ProcessDueAutoRenewalsUseCase {
+  private readonly logger = new Logger(ProcessDueAutoRenewalsUseCase.name);
+
   constructor(
     @Inject(SUBSCRIPTIONS_REPOSITORY)
     private readonly subscriptionsRepository: SubscriptionsRepository,
     @Inject(BILLING_PAYMENT_GATEWAY)
     private readonly billingPaymentGateway: BillingPaymentGateway,
+    @Inject(SUBSCRIPTION_PAYMENT_MAIL_PORT)
+    private readonly subscriptionPaymentMailPort: SubscriptionPaymentMailPort,
     private readonly configService: ConfigService,
   ) {}
 
@@ -105,7 +112,7 @@ export class ProcessDueAutoRenewalsUseCase {
         const paidAt = paymentResult.approvedAt ?? now;
         const period = resolveNextPeriod(subscription.currentPeriodEnd, paidAt);
 
-        await this.subscriptionsRepository.activateByPayment({
+        const updated = await this.subscriptionsRepository.activateByPayment({
           subscriptionId: subscription.id,
           provider: PaymentProvider.TOSS_PAYMENTS,
           status: SubscriptionPaymentStatus.DONE,
@@ -120,6 +127,14 @@ export class ProcessDueAutoRenewalsUseCase {
           currentPeriodEnd: period.currentPeriodEnd,
           nextBillingAt: period.nextBillingAt,
           rawData: paymentResult.rawData,
+        });
+        await this.sendPaymentSuccessMail({
+          subscriptionId: updated.id,
+          amount: paymentResult.totalAmount,
+          currency: paymentResult.currency,
+          approvedAt: paidAt,
+          currentPeriodEnd: period.currentPeriodEnd,
+          nextBillingAt: period.nextBillingAt,
         });
         succeeded += 1;
         continue;
@@ -152,6 +167,45 @@ export class ProcessDueAutoRenewalsUseCase {
     const raw = this.configService.get<string>('PRO_MONTHLY_AMOUNT');
     const amount = raw ? Number(raw) : 4900;
     return Number.isInteger(amount) && amount > 0 ? amount : 4900;
+  }
+
+  private async sendPaymentSuccessMail(input: {
+    subscriptionId: string;
+    amount: number;
+    currency: string;
+    approvedAt: Date;
+    currentPeriodEnd: Date;
+    nextBillingAt: Date;
+  }): Promise<void> {
+    try {
+      const recipient =
+        await this.subscriptionsRepository.findBillingMailRecipientBySubscriptionId(
+          input.subscriptionId,
+        );
+
+      if (!recipient) {
+        this.logger.warn(
+          `자동결제 성공 메일 수신자를 찾지 못했습니다. subscriptionId=${input.subscriptionId}`,
+        );
+        return;
+      }
+
+      // 자동결제 배치의 성공/실패 집계는 결제 결과 기준이며, 메일 발송 실패로 성공 건을 실패 처리하지 않는다.
+      await this.subscriptionPaymentMailPort.sendPaymentSuccess({
+        recipientEmail: recipient.email,
+        amount: input.amount,
+        currency: input.currency,
+        approvedAt: input.approvedAt,
+        plan: SubscriptionPlan.PRO,
+        currentPeriodEnd: input.currentPeriodEnd,
+        nextBillingAt: input.nextBillingAt,
+        paymentKind: 'AUTO_RENEWAL',
+      });
+    } catch (error) {
+      this.logger.warn(
+        `자동결제 성공 메일 발송에 실패했습니다. subscriptionId=${input.subscriptionId} error=${resolveErrorName(error)}`,
+      );
+    }
   }
 
   private assertAutoRenewalsBatchAllowed(
@@ -190,4 +244,8 @@ function isSameSecret(providedSecret: string, expectedSecret: string): boolean {
   return (
     provided.length === expected.length && timingSafeEqual(provided, expected)
   );
+}
+
+function resolveErrorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown';
 }

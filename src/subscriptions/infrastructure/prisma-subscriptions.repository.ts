@@ -9,6 +9,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   ActivateSubscriptionPaymentParams,
+  BillingMailRecipient,
   ClaimAutoRenewalPaymentParams,
   MarkPaymentFailedParams,
   SubscriptionsRepository,
@@ -69,6 +70,37 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
         select: subscriptionSelect,
       });
     });
+  }
+
+  async findBillingMailRecipientByUserId(
+    userId: string,
+  ): Promise<BillingMailRecipient | null> {
+    return this.findBillingMailRecipientByOwnerUserId(userId);
+  }
+
+  async findBillingMailRecipientBySubscriptionId(
+    subscriptionId: string,
+  ): Promise<BillingMailRecipient | null> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: {
+        id: subscriptionId,
+      },
+      select: {
+        workspace: {
+          select: {
+            ownerUserId: true,
+          },
+        },
+      },
+    });
+
+    if (!subscription) {
+      return null;
+    }
+
+    return this.findBillingMailRecipientByOwnerUserId(
+      subscription.workspace.ownerUserId,
+    );
   }
 
   async updateSubscription(
@@ -184,6 +216,28 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
       take: limit,
       select: subscriptionSelect,
     });
+  }
+
+  private async findBillingMailRecipientByOwnerUserId(
+    userId: string,
+  ): Promise<BillingMailRecipient | null> {
+    const account = await this.prisma.authAccount.findFirst({
+      where: {
+        userId,
+        email: {
+          not: '',
+        },
+      },
+      // AuthAccount에는 primary 플래그가 없으므로 id 기준으로 고정해 대표 이메일 선택을 재현 가능하게 만든다.
+      orderBy: {
+        id: 'asc',
+      },
+      select: {
+        email: true,
+      },
+    });
+
+    return account ? { email: account.email } : null;
   }
 
   private toSubscriptionUpdateData(
