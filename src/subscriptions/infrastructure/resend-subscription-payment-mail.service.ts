@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import {
   SendSubscriptionPaymentSuccessMailInput,
+  SendSubscriptionResumedMailInput,
   SubscriptionPaymentMailPort,
 } from '../application/ports/subscription-payment-mail.port';
 
@@ -42,6 +43,34 @@ export class ResendSubscriptionPaymentMailService implements SubscriptionPayment
     if (response.error) {
       throw new Error(
         `Resend payment success mail failed: ${response.error.name}(${response.error.statusCode})`,
+      );
+    }
+  }
+
+  async sendSubscriptionResumed(
+    input: SendSubscriptionResumedMailInput,
+  ): Promise<void> {
+    if (!this.isMailEnabled()) {
+      return;
+    }
+
+    const response = await this.getClient().emails.send({
+      from: this.getRequired('MAIL_FROM_ADDRESS'),
+      to: input.recipientEmail,
+      subject: 'Easy Clip PRO 구독 자동갱신이 재개되었습니다',
+      text: this.buildResumeText(input),
+      html: this.buildResumeHtml(input),
+      tags: [
+        {
+          name: 'category',
+          value: 'subscription-resumed',
+        },
+      ],
+    });
+
+    if (response.error) {
+      throw new Error(
+        `Resend subscription resumed mail failed: ${response.error.name}(${response.error.statusCode})`,
       );
     }
   }
@@ -129,6 +158,77 @@ export class ResendSubscriptionPaymentMailService implements SubscriptionPayment
                 ${this.buildHtmlRow('승인 시각', this.formatDateTime(input.approvedAt))}
                 ${this.buildHtmlRow('현재 이용 기간 종료일', this.formatDate(input.currentPeriodEnd))}
                 ${this.buildHtmlRow('다음 결제 예정일', this.formatDate(input.nextBillingAt))}
+              </td>
+            </tr>
+            <tr>
+              <td bgcolor="#f9fafb" style="padding-top:18px;padding-right:28px;padding-bottom:18px;padding-left:28px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
+                <p style="margin:0;font-size:13px;line-height:20px;color:#4b5563;">문의가 필요하시면 ${supportEmail}로 연락해주세요.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+  }
+
+  private buildResumeText(input: SendSubscriptionResumedMailInput): string {
+    const supportEmail =
+      this.configService.get<string>('MAIL_SUPPORT_EMAIL') ??
+      DEFAULT_SUPPORT_EMAIL;
+
+    return [
+      '안녕하세요. Easy Clip입니다.',
+      '',
+      'Easy Clip PRO 구독 자동갱신이 재개되었습니다.',
+      '',
+      `구독 플랜: ${input.plan}`,
+      `현재 이용 기간 종료일: ${this.formatDate(input.currentPeriodEnd)}`,
+      `다음 결제 예정일: ${this.formatDate(input.nextBillingAt)}`,
+      '',
+      '재개 시점에는 즉시 결제가 발생하지 않으며, 다음 결제 예정일에 자동결제가 진행됩니다.',
+      '',
+      `문의가 필요하시면 ${supportEmail}로 연락해주세요.`,
+      '',
+      'Easy Clip 드림',
+    ].join('\n');
+  }
+
+  private buildResumeHtml(input: SendSubscriptionResumedMailInput): string {
+    const supportEmail = escapeHtml(
+      this.configService.get<string>('MAIL_SUPPORT_EMAIL') ??
+        DEFAULT_SUPPORT_EMAIL,
+    );
+
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  </head>
+  <body style="margin:0;background-color:#f6f8fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f6f8fb" style="width:100%;background-color:#f6f8fb;">
+      <tr>
+        <td align="center" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #e5e7eb;">
+            <tr>
+              <td style="padding-top:28px;padding-right:28px;padding-bottom:12px;padding-left:28px;">
+                <p style="margin:0;font-size:14px;line-height:20px;color:#4b5563;">Easy Clip</p>
+                <h1 style="margin-top:8px;margin-right:0;margin-bottom:0;margin-left:0;font-size:24px;line-height:32px;color:#111827;font-weight:700;">PRO 구독 자동갱신이 재개되었습니다</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-top:8px;padding-right:28px;padding-bottom:12px;padding-left:28px;">
+                ${this.buildHtmlRow('구독 플랜', input.plan)}
+                ${this.buildHtmlRow('현재 이용 기간 종료일', this.formatDate(input.currentPeriodEnd))}
+                ${this.buildHtmlRow('다음 결제 예정일', this.formatDate(input.nextBillingAt))}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-top:0;padding-right:28px;padding-bottom:28px;padding-left:28px;">
+                <p style="margin:0;font-size:14px;line-height:22px;color:#374151;">재개 시점에는 즉시 결제가 발생하지 않으며, 다음 결제 예정일에 자동결제가 진행됩니다.</p>
               </td>
             </tr>
             <tr>

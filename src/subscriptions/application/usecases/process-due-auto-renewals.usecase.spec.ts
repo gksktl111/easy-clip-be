@@ -30,6 +30,7 @@ const createGateway = (): jest.Mocked<BillingPaymentGateway> => ({
 
 const createMailer = (): jest.Mocked<SubscriptionPaymentMailPort> => ({
   sendPaymentSuccess: jest.fn(),
+  sendSubscriptionResumed: jest.fn(),
 });
 
 const createConfig = () =>

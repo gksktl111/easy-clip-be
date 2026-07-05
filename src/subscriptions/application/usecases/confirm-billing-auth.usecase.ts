@@ -59,6 +59,12 @@ export class ConfirmBillingAuthUseCase {
         },
       );
 
+      await this.sendSubscriptionResumedMail({
+        userId,
+        currentPeriodEnd: updated.currentPeriodEnd,
+        nextBillingAt: updated.nextBillingAt,
+      });
+
       return toMySubscriptionResponse(updated);
     }
 
@@ -176,6 +182,42 @@ export class ConfirmBillingAuthUseCase {
     } catch (error) {
       this.logger.warn(
         `결제 성공 메일 발송에 실패했습니다. userId=${input.userId} error=${resolveErrorName(error)}`,
+      );
+    }
+  }
+
+  private async sendSubscriptionResumedMail(input: {
+    userId: string;
+    currentPeriodEnd: Date | null;
+    nextBillingAt: Date | null;
+  }): Promise<void> {
+    if (!input.currentPeriodEnd || !input.nextBillingAt) {
+      return;
+    }
+
+    try {
+      const recipient =
+        await this.subscriptionsRepository.findBillingMailRecipientByUserId(
+          input.userId,
+        );
+
+      if (!recipient) {
+        this.logger.warn(
+          `구독 재개 메일 수신자를 찾지 못했습니다. userId=${input.userId}`,
+        );
+        return;
+      }
+
+      // 재개는 즉시 과금이 아니므로 결제 성공 메일과 분리해 다음 결제 예정일만 안내한다.
+      await this.subscriptionPaymentMailPort.sendSubscriptionResumed({
+        recipientEmail: recipient.email,
+        plan: SubscriptionPlan.PRO,
+        currentPeriodEnd: input.currentPeriodEnd,
+        nextBillingAt: input.nextBillingAt,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `구독 재개 메일 발송에 실패했습니다. userId=${input.userId} error=${resolveErrorName(error)}`,
       );
     }
   }

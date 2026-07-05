@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { SUBSCRIPTIONS_REPOSITORY } from '../../domain/subscriptions.repository';
 import type { SubscriptionsRepository } from '../../domain/subscriptions.repository';
 import {
@@ -7,6 +7,8 @@ import {
   SubscriptionPlan,
   SubscriptionStatus,
 } from '../../domain/subscription.types';
+import { SUBSCRIPTION_PAYMENT_MAIL_PORT } from '../ports/subscription-payment-mail.port';
+import type { SubscriptionPaymentMailPort } from '../ports/subscription-payment-mail.port';
 import { MySubscriptionOutput } from '../dtos/my-subscription-output.dto';
 import { UpdateMySubscriptionInput } from '../dtos/update-my-subscription-input.dto';
 import { SubscriptionsError } from '../errors/subscriptions.error';
@@ -15,9 +17,13 @@ import { toMySubscriptionResponse } from '../helpers/subscription-response.helpe
 
 @Injectable()
 export class UpdateMySubscriptionUseCase {
+  private readonly logger = new Logger(UpdateMySubscriptionUseCase.name);
+
   constructor(
     @Inject(SUBSCRIPTIONS_REPOSITORY)
     private readonly subscriptionsRepository: SubscriptionsRepository,
+    @Inject(SUBSCRIPTION_PAYMENT_MAIL_PORT)
+    private readonly subscriptionPaymentMailPort: SubscriptionPaymentMailPort,
   ) {}
 
   async execute(
@@ -38,7 +44,10 @@ export class UpdateMySubscriptionUseCase {
     }
 
     if (input.type === SubscriptionAction.RESUME) {
-      return toMySubscriptionResponse(await this.resume(subscription));
+      const updated = await this.resume(subscription);
+      await this.sendSubscriptionResumedMail(userId, updated);
+
+      return toMySubscriptionResponse(updated);
     }
 
     throw new SubscriptionsError(
@@ -84,4 +93,43 @@ export class UpdateMySubscriptionUseCase {
       nextBillingAt: subscription.currentPeriodEnd,
     });
   }
+
+  private async sendSubscriptionResumedMail(
+    userId: string,
+    subscription: Subscription,
+  ): Promise<void> {
+    if (!subscription.currentPeriodEnd || !subscription.nextBillingAt) {
+      return;
+    }
+
+    try {
+      const recipient =
+        await this.subscriptionsRepository.findBillingMailRecipientByUserId(
+          userId,
+        );
+
+      if (!recipient) {
+        this.logger.warn(
+          `구독 재개 메일 수신자를 찾지 못했습니다. userId=${userId}`,
+        );
+        return;
+      }
+
+      // 재개는 즉시 과금이 아니므로 결제 성공 메일과 분리해 다음 결제 예정일만 안내한다.
+      await this.subscriptionPaymentMailPort.sendSubscriptionResumed({
+        recipientEmail: recipient.email,
+        plan: SubscriptionPlan.PRO,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        nextBillingAt: subscription.nextBillingAt,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `구독 재개 메일 발송에 실패했습니다. userId=${userId} error=${resolveErrorName(error)}`,
+      );
+    }
+  }
+}
+
+function resolveErrorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown';
 }

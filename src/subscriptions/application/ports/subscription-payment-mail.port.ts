@@ -15,8 +15,19 @@ export type SendSubscriptionPaymentSuccessMailInput = {
   paymentKind: 'INITIAL' | 'AUTO_RENEWAL';
 };
 
+export type SendSubscriptionResumedMailInput = {
+  recipientEmail: string;
+  plan: SubscriptionPlan;
+  currentPeriodEnd: Date;
+  nextBillingAt: Date;
+};
+
 export interface SubscriptionPaymentMailPort {
   sendPaymentSuccess(
     input: SendSubscriptionPaymentSuccessMailInput,
+  ): Promise<void>;
+
+  sendSubscriptionResumed(
+    input: SendSubscriptionResumedMailInput,
   ): Promise<void>;
 }

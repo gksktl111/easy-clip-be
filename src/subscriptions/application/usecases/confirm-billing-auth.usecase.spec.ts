@@ -47,6 +47,7 @@ const createGateway = (): jest.Mocked<BillingPaymentGateway> => ({
 
 const createMailer = (): jest.Mocked<SubscriptionPaymentMailPort> => ({
   sendPaymentSuccess: jest.fn(),
+  sendSubscriptionResumed: jest.fn(),
 });
 
 const createConfig = () =>
@@ -236,6 +237,9 @@ describe('ConfirmBillingAuthUseCase', () => {
         externalCustomerKey: 'customer-key',
       }),
     );
+    repo.findBillingMailRecipientByUserId.mockResolvedValue({
+      email: 'user@example.com',
+    });
 
     const usecase = new ConfirmBillingAuthUseCase(
       repo,
@@ -253,6 +257,12 @@ describe('ConfirmBillingAuthUseCase', () => {
     expect(repo.activateByPayment).not.toHaveBeenCalled();
     expect(repo.recordPaymentFailure).not.toHaveBeenCalled();
     expect(mailer.sendPaymentSuccess).not.toHaveBeenCalled();
+    expect(mailer.sendSubscriptionResumed).toHaveBeenCalledWith({
+      recipientEmail: 'user@example.com',
+      plan: SubscriptionPlan.PRO,
+      currentPeriodEnd,
+      nextBillingAt: currentPeriodEnd,
+    });
     expect(repo.updateSubscription).toHaveBeenCalledWith('subscription-id', {
       status: SubscriptionStatus.ACTIVE,
       autoRenew: true,
@@ -374,6 +384,62 @@ describe('ConfirmBillingAuthUseCase', () => {
     ).resolves.toMatchObject({
       plan: SubscriptionPlan.PRO,
       status: SubscriptionStatus.ACTIVE,
+    });
+  });
+
+  it('구독 재개 메일 발송 실패가 즉시 결제 없는 재개 응답을 막지 않는다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    const mailer = createMailer();
+    const currentPeriodEnd = new Date('2099-04-01T00:00:00.000Z');
+
+    repo.getOrCreatePersonalSubscription.mockResolvedValue(
+      createSubscription({
+        plan: SubscriptionPlan.PRO,
+        status: SubscriptionStatus.CANCELED,
+        autoRenew: false,
+        startedAt: new Date('2026-02-01T00:00:00.000Z'),
+        currentPeriodEnd,
+        nextBillingAt: null,
+        externalBillingKey: 'billing-key',
+        externalCustomerKey: 'customer-key',
+      }),
+    );
+    repo.updateSubscription.mockResolvedValue(
+      createSubscription({
+        plan: SubscriptionPlan.PRO,
+        status: SubscriptionStatus.ACTIVE,
+        autoRenew: true,
+        startedAt: new Date('2026-02-01T00:00:00.000Z'),
+        currentPeriodEnd,
+        nextBillingAt: currentPeriodEnd,
+        externalBillingKey: 'billing-key',
+        externalCustomerKey: 'customer-key',
+      }),
+    );
+    repo.findBillingMailRecipientByUserId.mockResolvedValue({
+      email: 'user@example.com',
+    });
+    mailer.sendSubscriptionResumed.mockRejectedValue(
+      new Error('resend failed'),
+    );
+
+    const usecase = new ConfirmBillingAuthUseCase(
+      repo,
+      gateway,
+      mailer,
+      createConfig(),
+    );
+
+    await expect(
+      usecase.execute('user-id', {
+        authKey: 'auth-key',
+        customerKey: 'customer-key',
+      }),
+    ).resolves.toMatchObject({
+      plan: SubscriptionPlan.PRO,
+      status: SubscriptionStatus.ACTIVE,
+      autoRenew: true,
     });
   });
 });
