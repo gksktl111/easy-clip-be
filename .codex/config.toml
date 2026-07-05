@@ -8,3 +8,6 @@ approval_mode = "approve"
 [mcp_servers.context7]
 command = "npx"
 args = ["-y", "@upstash/context7-mcp@latest"]
+
+[mcp_servers.resend]
+url = "https://mcp.resend.com"

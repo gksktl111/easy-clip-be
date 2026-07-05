@@ -54,8 +54,20 @@ export type ClaimAutoRenewalPaymentParams = {
   currency: string;
 };
 
+export type BillingMailRecipient = {
+  email: string;
+};
+
 export interface SubscriptionsRepository {
   getOrCreatePersonalSubscription(userId: string): Promise<Subscription>;
+
+  findBillingMailRecipientByUserId(
+    userId: string,
+  ): Promise<BillingMailRecipient | null>;
+
+  findBillingMailRecipientBySubscriptionId(
+    subscriptionId: string,
+  ): Promise<BillingMailRecipient | null>;
 
   updateSubscription(
     subscriptionId: string,
