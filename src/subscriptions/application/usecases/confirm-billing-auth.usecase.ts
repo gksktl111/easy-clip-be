@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SUBSCRIPTIONS_REPOSITORY } from '../../domain/subscriptions.repository';
 import type { SubscriptionsRepository } from '../../domain/subscriptions.repository';
@@ -10,6 +10,8 @@ import {
 } from '../../domain/subscription.types';
 import { BILLING_PAYMENT_GATEWAY } from '../ports/billing-payment.gateway';
 import type { BillingPaymentGateway } from '../ports/billing-payment.gateway';
+import { SUBSCRIPTION_PAYMENT_MAIL_PORT } from '../ports/subscription-payment-mail.port';
+import type { SubscriptionPaymentMailPort } from '../ports/subscription-payment-mail.port';
 import { ConfirmBillingAuthInput } from '../dtos/billing-auth-output.dto';
 import { MySubscriptionOutput } from '../dtos/my-subscription-output.dto';
 import { SubscriptionsError } from '../errors/subscriptions.error';
@@ -19,11 +21,15 @@ import { toMySubscriptionResponse } from '../helpers/subscription-response.helpe
 
 @Injectable()
 export class ConfirmBillingAuthUseCase {
+  private readonly logger = new Logger(ConfirmBillingAuthUseCase.name);
+
   constructor(
     @Inject(SUBSCRIPTIONS_REPOSITORY)
     private readonly subscriptionsRepository: SubscriptionsRepository,
     @Inject(BILLING_PAYMENT_GATEWAY)
     private readonly billingPaymentGateway: BillingPaymentGateway,
+    @Inject(SUBSCRIPTION_PAYMENT_MAIL_PORT)
+    private readonly subscriptionPaymentMailPort: SubscriptionPaymentMailPort,
     private readonly configService: ConfigService,
   ) {}
 
@@ -123,7 +129,55 @@ export class ConfirmBillingAuthUseCase {
       rawData: paymentResult.rawData,
     });
 
+    await this.sendPaymentSuccessMail({
+      userId,
+      amount: paymentResult.totalAmount,
+      currency: paymentResult.currency,
+      approvedAt: paidAt,
+      currentPeriodEnd: period.currentPeriodEnd,
+      nextBillingAt: period.nextBillingAt,
+    });
+
     return toMySubscriptionResponse(updated);
+  }
+
+  private async sendPaymentSuccessMail(input: {
+    userId: string;
+    amount: number;
+    currency: string;
+    approvedAt: Date;
+    currentPeriodEnd: Date;
+    nextBillingAt: Date;
+  }): Promise<void> {
+    try {
+      const recipient =
+        await this.subscriptionsRepository.findBillingMailRecipientByUserId(
+          input.userId,
+        );
+
+      if (!recipient) {
+        this.logger.warn(
+          `결제 성공 메일 수신자를 찾지 못했습니다. userId=${input.userId}`,
+        );
+        return;
+      }
+
+      // 결제 DB 반영은 이미 완료된 상태이므로, 메일 실패는 결제 성공 응답을 롤백하지 않는다.
+      await this.subscriptionPaymentMailPort.sendPaymentSuccess({
+        recipientEmail: recipient.email,
+        amount: input.amount,
+        currency: input.currency,
+        approvedAt: input.approvedAt,
+        plan: SubscriptionPlan.PRO,
+        currentPeriodEnd: input.currentPeriodEnd,
+        nextBillingAt: input.nextBillingAt,
+        paymentKind: 'INITIAL',
+      });
+    } catch (error) {
+      this.logger.warn(
+        `결제 성공 메일 발송에 실패했습니다. userId=${input.userId} error=${resolveErrorName(error)}`,
+      );
+    }
   }
 
   private canResumeWithoutImmediatePayment(subscription: {
@@ -156,4 +210,8 @@ export class ConfirmBillingAuthUseCase {
 
     return amount;
   }
+}
+
+function resolveErrorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown';
 }

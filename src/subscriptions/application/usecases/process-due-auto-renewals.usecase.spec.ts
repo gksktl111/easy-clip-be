@@ -2,6 +2,7 @@
 import { ConfigService } from '@nestjs/config';
 import { ProcessDueAutoRenewalsUseCase } from './process-due-auto-renewals.usecase';
 import { BillingPaymentGateway } from '../ports/billing-payment.gateway';
+import { SubscriptionPaymentMailPort } from '../ports/subscription-payment-mail.port';
 import { SubscriptionsRepository } from '../../domain/subscriptions.repository';
 import {
   PaymentProvider,
@@ -13,6 +14,8 @@ import {
 
 const createRepository = (): jest.Mocked<SubscriptionsRepository> => ({
   getOrCreatePersonalSubscription: jest.fn(),
+  findBillingMailRecipientByUserId: jest.fn(),
+  findBillingMailRecipientBySubscriptionId: jest.fn(),
   updateSubscription: jest.fn(),
   activateByPayment: jest.fn(),
   recordPaymentFailure: jest.fn(),
@@ -23,6 +26,10 @@ const createRepository = (): jest.Mocked<SubscriptionsRepository> => ({
 const createGateway = (): jest.Mocked<BillingPaymentGateway> => ({
   issueBillingKey: jest.fn(),
   chargeBilling: jest.fn(),
+});
+
+const createMailer = (): jest.Mocked<SubscriptionPaymentMailPort> => ({
+  sendPaymentSuccess: jest.fn(),
 });
 
 const createConfig = () =>
@@ -67,9 +74,11 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
   it('배치 실행이 비활성화되어 있으면 due 구독 조회 전에 거부한다', async () => {
     const repo = createRepository();
     const gateway = createGateway();
+    const mailer = createMailer();
     const usecase = new ProcessDueAutoRenewalsUseCase(
       repo,
       gateway,
+      mailer,
       createConfig(),
     );
 
@@ -89,9 +98,11 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
   it('배치 실행 시크릿이 설정되어 있지 않으면 due 구독 조회 전에 거부한다', async () => {
     const repo = createRepository();
     const gateway = createGateway();
+    const mailer = createMailer();
     const usecase = new ProcessDueAutoRenewalsUseCase(
       repo,
       gateway,
+      mailer,
       createConfig(),
     );
 
@@ -111,9 +122,11 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
   it('요청 시크릿이 일치하지 않으면 due 구독 조회 전에 거부한다', async () => {
     const repo = createRepository();
     const gateway = createGateway();
+    const mailer = createMailer();
     const usecase = new ProcessDueAutoRenewalsUseCase(
       repo,
       gateway,
+      mailer,
       createConfig(),
     );
 
@@ -133,6 +146,7 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
   it('자동결제 성공 시 기존 기간 뒤로 1개월 연장한다', async () => {
     const repo = createRepository();
     const gateway = createGateway();
+    const mailer = createMailer();
     const now = new Date('2026-02-01T00:00:00.000Z');
 
     repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
@@ -150,10 +164,20 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       failureMessage: null,
       rawData: {},
     });
+    repo.activateByPayment.mockResolvedValue(
+      createSubscription({
+        currentPeriodEnd: new Date('2026-03-01T00:00:00.000Z'),
+        nextBillingAt: new Date('2026-03-01T00:00:00.000Z'),
+      }),
+    );
+    repo.findBillingMailRecipientBySubscriptionId.mockResolvedValue({
+      email: 'user@example.com',
+    });
 
     const usecase = new ProcessDueAutoRenewalsUseCase(
       repo,
       gateway,
+      mailer,
       createConfig(),
     );
     const result = await usecase.execute(createInput(now));
@@ -182,11 +206,22 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       succeeded: 1,
       failed: 0,
     });
+    expect(mailer.sendPaymentSuccess).toHaveBeenCalledWith({
+      recipientEmail: 'user@example.com',
+      amount: 4900,
+      currency: 'KRW',
+      approvedAt: now,
+      plan: SubscriptionPlan.PRO,
+      currentPeriodEnd: new Date('2026-03-01T00:00:00.000Z'),
+      nextBillingAt: new Date('2026-03-01T00:00:00.000Z'),
+      paymentKind: 'AUTO_RENEWAL',
+    });
   });
 
   it('자동결제 실패 시 구독 기간을 변경하지 않고 실패 이력을 저장한다', async () => {
     const repo = createRepository();
     const gateway = createGateway();
+    const mailer = createMailer();
     const now = new Date('2026-02-01T00:00:00.000Z');
 
     repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
@@ -208,6 +243,7 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
     const usecase = new ProcessDueAutoRenewalsUseCase(
       repo,
       gateway,
+      mailer,
       createConfig(),
     );
     const result = await usecase.execute(createInput(now));
@@ -220,6 +256,7 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       }),
     );
     expect(repo.activateByPayment).not.toHaveBeenCalled();
+    expect(mailer.sendPaymentSuccess).not.toHaveBeenCalled();
     expect(result).toEqual({
       processed: 1,
       succeeded: 0,
@@ -230,6 +267,7 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
   it('동일 청구주기 결제가 이미 claim되어 있으면 외부 과금을 건너뛴다', async () => {
     const repo = createRepository();
     const gateway = createGateway();
+    const mailer = createMailer();
     const now = new Date('2026-02-01T00:00:00.000Z');
 
     repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
@@ -240,6 +278,7 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
     const usecase = new ProcessDueAutoRenewalsUseCase(
       repo,
       gateway,
+      mailer,
       createConfig(),
     );
     const result = await usecase.execute(createInput(now));
@@ -254,9 +293,57 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
     expect(gateway.chargeBilling).not.toHaveBeenCalled();
     expect(repo.activateByPayment).not.toHaveBeenCalled();
     expect(repo.recordPaymentFailure).not.toHaveBeenCalled();
+    expect(mailer.sendPaymentSuccess).not.toHaveBeenCalled();
     expect(result).toEqual({
       processed: 1,
       succeeded: 0,
+      failed: 0,
+    });
+  });
+
+  it('자동결제 성공 메일 발송 실패가 배치 성공 집계를 바꾸지 않는다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    const mailer = createMailer();
+    const now = new Date('2026-02-01T00:00:00.000Z');
+
+    repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
+      createSubscription(),
+    ]);
+    repo.claimAutoRenewalPayment.mockResolvedValue(true);
+    gateway.chargeBilling.mockResolvedValue({
+      paymentKey: 'payment-key',
+      orderId: 'provider-order-id',
+      status: SubscriptionPaymentStatus.DONE,
+      totalAmount: 4900,
+      currency: 'KRW',
+      approvedAt: now,
+      failureCode: null,
+      failureMessage: null,
+      rawData: {},
+    });
+    repo.activateByPayment.mockResolvedValue(
+      createSubscription({
+        currentPeriodEnd: new Date('2026-03-01T00:00:00.000Z'),
+        nextBillingAt: new Date('2026-03-01T00:00:00.000Z'),
+      }),
+    );
+    repo.findBillingMailRecipientBySubscriptionId.mockResolvedValue({
+      email: 'user@example.com',
+    });
+    mailer.sendPaymentSuccess.mockRejectedValue(new Error('resend failed'));
+
+    const usecase = new ProcessDueAutoRenewalsUseCase(
+      repo,
+      gateway,
+      mailer,
+      createConfig(),
+    );
+    const result = await usecase.execute(createInput(now));
+
+    expect(result).toEqual({
+      processed: 1,
+      succeeded: 1,
       failed: 0,
     });
   });
