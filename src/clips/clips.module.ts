@@ -4,6 +4,8 @@ import { ClipsController } from './presentation/clips.controller';
 import { CLIPS_REPOSITORY } from './domain/clips.repository';
 import { PrismaClipsRepository } from './infrastructure/prisma-clips.repository';
 import { DeleteClipUseCase } from './application/usecases/delete-clip.usecase';
+import { DeleteAllClipsUseCase } from './application/usecases/delete-all-clips.usecase';
+import { DeleteClipsUseCase } from './application/usecases/delete-clips.usecase';
 import { CreateClipUseCase } from './application/usecases/create-clip.usecase';
 import { UpdateClipUseCase } from './application/usecases/update-clip.usecase';
 import { ListFavoriteClipsUseCase } from './application/usecases/list-favorite-clips.usecase';
@@ -13,8 +15,8 @@ import { LikeClipUseCase } from './application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from './application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from './application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from './application/usecases/list-recent-viewed-clips.usecase';
-import { CLIP_IMAGE_STORAGE_PORT } from './application/ports/clip-image-storage.port';
-import { R2ClipImageStorageService } from './infrastructure/r2-clip-image-storage.service';
+import { CLIP_IMAGE_STORAGE_PORT } from 'src/shared/application/ports/clip-image-storage.port';
+import { R2ClipImageStorageService } from 'src/shared/infrastructure/r2-clip-image-storage.service';
 
 @Module({
   controllers: [ClipsController],
@@ -27,6 +29,8 @@ import { R2ClipImageStorageService } from './infrastructure/r2-clip-image-storag
     ListFavoriteClipsUseCase,
     ListRecentClipsUseCase,
     DeleteClipUseCase,
+    DeleteAllClipsUseCase,
+    DeleteClipsUseCase,
     LikeClipUseCase,
     UnlikeClipUseCase,
     RecordClipViewUseCase,

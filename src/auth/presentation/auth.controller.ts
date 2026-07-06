@@ -13,15 +13,16 @@ import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiExcludeEndpoint,
   ApiForbiddenResponse,
   ApiFoundResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Request as ExpressRequest } from 'express';
-import type { Response } from 'express';
+import type { Request as ExpressRequest, Response } from 'express';
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { AuthContext } from 'src/shared/types/auth-context.type';
 import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/application-exception.filter';
@@ -43,6 +44,7 @@ import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dt
 import { TestAdminLoginDto } from './dtos/test-admin-login.dto';
 import {
   clearAuthCookies,
+  extractAuthSessionMetadata,
   resolveOAuthSuccessRedirectUrl,
   setAccessTokenCookie,
   setAuthCookies,
@@ -106,7 +108,7 @@ export class AuthController {
     @Request() req: OAuthRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    await this.completeOAuthCallback(req.user, response);
+    await this.completeOAuthCallback(req, response);
   }
 
   /* ======================================================
@@ -149,26 +151,46 @@ export class AuthController {
     @Request() req: OAuthRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    await this.completeOAuthCallback(req.user, response);
+    await this.completeOAuthCallback(req, response);
   }
 
   @Post('test/admin-login')
+  @ApiExcludeEndpoint()
   @ApiOperation({ summary: '테스트용 관리자 로그인' })
+  @ApiHeader({
+    name: 'x-test-admin-secret',
+    required: true,
+    description: '테스트 관리자 로그인 실행 시크릿',
+  })
   @ApiBody({ type: TestAdminLoginDto, required: false })
   @ApiOkResponse({
     description: '테스트 관리자 계정으로 토큰과 사용자 정보를 발급합니다.',
     type: AuthSignInResponseDto,
   })
   async testAdminLogin(
+    @Request() request: ExpressRequest,
     @Body() dto: TestAdminLoginDto = {},
     @Res({ passthrough: true }) response: Response,
   ) {
-    const authSession = await this.testAdminLoginUseCase.execute({
-      email: 'admin@easyclip.local',
-      displayName: 'Test Admin',
-      avatarUrl: null,
-      platform: dto.platform ?? 'WEB',
-    });
+    const authSession = await this.testAdminLoginUseCase.execute(
+      {
+        email: 'admin@easyclip.local',
+        displayName: 'Test Admin',
+        avatarUrl: null,
+        platform: dto.platform ?? 'WEB',
+        accessPolicy: {
+          nodeEnv: this.configService.get<string>('NODE_ENV'),
+          enabled:
+            this.configService.get<string>('TEST_ADMIN_LOGIN_ENABLED') ===
+            'true',
+          expectedSecret: this.configService.get<string>(
+            'TEST_ADMIN_LOGIN_SECRET',
+          ),
+          providedSecret: request.get('x-test-admin-secret'),
+        },
+      },
+      extractAuthSessionMetadata(request),
+    );
 
     setAuthCookies(response, this.configService, authSession);
 
@@ -193,7 +215,7 @@ export class AuthController {
     type: ErrorResponseDto,
   })
   async switchUser(
-    @Request() req: { user: AuthContext },
+    @Request() req: ExpressRequest & { user: AuthContext },
     @Body() switchUserDto: SwitchUserDto,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -201,6 +223,7 @@ export class AuthController {
       req.user.userId,
       switchUserDto.authAccountId,
       req.user.platform,
+      extractAuthSessionMetadata(req),
     );
 
     setAuthCookies(response, this.configService, authSession);
@@ -210,7 +233,7 @@ export class AuthController {
 
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth('refresh-token')
   @ApiOperation({ summary: '액세스 토큰 재발급' })
   @ApiOkResponse({
     description: '새 액세스 토큰을 반환합니다.',
@@ -222,7 +245,7 @@ export class AuthController {
   })
   async refresh(
     @Request()
-    req: {
+    req: ExpressRequest & {
       user: AuthContext;
       refreshToken: string;
     },
@@ -231,9 +254,17 @@ export class AuthController {
     const result = await this.refreshAccessTokenUseCase.execute(
       req.user,
       req.refreshToken,
+      extractAuthSessionMetadata(req),
     );
 
-    setAccessTokenCookie(response, this.configService, result.access_token);
+    if (result.refresh_token) {
+      setAuthCookies(response, this.configService, {
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+      });
+    } else {
+      setAccessTokenCookie(response, this.configService, result.access_token);
+    }
 
     return result;
   }
@@ -241,9 +272,9 @@ export class AuthController {
   @UseGuards(JwtAccessGuard)
   @Post('logout')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: '현재 플랫폼 로그아웃' })
+  @ApiOperation({ summary: '현재 세션 로그아웃' })
   @ApiOkResponse({
-    description: '현재 플랫폼의 리프레시 토큰 세션을 만료시킵니다.',
+    description: '현재 리프레시 토큰 세션을 만료시킵니다.',
     type: LogoutResponseDto,
   })
   @ApiUnauthorizedResponse({
@@ -251,12 +282,13 @@ export class AuthController {
     type: ErrorResponseDto,
   })
   async logout(
-    @Request() req: { user: AuthContext },
+    @Request() req: ExpressRequest & { user: AuthContext },
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.logoutUseCase.execute(
       req.user.accountId,
       req.user.platform,
+      req.user.sessionId,
     );
 
     clearAuthCookies(response, this.configService);
@@ -264,19 +296,21 @@ export class AuthController {
     return result;
   }
 
-  private handleOAuthCallback(oauthUser: OAuthUser) {
+  private handleOAuthCallback(oauthUser: OAuthUser, request: ExpressRequest) {
+    const metadata = extractAuthSessionMetadata(request);
+
     if (oauthUser.mode === 'link') {
-      return this.linkAccountUseCase.execute(oauthUser);
+      return this.linkAccountUseCase.execute(oauthUser, metadata);
     }
 
-    return this.signInUseCase.execute(oauthUser);
+    return this.signInUseCase.execute(oauthUser, metadata);
   }
 
   private async completeOAuthCallback(
-    oauthUser: OAuthUser,
+    request: OAuthRequest,
     response: Response,
   ): Promise<void> {
-    const authSession = await this.handleOAuthCallback(oauthUser);
+    const authSession = await this.handleOAuthCallback(request.user, request);
 
     setAuthCookies(response, this.configService, authSession);
     response.redirect(

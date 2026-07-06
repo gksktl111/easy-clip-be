@@ -16,6 +16,9 @@ const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
   signAccessToken: jest.fn(),
   findRefreshTokenSession: jest.fn(),
+  rotateRefreshToken: jest.fn(),
+  touchRefreshTokenSession: jest.fn(),
+  revokeRefreshTokenSession: jest.fn(),
   revokeRefreshTokens: jest.fn(),
 });
 
@@ -40,7 +43,104 @@ const createAccount = (
   ...overrides,
 });
 
+const createInput = () => ({
+  email: 'admin@easyclip.local',
+  displayName: 'Test Admin',
+  platform: 'WEB' as const,
+  accessPolicy: {
+    nodeEnv: 'local',
+    enabled: true,
+    expectedSecret: 'test-admin-secret',
+    providedSecret: 'test-admin-secret',
+  },
+});
+
 describe('TestAdminLoginUseCase', () => {
+  it('운영 환경에서는 테스트 관리자 로그인을 거부한다', async () => {
+    const repo = createRepository();
+    const sessionPort = createSessionPort();
+    const usecase = new TestAdminLoginUseCase(repo, sessionPort);
+
+    await expect(
+      usecase.execute({
+        ...createInput(),
+        accessPolicy: {
+          ...createInput().accessPolicy,
+          nodeEnv: 'production',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(repo.findAccountByProvider).not.toHaveBeenCalled();
+  });
+
+  it('feature flag가 꺼져 있으면 테스트 관리자 로그인을 거부한다', async () => {
+    const repo = createRepository();
+    const sessionPort = createSessionPort();
+    const usecase = new TestAdminLoginUseCase(repo, sessionPort);
+
+    await expect(
+      usecase.execute({
+        ...createInput(),
+        accessPolicy: {
+          ...createInput().accessPolicy,
+          enabled: false,
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(repo.findAccountByProvider).not.toHaveBeenCalled();
+  });
+
+  it('시크릿이 설정되어 있지 않으면 테스트 관리자 로그인을 거부한다', async () => {
+    const repo = createRepository();
+    const sessionPort = createSessionPort();
+    const usecase = new TestAdminLoginUseCase(repo, sessionPort);
+
+    await expect(
+      usecase.execute({
+        ...createInput(),
+        accessPolicy: {
+          ...createInput().accessPolicy,
+          expectedSecret: undefined,
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(repo.findAccountByProvider).not.toHaveBeenCalled();
+  });
+
+  it('요청 시크릿이 없으면 테스트 관리자 로그인을 거부한다', async () => {
+    const repo = createRepository();
+    const sessionPort = createSessionPort();
+    const usecase = new TestAdminLoginUseCase(repo, sessionPort);
+
+    await expect(
+      usecase.execute({
+        ...createInput(),
+        accessPolicy: {
+          ...createInput().accessPolicy,
+          providedSecret: undefined,
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(repo.findAccountByProvider).not.toHaveBeenCalled();
+  });
+
+  it('요청 시크릿이 일치하지 않으면 테스트 관리자 로그인을 거부한다', async () => {
+    const repo = createRepository();
+    const sessionPort = createSessionPort();
+    const usecase = new TestAdminLoginUseCase(repo, sessionPort);
+
+    await expect(
+      usecase.execute({
+        ...createInput(),
+        accessPolicy: {
+          ...createInput().accessPolicy,
+          providedSecret: 'wrong-secret',
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(repo.findAccountByProvider).not.toHaveBeenCalled();
+  });
+
   it('기존 테스트 관리자 계정이 있으면 바로 토큰을 발급한다', async () => {
     const repo = createRepository();
     const sessionPort = createSessionPort();
@@ -51,11 +151,7 @@ describe('TestAdminLoginUseCase', () => {
     });
 
     const usecase = new TestAdminLoginUseCase(repo, sessionPort);
-    const result = await usecase.execute({
-      email: 'admin@easyclip.local',
-      displayName: 'Test Admin',
-      platform: 'WEB',
-    });
+    const result = await usecase.execute(createInput());
 
     expect(repo.findUserByAuthEmail).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -82,8 +178,7 @@ describe('TestAdminLoginUseCase', () => {
 
     const usecase = new TestAdminLoginUseCase(repo, sessionPort);
     await usecase.execute({
-      email: 'admin@easyclip.local',
-      displayName: 'Test Admin',
+      ...createInput(),
       platform: 'APP',
     });
 
@@ -120,8 +215,7 @@ describe('TestAdminLoginUseCase', () => {
 
     const usecase = new TestAdminLoginUseCase(repo, sessionPort);
     const result = await usecase.execute({
-      email: 'admin@easyclip.local',
-      displayName: 'Test Admin',
+      ...createInput(),
       platform: 'WEB',
       avatarUrl: 'https://example.com/admin.png',
     });

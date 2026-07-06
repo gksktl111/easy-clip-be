@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AuthUserResponseDto {
   @ApiProperty({ example: 'cmauthuser123' })
@@ -28,6 +28,13 @@ export class AuthSignInResponseDto {
 export class RefreshAccessTokenResponseDto {
   @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })
   access_token: string;
+
+  @ApiPropertyOptional({
+    example: 'refresh-token-value',
+    description:
+      '리프레시 토큰 만료가 24시간 이내로 남아 rotation이 발생한 경우에만 반환됩니다.',
+  })
+  refresh_token?: string;
 }
 
 export class LogoutResponseDto {

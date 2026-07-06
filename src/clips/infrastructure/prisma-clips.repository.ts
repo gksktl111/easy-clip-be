@@ -47,6 +47,9 @@ export class PrismaClipsRepository implements ClipsRepository {
       where: {
         id: clipId,
         deletedAt: null,
+        folder: {
+          deletedAt: null,
+        },
         workspace: {
           ownerUserId: userId,
         },
@@ -157,6 +160,9 @@ export class PrismaClipsRepository implements ClipsRepository {
         userId,
         clip: {
           deletedAt: null,
+          folder: {
+            deletedAt: null,
+          },
           workspace: {
             ownerUserId: userId,
           },
@@ -186,6 +192,9 @@ export class PrismaClipsRepository implements ClipsRepository {
           in: clipIds,
         },
         deletedAt: null,
+        folder: {
+          deletedAt: null,
+        },
         workspace: {
           ownerUserId: userId,
         },
@@ -392,6 +401,40 @@ export class PrismaClipsRepository implements ClipsRepository {
     });
   }
 
+  async softDeleteClips(clipIds: string[]): Promise<number> {
+    const result = await this.prisma.clip.updateMany({
+      where: {
+        id: {
+          in: clipIds,
+        },
+        deletedAt: null,
+        folder: {
+          deletedAt: null,
+        },
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    return result.count;
+  }
+
+  async softDeleteAllClipsForUser(userId: string): Promise<number> {
+    const result = await this.prisma.clip.updateMany({
+      where: {
+        deletedAt: null,
+        folder: {
+          deletedAt: null,
+        },
+        workspace: {
+          ownerUserId: userId,
+        },
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    return result.count;
+  }
+
   private buildWhere(
     params: Omit<FindClipsParams, 'cursor' | 'limit'>,
   ): Prisma.ClipWhereInput {
@@ -404,10 +447,16 @@ export class PrismaClipsRepository implements ClipsRepository {
         ? {
             folderId,
             ...(workspaceId ? { workspaceId } : {}),
+            folder: {
+              deletedAt: null,
+            },
           }
         : {
             workspace: {
               ownerUserId: userId,
+            },
+            folder: {
+              deletedAt: null,
             },
           }),
       ...(type ? { type } : {}),

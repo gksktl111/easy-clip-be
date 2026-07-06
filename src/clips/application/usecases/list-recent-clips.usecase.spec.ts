@@ -20,6 +20,8 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   createClip: jest.fn(),
   updateClip: jest.fn(),
   softDeleteClip: jest.fn(),
+  softDeleteClips: jest.fn(),
+  softDeleteAllClipsForUser: jest.fn(),
 });
 
 describe('ListRecentClipsUseCase', () => {
@@ -57,6 +59,7 @@ describe('ListRecentClipsUseCase', () => {
       likedOnly: false,
     });
     expect(result.items).toHaveLength(3);
+    expect(result.hasMore).toBe(false);
     expect(result.nextCursor).toBeNull();
   });
 

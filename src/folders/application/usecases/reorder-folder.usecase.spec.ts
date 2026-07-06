@@ -19,7 +19,7 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   updateFolderTagName: jest.fn(),
   updateFolderOrder: jest.fn(),
   deleteFolderTag: jest.fn(),
-  softDeleteFolderWithClips: jest.fn(),
+  softDeleteFolder: jest.fn(),
   findPreviousFolderOrder: jest.fn(),
   findNextFolderOrder: jest.fn(),
 });

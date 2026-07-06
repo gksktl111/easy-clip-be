@@ -19,7 +19,7 @@ const createRepository = (): jest.Mocked<FoldersRepository> => ({
   updateFolderTagName: jest.fn(),
   updateFolderOrder: jest.fn(),
   deleteFolderTag: jest.fn(),
-  softDeleteFolderWithClips: jest.fn(),
+  softDeleteFolder: jest.fn(),
   findPreviousFolderOrder: jest.fn(),
   findNextFolderOrder: jest.fn(),
 });
@@ -60,5 +60,48 @@ describe('UpdateFolderUseCase', () => {
     });
 
     expect(repo.updateFolderName).toHaveBeenCalledWith('folder-id', 'Renamed');
+  });
+
+  it('폴더명을 trim한 값으로 수정한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.updateFolderName.mockResolvedValue({ id: 'folder-id' } as never);
+
+    const usecase = new UpdateFolderUseCase(repo);
+    await usecase.execute('user-id', {
+      folderId: 'folder-id',
+      name: '  Renamed  ',
+    });
+
+    expect(repo.updateFolderName).toHaveBeenCalledWith('folder-id', 'Renamed');
+  });
+
+  it('trim 후 폴더명이 비어있으면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+
+    const usecase = new UpdateFolderUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', { folderId: 'folder-id', name: '   ' }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.updateFolderName).not.toHaveBeenCalled();
+  });
+
+  it('폴더명이 10자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+
+    const usecase = new UpdateFolderUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        folderId: 'folder-id',
+        name: '가'.repeat(11),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.updateFolderName).not.toHaveBeenCalled();
   });
 });

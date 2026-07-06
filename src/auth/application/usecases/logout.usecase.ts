@@ -14,8 +14,13 @@ export class LogoutUseCase {
   async execute(
     authAccountId: string,
     platform: AuthPlatform,
+    sessionId?: string,
   ): Promise<LogoutOutput> {
-    await this.authSessionPort.revokeRefreshTokens(authAccountId, platform);
+    if (sessionId) {
+      await this.authSessionPort.revokeRefreshTokenSession(sessionId);
+    } else {
+      await this.authSessionPort.revokeRefreshTokens(authAccountId, platform);
+    }
 
     return { success: true };
   }
