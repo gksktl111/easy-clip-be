@@ -1,4 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  USER_LANGUAGES,
+  USER_THEMES,
+  type UserLanguage,
+  type UserTheme,
+} from '../../domain/user.types';
 
 export class UserAuthAccountResponseDto {
   @ApiProperty({ example: 'cmauth123' })
@@ -35,11 +41,11 @@ export class UserSettingsResponseDto {
   @ApiProperty({ example: 'cmuser123' })
   userId: string;
 
-  @ApiProperty({ enum: ['LIGHT', 'DARK', 'SYSTEM'], example: 'SYSTEM' })
-  theme: 'LIGHT' | 'DARK' | 'SYSTEM';
+  @ApiProperty({ enum: USER_THEMES, example: 'SYSTEM' })
+  theme: UserTheme;
 
-  @ApiProperty({ example: 'ko' })
-  language: string;
+  @ApiProperty({ enum: USER_LANGUAGES, example: 'ko' })
+  language: UserLanguage;
 }
 
 export class DeleteMeResponseDto {
