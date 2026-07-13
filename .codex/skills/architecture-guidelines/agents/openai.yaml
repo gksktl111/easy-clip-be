@@ -1,0 +1,4 @@
+interface:
+  display_name: "Easy Clip Architecture Guidelines"
+  short_description: "Guide Easy Clip architecture and domain boundaries"
+  default_prompt: "Use $architecture-guidelines to verify layer placement and feature-domain boundaries for this code change."

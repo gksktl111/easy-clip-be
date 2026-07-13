@@ -1,0 +1,4 @@
+interface:
+  display_name: "Easy Clip Git Workflow"
+  short_description: "Run issue-based Git and GitHub workflows safely"
+  default_prompt: "Use $git-workflow to perform this issue-based Git or GitHub task safely."
