@@ -22,6 +22,33 @@ describe('UpdateUserSettingsUseCase', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
+  it.each(['ja', 'zh'] as const)(
+    '%s language를 부분 수정한다',
+    async (language) => {
+      const repo = createRepository();
+      repo.findUserById.mockResolvedValue({ id: 'user-id' });
+      repo.upsertUserSettings.mockResolvedValue({
+        id: 'settings-id',
+        userId: 'user-id',
+        theme: 'DARK',
+        language,
+      });
+
+      const usecase = new UpdateUserSettingsUseCase(repo);
+      const result = await usecase.execute('user-id', {
+        theme: 'DARK',
+        language,
+      });
+
+      expect(repo.upsertUserSettings).toHaveBeenCalledWith('user-id', {
+        theme: 'DARK',
+        language,
+      });
+      expect(result.theme).toBe('DARK');
+      expect(result.language).toBe(language);
+    },
+  );
+
   it('theme/language를 부분 수정한다', async () => {
     const repo = createRepository();
     repo.findUserById.mockResolvedValue({ id: 'user-id' });
