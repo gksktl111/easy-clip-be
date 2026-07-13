@@ -1,5 +1,6 @@
 import {
   UserAuthAccount,
+  UserLanguage,
   UserSettings,
   UserSummary,
   UserTheme,
@@ -15,7 +16,7 @@ export type UpdateAuthAccountProfileParams = {
 
 export type UpdateUserSettingsParams = {
   theme?: UserTheme;
-  language?: string;
+  language?: UserLanguage;
 };
 
 export interface UsersRepository {

@@ -3,6 +3,9 @@ import type { AuthProvider } from 'src/shared/types/auth-provider.type';
 export const USER_THEMES = ['LIGHT', 'DARK', 'SYSTEM'] as const;
 export type UserTheme = (typeof USER_THEMES)[number];
 
+export const USER_LANGUAGES = ['ko', 'en', 'ja', 'zh'] as const;
+export type UserLanguage = (typeof USER_LANGUAGES)[number];
+
 export type UserSummary = {
   id: string;
 };
@@ -35,5 +38,5 @@ export type UserSettings = {
   id: string;
   userId: string;
   theme: UserTheme;
-  language: string;
+  language: UserLanguage;
 };

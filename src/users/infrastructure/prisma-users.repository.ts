@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { UserSettings as PrismaUserSettings } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   UpdateAuthAccountProfileParams,
@@ -7,6 +8,7 @@ import {
 } from '../domain/users.repository';
 import {
   UserAuthAccount,
+  UserLanguage,
   UserSettings,
   UserSummary,
   UserWithAuthAccounts,
@@ -75,7 +77,7 @@ export class PrismaUsersRepository implements UsersRepository {
     userId: string,
     params: UpdateUserSettingsParams,
   ): Promise<UserSettings> {
-    return this.prisma.userSettings.upsert({
+    const settings = await this.prisma.userSettings.upsert({
       where: { userId },
       create: {
         userId,
@@ -87,6 +89,8 @@ export class PrismaUsersRepository implements UsersRepository {
         ...(params.language !== undefined ? { language: params.language } : {}),
       },
     });
+
+    return this.toUserSettings(settings);
   }
 
   async deleteUserAndOwnedPersonalWorkspaces(userId: string): Promise<void> {
@@ -120,5 +124,12 @@ export class PrismaUsersRepository implements UsersRepository {
         where: { id: userId },
       });
     });
+  }
+
+  private toUserSettings(settings: PrismaUserSettings): UserSettings {
+    return {
+      ...settings,
+      language: settings.language as UserLanguage,
+    };
   }
 }

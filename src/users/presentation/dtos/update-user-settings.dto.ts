@@ -1,6 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional } from 'class-validator';
-import { USER_THEMES, type UserTheme } from '../../domain/user.types';
+import {
+  USER_LANGUAGES,
+  USER_THEMES,
+  type UserLanguage,
+  type UserTheme,
+} from '../../domain/user.types';
 
 export class UpdateUserSettingsDto {
   @ApiPropertyOptional({ enum: USER_THEMES, example: 'SYSTEM' })
@@ -8,8 +13,8 @@ export class UpdateUserSettingsDto {
   @IsIn(USER_THEMES)
   theme?: UserTheme;
 
-  @ApiPropertyOptional({ enum: ['ko', 'en'], example: 'ko' })
+  @ApiPropertyOptional({ enum: USER_LANGUAGES, example: 'ko' })
   @IsOptional()
-  @IsIn(['ko', 'en'])
-  language?: 'ko' | 'en';
+  @IsIn(USER_LANGUAGES)
+  language?: UserLanguage;
 }
