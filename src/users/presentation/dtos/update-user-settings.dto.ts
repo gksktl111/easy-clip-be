@@ -8,7 +8,7 @@ import {
 } from '../../domain/user.types';
 
 export class UpdateUserSettingsDto {
-  @ApiPropertyOptional({ enum: USER_THEMES, example: 'SYSTEM' })
+  @ApiPropertyOptional({ enum: USER_THEMES, example: 'LIGHT' })
   @IsOptional()
   @IsIn(USER_THEMES)
   theme?: UserTheme;

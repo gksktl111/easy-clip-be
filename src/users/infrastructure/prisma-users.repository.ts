@@ -11,6 +11,7 @@ import {
   UserLanguage,
   UserSettings,
   UserSummary,
+  UserTheme,
   UserWithAuthAccounts,
 } from '../domain/user.types';
 
@@ -129,6 +130,8 @@ export class PrismaUsersRepository implements UsersRepository {
   private toUserSettings(settings: PrismaUserSettings): UserSettings {
     return {
       ...settings,
+      // 마이그레이션과 요청 검증이 theme 값을 도메인 계약 안으로 제한한다.
+      theme: settings.theme as UserTheme,
       language: settings.language as UserLanguage,
     };
   }
