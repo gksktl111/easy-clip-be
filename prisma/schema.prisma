@@ -17,7 +17,6 @@ enum AuthProvider {
 enum Theme {
   LIGHT
   DARK
-  SYSTEM
 }
 
 // 구독 플랜
@@ -128,7 +127,7 @@ model Workspace {
 
 model UserSettings {
   id       String @id @default(cuid())
-  theme    Theme  @default(SYSTEM)
+  theme    Theme  @default(LIGHT)
   language String @default("ko")
 
   userId String @unique
