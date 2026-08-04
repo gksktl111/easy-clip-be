@@ -278,21 +278,14 @@ CI에서는 PostgreSQL 서비스 컨테이너를 띄운 뒤 아래 순서로 검
 
 ## Deployment
 
-운영 배포는 EC2 + PM2 + GitHub Actions 기반으로 구성합니다.
+운영 배포는 Lightsail 단일 인스턴스 + Docker Compose + GitHub Actions 기반으로 구성합니다.
 
-### EC2 Runtime
+### Lightsail Runtime
 
-- 서버 경로: `/home/ec2-user/easy-clip-be`
-- 프로세스 매니저: `pm2`
-- 실행 엔트리: `pnpm start:prod`
-
-PM2 예시:
-
-```bash
-export NODE_ENV=production
-pm2 start dist/src/main.js --name easy-clip-be --interpreter node --update-env
-pm2 save
-```
+- 서버 경로 기본값: `/home/ubuntu/easy-clip-be`
+- 실행 구성: `docker/docker-compose.production.yml`
+- 서비스: `api`, `postgres`, `nginx`
+- 운영 환경 파일: `.env.production`
 
 ### Deploy Script
 
@@ -302,35 +295,33 @@ pm2 save
 
 동작 순서:
 
-1. `git pull origin main`
-2. `pnpm install --frozen-lockfile`
-3. `pnpm prisma generate`
-4. `pnpm prisma migrate deploy`
-5. `pnpm build`
-6. `pm2 restart easy-clip-be --update-env`
-7. `pm2 save`
+1. `git fetch origin main`
+2. `git reset --hard origin/main`
+3. `docker compose --env-file .env.production -f docker/docker-compose.production.yml up -d --build --remove-orphans`
+4. `docker image prune -f`
 
 ### GitHub Actions
 
 - PR 검증: `.github/workflows/ci.yml`
 - 운영 배포: `.github/workflows/deploy.yml`
 
-배포 워크플로우는 `main` 브랜치 push 시 동작하며, `appleboy/ssh-action`을 통해 EC2에서 `deploy.sh`를 실행합니다.
+배포 워크플로우는 `main` 브랜치 push 시 동작하며, `appleboy/ssh-action`을 통해 Lightsail 인스턴스에서 `deploy.sh`를 실행합니다.
 
 필요한 GitHub Secrets:
 
-- `EC2_HOST`
-- `EC2_USER`
-- `EC2_SSH_KEY`
+- `LIGHTSAIL_HOST`
+- `LIGHTSAIL_USER`
+- `LIGHTSAIL_SSH_KEY`
+- `LIGHTSAIL_APP_DIR` (선택, 기본값: `/home/ubuntu/easy-clip-be`)
 
 ## Operational Notes
 
-- Prisma 관련 명령과 운영 실행은 `NODE_ENV=production` 기준으로 수행합니다.
-- RDS 접속 오류가 발생하면 먼저 `DATABASE_URL`, 사용자명, 비밀번호, DB 이름, `sslmode=require` 여부를 확인합니다.
+- Prisma migration은 API 컨테이너 시작 시 `prisma migrate deploy`로 수행합니다.
+- DB 접속 오류가 발생하면 먼저 `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`를 확인합니다.
 - 앱 실행 실패 시 우선 확인 순서:
-  - `pnpm build`
-  - `pnpm start:prod`
-  - `pm2 logs easy-clip-be`
+  - `docker compose --env-file .env.production -f docker/docker-compose.production.yml ps`
+  - `docker compose --env-file .env.production -f docker/docker-compose.production.yml logs -f api`
+  - `docker compose --env-file .env.production -f docker/docker-compose.production.yml logs -f nginx`
 
 ## Repository Conventions
 
