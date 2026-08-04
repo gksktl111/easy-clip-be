@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { UserSettings as PrismaUserSettings } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   UpdateAuthAccountProfileParams,
@@ -7,8 +8,10 @@ import {
 } from '../domain/users.repository';
 import {
   UserAuthAccount,
+  UserLanguage,
   UserSettings,
   UserSummary,
+  UserTheme,
   UserWithAuthAccounts,
 } from '../domain/user.types';
 
@@ -75,7 +78,7 @@ export class PrismaUsersRepository implements UsersRepository {
     userId: string,
     params: UpdateUserSettingsParams,
   ): Promise<UserSettings> {
-    return this.prisma.userSettings.upsert({
+    const settings = await this.prisma.userSettings.upsert({
       where: { userId },
       create: {
         userId,
@@ -87,6 +90,8 @@ export class PrismaUsersRepository implements UsersRepository {
         ...(params.language !== undefined ? { language: params.language } : {}),
       },
     });
+
+    return this.toUserSettings(settings);
   }
 
   async deleteUserAndOwnedPersonalWorkspaces(userId: string): Promise<void> {
@@ -120,5 +125,14 @@ export class PrismaUsersRepository implements UsersRepository {
         where: { id: userId },
       });
     });
+  }
+
+  private toUserSettings(settings: PrismaUserSettings): UserSettings {
+    return {
+      ...settings,
+      // 마이그레이션과 요청 검증이 theme 값을 도메인 계약 안으로 제한한다.
+      theme: settings.theme as UserTheme,
+      language: settings.language as UserLanguage,
+    };
   }
 }

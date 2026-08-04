@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.git
+.github
+.codex
+.agents
+.env
+.env.*
+!.env.production.example
+!.env.local.example
+npm-debug.log*
+pnpm-debug.log*
+Dockerfile
+docker/*.yml
+docker/*.yaml

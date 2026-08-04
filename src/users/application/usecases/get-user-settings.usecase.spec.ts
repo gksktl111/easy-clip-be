@@ -28,7 +28,7 @@ describe('GetUserSettingsUseCase', () => {
     repo.upsertUserSettings.mockResolvedValue({
       id: 'settings-id',
       userId: 'user-id',
-      theme: 'SYSTEM',
+      theme: 'LIGHT',
       language: 'ko',
     });
 
@@ -39,7 +39,7 @@ describe('GetUserSettingsUseCase', () => {
     expect(result).toEqual({
       id: 'settings-id',
       userId: 'user-id',
-      theme: 'SYSTEM',
+      theme: 'LIGHT',
       language: 'ko',
     });
   });
