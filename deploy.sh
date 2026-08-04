@@ -1,16 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-cd /home/ec2-user/easy-clip-be
+APP_DIR="${APP_DIR:-/home/ubuntu/easy-clip-be}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker/docker-compose.production.yml}"
+ENV_FILE="${ENV_FILE:-.env.production}"
 
-export NODE_ENV=production
+cd "$APP_DIR"
 
-git pull origin main
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Missing $ENV_FILE. Create it from .env.production.example before deploying." >&2
+  exit 1
+fi
 
-pnpm install --frozen-lockfile
-pnpm prisma generate
-pnpm prisma migrate deploy
-pnpm build
+git fetch origin main
+git reset --hard origin/main
 
-pm2 restart easy-clip-be --update-env
-pm2 save
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build --remove-orphans
+docker image prune -f

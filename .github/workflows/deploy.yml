@@ -4,18 +4,21 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to EC2
+      - name: Deploy to Lightsail
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script_stop: true
           script: |
-            cd /home/ec2-user/easy-clip-be
+            APP_DIR="${{ secrets.LIGHTSAIL_APP_DIR }}"
+            cd "${APP_DIR:-/home/ubuntu/easy-clip-be}"
             ./deploy.sh

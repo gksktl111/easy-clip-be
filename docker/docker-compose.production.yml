@@ -1,0 +1,56 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: easy-clip-api:latest
+    container_name: easyclip-api
+    restart: unless-stopped
+    env_file:
+      - ${APP_ENV_FILE:-../.env.production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - easyclip
+
+  postgres:
+    image: postgres:18
+    container_name: easyclip-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - easyclip
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: easyclip-nginx
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+    depends_on:
+      - api
+    networks:
+      - easyclip
+
+volumes:
+  postgres-data:
+
+networks:
+  easyclip:
+    driver: bridge
