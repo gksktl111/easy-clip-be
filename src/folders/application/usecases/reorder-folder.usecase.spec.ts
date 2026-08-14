@@ -1,28 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { ReorderFolderUseCase } from './reorder-folder.usecase';
-import { FoldersRepository } from '../../domain/folders.repository';
-
-const createRepository = (): jest.Mocked<FoldersRepository> => ({
-  findPersonalWorkspaceId: jest.fn(),
-  getOrCreatePersonalWorkspaceId: jest.fn(),
-  findFoldersByWorkspaceId: jest.fn(),
-  findPersonalFolderById: jest.fn(),
-  findFolderById: jest.fn(),
-  findFolderByIdInWorkspace: jest.fn(),
-  findTagsByFolderId: jest.fn(),
-  findTagByIdInFolder: jest.fn(),
-  findTagByNameInFolder: jest.fn(),
-  findLastFolderOrder: jest.fn(),
-  createFolder: jest.fn(),
-  createFolderTag: jest.fn(),
-  updateFolderName: jest.fn(),
-  updateFolderTagName: jest.fn(),
-  updateFolderOrder: jest.fn(),
-  deleteFolderTag: jest.fn(),
-  softDeleteFolder: jest.fn(),
-  findPreviousFolderOrder: jest.fn(),
-  findNextFolderOrder: jest.fn(),
-});
+import { createFoldersRepositoryMock as createRepository } from '../../test-support/create-folders-repository-mock';
 
 describe('ReorderFolderUseCase', () => {
   it('afterId/beforeId가 모두 없으면 에러를 던진다', async () => {
