@@ -1,17 +1,8 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { LinkAccountUseCase } from './link-account.usecase';
-import type { AuthRepository } from '../../domain/auth.repository';
+import { createAuthRepositoryMock } from '../../test-support/create-auth-repository-mock';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { OAuthUser } from '../../domain/auth.types';
-
-const createRepository = (): jest.Mocked<AuthRepository> => ({
-  findAccountByProvider: jest.fn(),
-  findAccountById: jest.fn(),
-  findUserById: jest.fn(),
-  findUserByAuthEmail: jest.fn(),
-  createUserWithAuthAccount: jest.fn(),
-  createAuthAccountForUser: jest.fn(),
-});
 
 const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
@@ -37,7 +28,7 @@ const createOAuthUser = (overrides: Partial<OAuthUser> = {}): OAuthUser => ({
 
 describe('LinkAccountUseCase', () => {
   it('로그인이 없으면 FORBIDDEN 오류를 반환한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     const usecase = new LinkAccountUseCase(repo, sessionPort);
 
@@ -47,7 +38,7 @@ describe('LinkAccountUseCase', () => {
   });
 
   it('이메일이 없으면 BAD_REQUEST 오류를 반환한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     const usecase = new LinkAccountUseCase(repo, sessionPort);
 
@@ -57,7 +48,7 @@ describe('LinkAccountUseCase', () => {
   });
 
   it('사용자가 없으면 NOT_FOUND 오류를 반환한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findUserById.mockResolvedValue(null);
 
@@ -69,7 +60,7 @@ describe('LinkAccountUseCase', () => {
   });
 
   it('이미 연동된 계정이면 CONFLICT 오류를 반환한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findUserById.mockResolvedValue({ id: 'current-user-id' });
     repo.findAccountByProvider.mockResolvedValue({
@@ -90,7 +81,7 @@ describe('LinkAccountUseCase', () => {
   });
 
   it('정상적인 요청이면 계정을 생성하고 토큰을 발급한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findUserById.mockResolvedValue({ id: 'current-user-id' });
     repo.findAccountByProvider.mockResolvedValue(null);

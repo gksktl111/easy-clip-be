@@ -1,17 +1,8 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { SignInUseCase } from './sign-in.usecase';
-import type { AuthRepository } from '../../domain/auth.repository';
+import { createAuthRepositoryMock } from '../../test-support/create-auth-repository-mock';
 import type { AuthSessionPort } from '../ports/auth-session.port';
 import { OAuthUser } from '../../domain/auth.types';
-
-const createRepository = (): jest.Mocked<AuthRepository> => ({
-  findAccountByProvider: jest.fn(),
-  findAccountById: jest.fn(),
-  findUserById: jest.fn(),
-  findUserByAuthEmail: jest.fn(),
-  createUserWithAuthAccount: jest.fn(),
-  createAuthAccountForUser: jest.fn(),
-});
 
 const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
@@ -36,7 +27,7 @@ const createOAuthUser = (overrides: Partial<OAuthUser> = {}): OAuthUser => ({
 
 describe('SignInUseCase', () => {
   it('이메일이 없으면 BAD_REQUEST 오류를 반환한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     const usecase = new SignInUseCase(repo, sessionPort);
 
@@ -46,7 +37,7 @@ describe('SignInUseCase', () => {
   });
 
   it('기존 계정이 있으면 토큰을 발급한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue({
       id: 'account-id',
@@ -84,7 +75,7 @@ describe('SignInUseCase', () => {
   });
 
   it('동일 이메일 사용자가 있으면 CONFLICT 오류를 반환한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue(null);
     repo.findUserByAuthEmail.mockResolvedValue({ id: 'user-id' });
@@ -97,7 +88,7 @@ describe('SignInUseCase', () => {
   });
 
   it('신규 계정이면 계정을 생성하고 토큰을 발급한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue(null);
     repo.findUserByAuthEmail.mockResolvedValue(null);
