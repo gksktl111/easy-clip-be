@@ -11,6 +11,7 @@ description: Apply the Easy Clip issue, branch, commit, push, pull request, merg
 - Create an issue first and use the same issue number in the branch, commit, and PR.
 - Inspect `git status --short --branch` and the current branch before changing repository state.
 - Preserve existing user changes and never stage or modify unrelated files.
+- For GitHub-related work, run any delegated agent with the smallest available model that can complete the task.
 - Commit, push, create or merge a PR, and force-push only within the scope explicitly authorized by the user.
 - Never expose secrets, environment files, or tokens in code, commits, PR bodies, or command output.
 
