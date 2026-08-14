@@ -1,13 +1,5 @@
 import { GetMeUseCase } from './get-me.usecase';
-import { UsersRepository } from '../../domain/users.repository';
-
-const createRepository = (): jest.Mocked<UsersRepository> => ({
-  findUserById: jest.fn(),
-  findUserWithAuthAccounts: jest.fn(),
-  updateAuthAccountProfile: jest.fn(),
-  upsertUserSettings: jest.fn(),
-  deleteUserAndOwnedPersonalWorkspaces: jest.fn(),
-});
+import { createUsersRepositoryMock as createRepository } from '../../test-support/create-users-repository-mock';
 
 describe('GetMeUseCase', () => {
   it('사용자가 없으면 NOT_FOUND 에러를 던진다', async () => {
