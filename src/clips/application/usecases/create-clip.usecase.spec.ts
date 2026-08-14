@@ -23,7 +23,7 @@ const createRepository = (): jest.Mocked<ClipsRepository> => ({
   updateClip: jest.fn(),
   softDeleteClip: jest.fn(),
   softDeleteClips: jest.fn(),
-  softDeleteAllClipsForUser: jest.fn(),
+  softDeleteAllClipsInFolder: jest.fn(),
 });
 
 const createImageStorage = (): jest.Mocked<ClipImageStoragePort> => ({
