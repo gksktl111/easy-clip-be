@@ -418,12 +418,19 @@ export class PrismaClipsRepository implements ClipsRepository {
     return result.count;
   }
 
-  async softDeleteAllClipsForUser(userId: string): Promise<number> {
+  async softDeleteAllClipsInFolder(
+    userId: string,
+    folderId: string,
+  ): Promise<number> {
     const result = await this.prisma.clip.updateMany({
       where: {
+        folderId,
         deletedAt: null,
         folder: {
           deletedAt: null,
+          workspace: {
+            ownerUserId: userId,
+          },
         },
         workspace: {
           ownerUserId: userId,

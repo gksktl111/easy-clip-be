@@ -213,15 +213,23 @@ export class ClipsController {
     );
   }
 
-  @Delete('all')
+  @Delete('all/:folderId')
   @UseGuards(JwtAccessGuard)
   @ApiOperation({ summary: '클립 전체 삭제' })
+  @ApiParam({ name: 'folderId', description: '폴더 ID' })
   @ApiOkResponse({
     description: '소프트 삭제된 클립 개수를 반환합니다.',
     type: DeleteClipsResponseDto,
   })
-  deleteAllClips(@Request() req: { user: AuthContext }) {
-    return this.deleteAllClipsUseCase.execute(req.user.userId);
+  @ApiNotFoundResponse({
+    description: '폴더를 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
+  deleteAllClips(
+    @Request() req: { user: AuthContext },
+    @Param('folderId') folderId: string,
+  ) {
+    return this.deleteAllClipsUseCase.execute(req.user.userId, folderId);
   }
 
   @Delete(':id')
