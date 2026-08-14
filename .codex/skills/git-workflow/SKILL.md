@@ -59,7 +59,7 @@ Examples:
 Validate the title with this regular expression:
 
 ```regex
-^#[1-9][0-9]*/(chore|feat|refactor|fix|docs|style|hotfix|release)\((chore|docs|test|auth|user|clip|setting)\) : .+$
+^#[1-9][0-9]*/(chore|feat|refactor|fix|docs|style|hotfix|release)\((chore|docs|test|auth|user|clip|folder|subscriptions|trash|setting)\) : .+$
 ```
 
 - Put the related issue number first. Never substitute the PR number for the related issue number.
@@ -79,7 +79,7 @@ Allowed types:
 - `hotfix`: Urgent change that bypasses the normal release flow
 - `release`: Versioning, tags, deployment, and `dev → main` promotion
 
-Allowed scopes are `chore`, `docs`, `test`, `auth`, `user`, `clip`, and `setting`. If none fits, do not invent a new scope; ask the maintainer whether to extend the policy.
+Allowed scopes are `chore`, `docs`, `test`, `auth`, `user`, `clip`, `folder`, `subscriptions`, `trash`, and `setting`. If none fits, do not invent a new scope; ask the maintainer whether to extend the policy.
 
 ## Commit Changes
 

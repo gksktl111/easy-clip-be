@@ -1,21 +1,8 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Logger } from '@nestjs/common';
 import { ClipImageStoragePort } from 'src/shared/application/ports/clip-image-storage.port';
-import { TrashRepository } from '../../domain/trash.repository';
+import { createTrashRepositoryMock as createRepository } from '../../test-support/create-trash-repository-mock';
 import { DeleteAllTrashItemsUseCase } from './delete-all-trash-items.usecase';
-
-const createRepository = (): jest.Mocked<TrashRepository> => ({
-  findDeletedItems: jest.fn(),
-  findDeletedClipsByIds: jest.fn(),
-  findDeletedClipById: jest.fn(),
-  restoreItems: jest.fn(),
-  hardDeleteItems: jest.fn(),
-  findDeletedFoldersByIds: jest.fn(),
-  findDeletedFolderById: jest.fn(),
-  hardDeleteExpiredFoldersWithClips: jest.fn(),
-  hardDeleteExpiredClips: jest.fn(),
-  hardDeleteAllTrashItemsForUser: jest.fn(),
-});
 
 const createImageStorage = (): jest.Mocked<ClipImageStoragePort> => ({
   uploadImage: jest.fn(),

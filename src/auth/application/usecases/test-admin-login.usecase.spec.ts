@@ -1,16 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { TestAdminLoginUseCase } from './test-admin-login.usecase';
-import type { AuthRepository } from '../../domain/auth.repository';
+import { createAuthRepositoryMock } from '../../test-support/create-auth-repository-mock';
 import type { AuthSessionPort } from '../ports/auth-session.port';
-
-const createRepository = (): jest.Mocked<AuthRepository> => ({
-  findAccountByProvider: jest.fn(),
-  findAccountById: jest.fn(),
-  findUserById: jest.fn(),
-  findUserByAuthEmail: jest.fn(),
-  createUserWithAuthAccount: jest.fn(),
-  createAuthAccountForUser: jest.fn(),
-});
 
 const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
@@ -57,7 +48,7 @@ const createInput = () => ({
 
 describe('TestAdminLoginUseCase', () => {
   it('운영 환경에서는 테스트 관리자 로그인을 거부한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     const usecase = new TestAdminLoginUseCase(repo, sessionPort);
 
@@ -74,7 +65,7 @@ describe('TestAdminLoginUseCase', () => {
   });
 
   it('feature flag가 꺼져 있으면 테스트 관리자 로그인을 거부한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     const usecase = new TestAdminLoginUseCase(repo, sessionPort);
 
@@ -91,7 +82,7 @@ describe('TestAdminLoginUseCase', () => {
   });
 
   it('시크릿이 설정되어 있지 않으면 테스트 관리자 로그인을 거부한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     const usecase = new TestAdminLoginUseCase(repo, sessionPort);
 
@@ -108,7 +99,7 @@ describe('TestAdminLoginUseCase', () => {
   });
 
   it('요청 시크릿이 없으면 테스트 관리자 로그인을 거부한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     const usecase = new TestAdminLoginUseCase(repo, sessionPort);
 
@@ -125,7 +116,7 @@ describe('TestAdminLoginUseCase', () => {
   });
 
   it('요청 시크릿이 일치하지 않으면 테스트 관리자 로그인을 거부한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     const usecase = new TestAdminLoginUseCase(repo, sessionPort);
 
@@ -142,7 +133,7 @@ describe('TestAdminLoginUseCase', () => {
   });
 
   it('기존 테스트 관리자 계정이 있으면 바로 토큰을 발급한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue(createAccount());
     sessionPort.issueTokens.mockResolvedValue({
@@ -166,7 +157,7 @@ describe('TestAdminLoginUseCase', () => {
   });
 
   it('동일 이메일 사용자가 있으면 테스트 관리자 계정을 연결한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue(null);
     repo.findUserByAuthEmail.mockResolvedValue({ id: 'user-id' });
@@ -198,7 +189,7 @@ describe('TestAdminLoginUseCase', () => {
   });
 
   it('동일 이메일 사용자가 없으면 테스트 관리자 사용자를 생성한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountByProvider.mockResolvedValue(null);
     repo.findUserByAuthEmail.mockResolvedValue(null);
