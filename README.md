@@ -134,6 +134,7 @@ R2_MAX_IMAGE_BYTES=10485760
 CORS_ALLOWED_ORIGINS=http://localhost:3001
 CORS_ALLOWED_PORTS=3000,3001,5173
 ENABLE_SWAGGER=true
+ENABLE_HTTP_LOGGING=true
 AUTO_RENEWALS_BATCH_ENABLED=false
 AUTO_RENEWALS_BATCH_SECRET=
 
@@ -163,6 +164,7 @@ OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠�
 - `CORS_ALLOWED_ORIGINS`: API 호출을 허용할 전체 origin 목록. 운영에서는 배포된 프론트 도메인을 쉼표로 구분해 명시합니다. 예: `https://app.easy-clip.app,https://www.easy-clip.app`
 - `CORS_ALLOWED_PORTS`: local 개발에서만 허용할 `localhost`/`127.0.0.1` 포트 목록
 - `ENABLE_SWAGGER`: production에서는 기본 비활성화됩니다. 운영에서 문서 노출이 필요할 때만 `true`로 설정합니다.
+- `ENABLE_HTTP_LOGGING`: Pino HTTP 요청 로그를 제어합니다. local에서는 기본 활성화, production에서는 기본 비활성화이며 필요하면 `true` 또는 `false`로 명시합니다.
 - `AUTO_RENEWALS_BATCH_ENABLED`: 자동결제 배치 엔드포인트를 명시적으로 켤 때만 `true`로 설정
 - `AUTO_RENEWALS_BATCH_SECRET`: 자동결제 배치 엔드포인트 호출 시 `x-auto-renewals-secret` 헤더로 전달해야 하는 시크릿
 
