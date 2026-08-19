@@ -20,7 +20,11 @@ const SENSITIVE_LOG_PATHS = [
 
 export function createPinoHttpOptions(env: NodeJS.ProcessEnv): Options {
   return {
-    autoLogging: isHttpLoggingEnabled(env),
+    autoLogging: isHttpLoggingEnabled(env)
+      ? {
+          ignore: (request) => isMetricsRequest(request.url),
+        }
+      : false,
     genReqId: (request, response) => {
       const requestId = resolveRequestId(request.headers[REQUEST_ID_HEADER]);
 
@@ -76,6 +80,10 @@ function isHttpLoggingEnabled(env: NodeJS.ProcessEnv): boolean {
   }
 
   return env.NODE_ENV !== 'production';
+}
+
+function isMetricsRequest(url: string | undefined): boolean {
+  return url === '/metrics' || url?.startsWith('/metrics?') === true;
 }
 
 function resolveRequestId(value: string | string[] | undefined): string {

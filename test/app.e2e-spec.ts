@@ -32,4 +32,24 @@ describe('AppController (e2e)', () => {
 
     return request(instance).get('/').expect(200).expect('Hello World!');
   });
+
+  it('/metrics (GET)', async () => {
+    const instance = app.getHttpAdapter().getInstance() as unknown as App;
+
+    await request(instance).get('/').expect(200);
+
+    const response = await request(instance)
+      .get('/metrics')
+      .expect(200)
+      .expect('Content-Type', /text\/plain/);
+
+    expect(response.text).toContain(
+      'easy_clip_http_requests_total{method="GET",route="/",status_code="200"} 1',
+    );
+    expect(response.text).toContain(
+      'easy_clip_http_request_duration_seconds_bucket',
+    );
+    expect(response.text).toContain('easy_clip_db_query_duration_seconds');
+    expect(response.text).toContain('easy_clip_process_cpu_user_seconds_total');
+  });
 });

@@ -1,0 +1,958 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m]))",
+          "legendFormat": "요청/초",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP 요청률",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001)",
+          "legendFormat": "5xx 비율",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "5xx 오류율",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(easy_clip_http_request_duration_seconds_bucket{service=\"easy-clip-api\", environment=\"local\"}[5m])))",
+          "legendFormat": "p95",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP p95 응답 시간",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": true,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(easy_clip_http_requests_in_progress{service=\"easy-clip-api\", environment=\"local\"})",
+          "legendFormat": "처리 중 요청",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "처리 중 HTTP 요청",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "easy_clip_process_resident_memory_bytes{service=\"easy-clip-api\", environment=\"local\"}",
+          "legendFormat": "RSS 메모리",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "API 프로세스 메모리",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(easy_clip_process_cpu_user_seconds_total{service=\"easy-clip-api\", environment=\"local\"}[5m]) + rate(easy_clip_process_cpu_system_seconds_total{service=\"easy-clip-api\", environment=\"local\"}[5m])",
+          "legendFormat": "CPU 사용률",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "API 프로세스 CPU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=~\"2..\"}[5m])) / clamp_min(sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001)",
+          "legendFormat": "2xx",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=~\"4..\"}[5m])) / clamp_min(sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001)",
+          "legendFormat": "4xx",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001)",
+          "legendFormat": "5xx",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "HTTP 상태 비율",
+      "description": "전체 요청 대비 2xx, 4xx, 5xx 응답 비율입니다.",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=\"401\"}[5m])) / clamp_min(sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001)",
+          "legendFormat": "401",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=\"403\"}[5m])) / clamp_min(sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001)",
+          "legendFormat": "403",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=\"404\"}[5m])) / clamp_min(sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001)",
+          "legendFormat": "404",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=\"429\"}[5m])) / clamp_min(sum(rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001)",
+          "legendFormat": "429",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "주요 4xx 비율",
+      "description": "인증·권한·경로·요청 제한 이상 징후를 위한 401, 403, 404, 429 비율입니다.",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 12,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(5, histogram_quantile(0.95, sum by (le, method, route) (rate(easy_clip_http_request_duration_seconds_bucket{service=\"easy-clip-api\", environment=\"local\"}[5m]))))",
+          "legendFormat": "{{ method }} {{ route }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Top 5 느린 엔드포인트 (p95)",
+      "description": "엔드포인트별 p95 응답 시간을 상위 5개로 표시합니다.",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 13,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(5, sum by (method, route) (rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\", status_code=~\"5..\"}[5m])) / clamp_min(sum by (method, route) (rate(easy_clip_http_requests_total{service=\"easy-clip-api\", environment=\"local\"}[5m])), 0.001))",
+          "legendFormat": "{{ method }} {{ route }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Top 5 오류 엔드포인트 (5xx 비율)",
+      "description": "엔드포인트별 5xx 비율을 상위 5개로 표시합니다.",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "사용률"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(pg_stat_activity_count{service=\"easy-clip-postgres\", environment=\"local\"})",
+          "legendFormat": "현재 연결",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(pg_settings_max_connections{service=\"easy-clip-postgres\", environment=\"local\"})",
+          "legendFormat": "최대 연결",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(pg_stat_activity_count{service=\"easy-clip-postgres\", environment=\"local\"}) / clamp_min(max(pg_settings_max_connections{service=\"easy-clip-postgres\", environment=\"local\"}), 1)",
+          "legendFormat": "사용률",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "PostgreSQL 연결",
+      "description": "DB 서버 관점의 현재 연결 수, 최대 연결 수, 사용률입니다.",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": ["lastNotNull"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(easy_clip_db_query_duration_seconds_bucket{service=\"easy-clip-api\", environment=\"local\"}[5m])))",
+          "legendFormat": "p95",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(easy_clip_db_query_duration_seconds_bucket{service=\"easy-clip-api\", environment=\"local\"}[5m])))",
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "DB 쿼리 지연 시간",
+      "description": "Prisma가 보고한 DB 왕복 시간의 p95·p99입니다.",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
+      "id": 16,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(5, histogram_quantile(0.95, sum by (le, operation, model) (rate(easy_clip_db_query_duration_seconds_bucket{service=\"easy-clip-api\", environment=\"local\", operation=~\"select|insert|update|delete\"}[5m]))))",
+          "legendFormat": "{{ operation }} {{ model }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Top 5 느린 DB 작업 (p95)",
+      "description": "원본 SQL이나 파라미터 대신 정규화된 Prisma 작업·모델만 표시합니다.",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 56
+      },
+      "id": 7,
+      "options": {
+        "deduplication": "none",
+        "enableLogDetails": true,
+        "prettifyJSON": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "{service=\"easy-clip-api\", environment=\"local\"} | json | responseTime != \"\" | line_format `{{ if eq .level \"30\" }}INFO{{ else if eq .level \"40\" }}WARN{{ else if eq .level \"50\" }}ERROR{{ else if eq .level \"60\" }}FATAL{{ else }}LOG{{ end }}{{ if .req_method }} {{ .req_method }}{{ end }}{{ if .req_url }} {{ .req_url }}{{ end }}{{ if .res_statusCode }} → {{ .res_statusCode }}{{ end }}{{ if .responseTime }} {{ .responseTime }}ms{{ end }} — {{ .msg }}`",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP 요청 로그",
+      "description": "Pino 원본 JSON을 화면에서만 짧은 요청 로그로 변환합니다.",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 66
+      },
+      "id": 8,
+      "options": {
+        "deduplication": "none",
+        "enableLogDetails": true,
+        "prettifyJSON": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "{service=\"easy-clip-api\", environment=\"local\"} | json | level=~\"40|50|60\" | line_format `{{ if eq .level \"30\" }}INFO{{ else if eq .level \"40\" }}WARN{{ else if eq .level \"50\" }}ERROR{{ else if eq .level \"60\" }}FATAL{{ else }}LOG{{ end }}{{ if .req_method }} {{ .req_method }}{{ end }}{{ if .req_url }} {{ .req_url }}{{ end }}{{ if .res_statusCode }} → {{ .res_statusCode }}{{ end }}{{ if .responseTime }} {{ .responseTime }}ms{{ end }} — {{ .msg }}`",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "경고 · 오류 로그",
+      "description": "Pino warn(40), error(50), fatal(60) 로그만 표시합니다.",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
+      "id": 9,
+      "options": {
+        "deduplication": "none",
+        "enableLogDetails": true,
+        "prettifyJSON": true,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "{service=\"easy-clip-api\", environment=\"local\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "원본 Pino JSON · 상세 조사",
+      "description": "요청 ID, 예외, 정제된 요청·응답 속성은 이 원본 JSON 또는 Grafana Explore에서 확인합니다.",
+      "type": "logs"
+    }
+  ],
+  "schemaVersion": 41,
+  "tags": ["easy-clip", "prometheus", "loki"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "",
+  "title": "Easy Clip API 운영 현황",
+  "uid": "easy-clip-api-overview",
+  "version": 3,
+  "weekStart": ""
+}

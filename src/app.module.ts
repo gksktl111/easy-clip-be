@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ClipsModule } from './clips/clips.module';
 import { FoldersModule } from './folders/folders.module';
+import { MetricsModule } from './shared/metrics.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { TrashModule } from './trash/trash.module';
@@ -27,6 +28,7 @@ const envFilePath =
       pinoHttp: createPinoHttpOptions(process.env),
     }),
     ScheduleModule.forRoot(),
+    MetricsModule,
     PrismaModule,
     AuthModule,
     UsersModule,
