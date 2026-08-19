@@ -33,6 +33,40 @@ services:
     networks:
       - easyclip
 
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.19.1
+    container_name: easyclip-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: 'postgres:5432/${POSTGRES_DB}?sslmode=disable'
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - easyclip
+
+  alloy:
+    image: grafana/alloy:v1.18.0
+    container_name: easyclip-alloy
+    restart: unless-stopped
+    env_file:
+      - ${APP_ENV_FILE:-../.env.production}
+    command:
+      - run
+      - '--storage.path=/var/lib/alloy/data'
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./alloy/config.production.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      - api
+      - postgres-exporter
+    networks:
+      - easyclip
+
   nginx:
     image: nginx:stable-alpine
     container_name: easyclip-nginx
@@ -52,6 +86,7 @@ services:
 
 volumes:
   postgres-data:
+  alloy-data:
 
 networks:
   easyclip:

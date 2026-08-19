@@ -1,19 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { TrashRepository } from '../../domain/trash.repository';
+import { createTrashRepositoryMock as createRepository } from '../../test-support/create-trash-repository-mock';
 import { ListTrashItemsUseCase } from './list-trash-items.usecase';
-
-const createRepository = (): jest.Mocked<TrashRepository> => ({
-  findDeletedItems: jest.fn(),
-  findDeletedClipsByIds: jest.fn(),
-  findDeletedClipById: jest.fn(),
-  restoreItems: jest.fn(),
-  hardDeleteItems: jest.fn(),
-  findDeletedFoldersByIds: jest.fn(),
-  findDeletedFolderById: jest.fn(),
-  hardDeleteExpiredFoldersWithClips: jest.fn(),
-  hardDeleteExpiredClips: jest.fn(),
-  hardDeleteAllTrashItemsForUser: jest.fn(),
-});
 
 describe('ListTrashItemsUseCase', () => {
   it('휴지통 클립과 폴더 목록 첫 페이지를 반환한다', async () => {

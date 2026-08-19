@@ -1,11 +1,8 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger as NestLogger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { ApplicationExceptionFilter } from './shared/presentation/filters/application-exception.filter';
-import {
-  isHttpLoggingEnabled,
-  registerHttpLoggingMiddleware,
-} from './shared/presentation/logging/http-logging.helper';
 import {
   createCorsOptions,
   shouldWarnMissingProductionCorsOrigins,
@@ -13,8 +10,10 @@ import {
 import { setupSwagger } from './shared/presentation/swagger/swagger.helper';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(PinoLogger));
+
+  const logger = new NestLogger('Bootstrap');
 
   if (shouldWarnMissingProductionCorsOrigins(process.env)) {
     logger.warn(
@@ -24,10 +23,6 @@ async function bootstrap() {
 
   app.enableCors(createCorsOptions(process.env));
   app.useGlobalFilters(new ApplicationExceptionFilter());
-
-  if (isHttpLoggingEnabled(process.env)) {
-    app.use(registerHttpLoggingMiddleware);
-  }
 
   app.useGlobalPipes(
     new ValidationPipe({

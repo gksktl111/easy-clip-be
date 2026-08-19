@@ -11,6 +11,7 @@ description: Apply the Easy Clip issue, branch, commit, push, pull request, merg
 - Create an issue first and use the same issue number in the branch, commit, and PR.
 - Inspect `git status --short --branch` and the current branch before changing repository state.
 - Preserve existing user changes and never stage or modify unrelated files.
+- For GitHub-related work, run any delegated agent with the smallest available model that can complete the task.
 - Commit, push, create or merge a PR, and force-push only within the scope explicitly authorized by the user.
 - Never expose secrets, environment files, or tokens in code, commits, PR bodies, or command output.
 
@@ -58,7 +59,7 @@ Examples:
 Validate the title with this regular expression:
 
 ```regex
-^#[1-9][0-9]*/(chore|feat|refactor|fix|docs|style|hotfix|release)\((chore|docs|test|auth|user|clip|setting)\) : .+$
+^#[1-9][0-9]*/(chore|feat|refactor|fix|docs|style|hotfix|release)\((chore|docs|test|auth|user|clip|folder|subscriptions|trash|setting)\) : .+$
 ```
 
 - Put the related issue number first. Never substitute the PR number for the related issue number.
@@ -78,7 +79,7 @@ Allowed types:
 - `hotfix`: Urgent change that bypasses the normal release flow
 - `release`: Versioning, tags, deployment, and `dev → main` promotion
 
-Allowed scopes are `chore`, `docs`, `test`, `auth`, `user`, `clip`, and `setting`. If none fits, do not invent a new scope; ask the maintainer whether to extend the policy.
+Allowed scopes are `chore`, `docs`, `test`, `auth`, `user`, `clip`, `folder`, `subscriptions`, `trash`, and `setting`. If none fits, do not invent a new scope; ask the maintainer whether to extend the policy.
 
 ## Commit Changes
 

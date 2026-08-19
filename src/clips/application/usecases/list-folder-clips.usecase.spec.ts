@@ -1,28 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { ListFolderClipsUseCase } from './list-folder-clips.usecase';
-import { ClipsRepository } from '../../domain/clips.repository';
-
-const createRepository = (): jest.Mocked<ClipsRepository> => ({
-  findPersonalFolderById: jest.fn(),
-  findClipByIdForUser: jest.fn(),
-  findClips: jest.fn(),
-  findRecentClips: jest.fn(),
-  hasTitleMatches: jest.fn(),
-  hasRecentTitleMatches: jest.fn(),
-  isClipMatchingQuery: jest.fn(),
-  isRecentCursorMatchingQuery: jest.fn(),
-  findRecentViewedClipIds: jest.fn(),
-  findClipsByIdsForUser: jest.fn(),
-  createClipView: jest.fn(),
-  isClipLikedByUser: jest.fn(),
-  createClipLike: jest.fn(),
-  deleteClipLike: jest.fn(),
-  createClip: jest.fn(),
-  updateClip: jest.fn(),
-  softDeleteClip: jest.fn(),
-  softDeleteClips: jest.fn(),
-  softDeleteAllClipsForUser: jest.fn(),
-});
+import { createClipsRepositoryMock as createRepository } from '../../test-support/create-clips-repository-mock';
 
 const createClips = (count: number, prefix = 'clip') =>
   Array.from({ length: count }, (_, index) => ({

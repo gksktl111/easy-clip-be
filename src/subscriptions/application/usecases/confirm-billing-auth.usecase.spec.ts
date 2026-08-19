@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ConfirmBillingAuthUseCase } from './confirm-billing-auth.usecase';
 import { BillingPaymentGateway } from '../ports/billing-payment.gateway';
 import { SubscriptionPaymentMailPort } from '../ports/subscription-payment-mail.port';
-import { SubscriptionsRepository } from '../../domain/subscriptions.repository';
+import { createSubscriptionsRepositoryMock as createRepository } from '../../test-support/create-subscriptions-repository-mock';
 import {
   PaymentProvider,
   Subscription,
@@ -27,17 +27,6 @@ const createSubscription = (
   externalBillingKey: null,
   externalCustomerKey: 'customer-key',
   ...overrides,
-});
-
-const createRepository = (): jest.Mocked<SubscriptionsRepository> => ({
-  getOrCreatePersonalSubscription: jest.fn(),
-  findBillingMailRecipientByUserId: jest.fn(),
-  findBillingMailRecipientBySubscriptionId: jest.fn(),
-  updateSubscription: jest.fn(),
-  activateByPayment: jest.fn(),
-  recordPaymentFailure: jest.fn(),
-  claimAutoRenewalPayment: jest.fn(),
-  findDueAutoRenewalSubscriptions: jest.fn(),
 });
 
 const createGateway = (): jest.Mocked<BillingPaymentGateway> => ({

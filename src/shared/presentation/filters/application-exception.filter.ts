@@ -27,10 +27,14 @@ export class ApplicationExceptionFilter implements ExceptionFilter {
     const status = httpException.getStatus();
     const payload = httpException.getResponse();
 
-    this.logger.error(
-      this.formatErrorLog(request, status, exception),
-      exception instanceof Error ? exception.stack : undefined,
-    );
+    this.logger.error({
+      err: exception instanceof Error ? exception : undefined,
+      method: request.method,
+      msg: '요청 처리 중 예외가 발생했습니다.',
+      path: request.originalUrl || request.url,
+      statusCode: status,
+      userId: this.extractUserId(request),
+    });
 
     response.status(status).json(payload);
   }
@@ -60,30 +64,8 @@ export class ApplicationExceptionFilter implements ExceptionFilter {
     }
   }
 
-  private formatErrorLog(
-    request: Request,
-    status: number,
-    exception: unknown,
-  ): string {
-    const base = `${request.method} ${request.originalUrl || request.url} ${status}`;
-    const userId = this.extractUserId(request);
-    const message = this.extractErrorMessage(exception);
-
-    return [base, userId ? `user=${userId}` : undefined, `message=${message}`]
-      .filter(Boolean)
-      .join(' ');
-  }
-
   private extractUserId(request: Request): string | undefined {
     const user = request.user as { userId?: string } | undefined;
     return user?.userId;
-  }
-
-  private extractErrorMessage(exception: unknown): string {
-    if (exception instanceof ApplicationError || exception instanceof Error) {
-      return exception.message;
-    }
-
-    return 'Unknown error';
   }
 }

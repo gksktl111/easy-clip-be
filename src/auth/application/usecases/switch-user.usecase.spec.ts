@@ -1,16 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { SwitchUserUseCase } from './switch-user.usecase';
-import type { AuthRepository } from '../../domain/auth.repository';
+import { createAuthRepositoryMock } from '../../test-support/create-auth-repository-mock';
 import type { AuthSessionPort } from '../ports/auth-session.port';
-
-const createRepository = (): jest.Mocked<AuthRepository> => ({
-  findAccountByProvider: jest.fn(),
-  findAccountById: jest.fn(),
-  findUserById: jest.fn(),
-  findUserByAuthEmail: jest.fn(),
-  createUserWithAuthAccount: jest.fn(),
-  createAuthAccountForUser: jest.fn(),
-});
 
 const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
   issueTokens: jest.fn(),
@@ -24,7 +15,7 @@ const createSessionPort = (): jest.Mocked<AuthSessionPort> => ({
 
 describe('SwitchUserUseCase', () => {
   it('계정이 없으면 NOT_FOUND 오류를 반환한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountById.mockResolvedValue(null);
 
@@ -36,7 +27,7 @@ describe('SwitchUserUseCase', () => {
   });
 
   it('현재 사용자와 계정이 다르면 FORBIDDEN 오류를 반환한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountById.mockResolvedValue({
       id: 'account-id',
@@ -56,7 +47,7 @@ describe('SwitchUserUseCase', () => {
   });
 
   it('정상적인 요청이면 토큰을 발급한다', async () => {
-    const repo = createRepository();
+    const repo = createAuthRepositoryMock();
     const sessionPort = createSessionPort();
     repo.findAccountById.mockResolvedValue({
       id: 'account-id',

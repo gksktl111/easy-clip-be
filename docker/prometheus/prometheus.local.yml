@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: easy-clip-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - api:3000
+        labels:
+          service: easy-clip-api
+          environment: local
+
+  - job_name: easy-clip-postgres
+    static_configs:
+      - targets:
+          - postgres-exporter:9187
+        labels:
+          service: easy-clip-postgres
+          environment: local
