@@ -142,13 +142,13 @@ describe('auth-cookie helper', () => {
     );
   });
 
-  it('OAuth 성공 리다이렉트 URL을 mode 기준으로 고른다', () => {
+  it('OAuth 성공 리다이렉트 URL을 favorites 경로로 구성한다', () => {
     const config = createConfigService({
       OAUTH_SUCCESS_REDIRECT_BASE_URL: 'http://localhost:3001/',
     });
 
-    expect(resolveOAuthSuccessRedirectUrl(config, 'user-id')).toBe(
-      'http://localhost:3001/user-id/favorites',
+    expect(resolveOAuthSuccessRedirectUrl(config)).toBe(
+      'http://localhost:3001/favorites',
     );
   });
 });
