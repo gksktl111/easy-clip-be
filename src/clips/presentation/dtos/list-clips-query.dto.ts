@@ -17,7 +17,7 @@ export class ListClipsQueryDto {
 
   @ApiPropertyOptional({
     enum: ['true'],
-    description: '좋아요 목록 조회 여부',
+    description: '명시한 경우에만 좋아요 목록을 조회합니다.',
   })
   @IsOptional()
   @IsIn(['true'])
@@ -25,7 +25,8 @@ export class ListClipsQueryDto {
 
   @ApiPropertyOptional({
     enum: ['true'],
-    description: '최근 클립 목록 조회 여부',
+    description:
+      '좋아요 목록을 명시하지 않은 기본 조회는 최근 클립 목록을 반환합니다.',
   })
   @IsOptional()
   @IsIn(['true'])

@@ -4,9 +4,13 @@ import type { ClipsRepository } from '../../domain/clips.repository';
 import { ClipCursorPageOutput } from '../dtos/clip-cursor-page-output.dto';
 import { ListFolderClipsInput } from '../dtos/list-folder-clips-input.dto';
 import { ClipsError } from '../errors/clips.error';
-import { normalizeCursor, normalizeType } from './list-clips.common';
 import {
-  listClipsWithLikedPriority,
+  LIST_CLIPS_LIMIT,
+  buildPage,
+  normalizeCursor,
+  normalizeType,
+} from './list-clips.common';
+import {
   resolveClipSearchTarget,
   validateClipCursor,
 } from './list-clips.helper';
@@ -41,10 +45,9 @@ export class ListFolderClipsUseCase {
       workspaceId: folder.workspaceId,
       type,
       q: query,
-      likedOnly: undefined,
     });
 
-    const cursorLiked = await validateClipCursor({
+    await validateClipCursor({
       clipsRepository: this.clipsRepository,
       userId,
       cursor,
@@ -53,19 +56,20 @@ export class ListFolderClipsUseCase {
       type,
       q: query,
       searchTarget,
-      likedOnly: undefined,
     });
 
-    return listClipsWithLikedPriority({
-      clipsRepository: this.clipsRepository,
-      userId,
-      folderId: folder.id,
-      workspaceId: folder.workspaceId,
-      cursor,
-      cursorLiked,
-      type,
-      q: query,
-      searchTarget,
-    });
+    return buildPage(
+      await this.clipsRepository.findClips({
+        userId,
+        folderId: folder.id,
+        workspaceId: folder.workspaceId,
+        cursor,
+        limit: LIST_CLIPS_LIMIT,
+        type,
+        q: query,
+        searchTarget,
+      }),
+      LIST_CLIPS_LIMIT,
+    );
   }
 }

@@ -32,7 +32,7 @@ export type FindClipsParams = {
   type?: ClipType;
   q?: string;
   searchTarget?: ClipSearchTarget;
-  likedOnly?: boolean;
+  likedOnly?: true;
 };
 
 export type FindRecentClipsParams = {
@@ -42,7 +42,6 @@ export type FindRecentClipsParams = {
   type?: ClipType;
   q?: string;
   searchTarget?: ClipSearchTarget;
-  likedOnly?: boolean;
 };
 
 export interface ClipsRepository {
@@ -77,7 +76,7 @@ export interface ClipsRepository {
       viewId: string;
       searchTarget: ClipSearchTarget;
     },
-  ): Promise<{ liked: boolean } | null>;
+  ): Promise<boolean>;
   createClipView(userId: string, clipId: string): Promise<void>;
   isClipLikedByUser(userId: string, clipId: string): Promise<boolean>;
   createClipLike(userId: string, clipId: string): Promise<void>;

@@ -105,7 +105,6 @@ export class PrismaClipsRepository implements ClipsRepository {
       type: params.type,
       q: params.q,
       searchTarget: params.searchTarget,
-      likedOnly: params.likedOnly,
     });
 
     const views = await this.prisma.clipView.findMany({
@@ -244,7 +243,6 @@ export class PrismaClipsRepository implements ClipsRepository {
       type: params.type,
       q: params.q,
       searchTarget: 'title',
-      likedOnly: undefined,
     });
     const match = await this.prisma.clipView.findFirst({
       where: {
@@ -280,13 +278,12 @@ export class PrismaClipsRepository implements ClipsRepository {
       viewId: string;
       searchTarget: ClipSearchTarget;
     },
-  ): Promise<{ liked: boolean } | null> {
+  ): Promise<boolean> {
     const clipWhere = this.buildWhere({
       userId: params.userId,
       type: params.type,
       q: params.q,
       searchTarget: params.searchTarget,
-      likedOnly: undefined,
     });
     const match = await this.prisma.clipView.findFirst({
       where: {
@@ -294,23 +291,10 @@ export class PrismaClipsRepository implements ClipsRepository {
         userId: params.userId,
         clip: clipWhere,
       },
-      select: {
-        clip: {
-          select: {
-            likes: {
-              where: { userId: params.userId },
-              select: { id: true },
-            },
-          },
-        },
-      },
+      select: { id: true },
     });
 
-    if (!match) {
-      return null;
-    }
-
-    return { liked: match.clip.likes.length > 0 };
+    return Boolean(match);
   }
 
   async createClipView(userId: string, clipId: string): Promise<void> {
@@ -489,19 +473,10 @@ export class PrismaClipsRepository implements ClipsRepository {
             },
           }
         : {}),
-      ...(likedOnly === true
+      ...(likedOnly
         ? {
             likes: {
               some: {
-                userId,
-              },
-            },
-          }
-        : {}),
-      ...(likedOnly === false
-        ? {
-            likes: {
-              none: {
                 userId,
               },
             },
