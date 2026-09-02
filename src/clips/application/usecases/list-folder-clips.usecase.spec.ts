@@ -23,13 +23,17 @@ describe('ListFolderClipsUseCase', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('좋아요된 클립이 limit보다 많으면 좋아요 목록만 반환한다', async () => {
+  it('좋아요 상태와 무관하게 저장소가 반환한 최신순 단일 페이지를 반환한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({
       id: 'folder-id',
       workspaceId: 'workspace-id',
     } as never);
-    repo.findClips.mockResolvedValue(createClips(21) as never);
+    repo.findClips.mockResolvedValue([
+      { id: 'latest-1', likeByMe: false },
+      { id: 'liked-2', likeByMe: true },
+      ...createClips(19, 'older'),
+    ] as never);
 
     const usecase = new ListFolderClipsUseCase(repo);
     const result = await usecase.execute('user-id', {
@@ -38,98 +42,28 @@ describe('ListFolderClipsUseCase', () => {
       type: 'ALL',
     });
 
-    expect(repo.findClips).toHaveBeenCalledTimes(1);
-    expect(result.items).toHaveLength(20);
-    expect(result.hasMore).toBe(true);
-    expect(result.nextCursor).toBe('clip-20');
-  });
-
-  it('좋아요된 클립과 좋아요되지 않은 클립을 결합해 반환한다', async () => {
-    const repo = createRepository();
-    repo.findPersonalFolderById.mockResolvedValue({
-      id: 'folder-id',
-      workspaceId: 'workspace-id',
-    } as never);
-    repo.findClips
-      .mockResolvedValueOnce([{ id: 'liked-1' }] as never)
-      .mockResolvedValueOnce(createClips(2, 'normal') as never);
-
-    const usecase = new ListFolderClipsUseCase(repo);
-    const result = await usecase.execute('user-id', {
-      folderId: 'folder-id',
-      cursor: '',
-      type: 'ALL',
-    });
-
-    expect(repo.findClips).toHaveBeenNthCalledWith(1, {
+    expect(repo.findClips).toHaveBeenCalledWith({
       userId: 'user-id',
       folderId: 'folder-id',
       workspaceId: 'workspace-id',
-      limit: 20,
-      type: undefined,
-      q: undefined,
-      searchTarget: undefined,
-      likedOnly: true,
       cursor: undefined,
-    });
-    expect(repo.findClips).toHaveBeenNthCalledWith(2, {
-      userId: 'user-id',
-      folderId: 'folder-id',
-      workspaceId: 'workspace-id',
-      limit: 19,
+      limit: 20,
       type: undefined,
       q: undefined,
       searchTarget: undefined,
-      likedOnly: false,
     });
+    expect(repo.isClipLikedByUser).not.toHaveBeenCalled();
     expect(result.items.map((item) => item.id)).toEqual([
-      'liked-1',
-      'normal-1',
-      'normal-2',
+      'latest-1',
+      'liked-2',
+      ...createClips(18, 'older').map((item) => item.id),
     ]);
-    expect(result.hasMore).toBe(false);
-    expect(result.nextCursor).toBeNull();
-  });
-
-  it('커서가 좋아요된 클립을 가리키면 좋아요 목록을 이어 조회한다', async () => {
-    const repo = createRepository();
-    repo.findPersonalFolderById.mockResolvedValue({
-      id: 'folder-id',
-      workspaceId: 'workspace-id',
-    } as never);
-    repo.findClipByIdForUser.mockResolvedValue({
-      id: 'cursor-id',
-      type: 'TEXT',
-      folderId: 'folder-id',
-      workspaceId: 'workspace-id',
-    } as never);
-    repo.isClipLikedByUser.mockResolvedValue(true);
-    repo.findClips.mockResolvedValue(createClips(21, 'liked') as never);
-
-    const usecase = new ListFolderClipsUseCase(repo);
-    const result = await usecase.execute('user-id', {
-      folderId: 'folder-id',
-      cursor: 'cursor-id',
-      type: 'TEXT',
-    });
-
-    expect(repo.findClips).toHaveBeenCalledWith({
-      userId: 'user-id',
-      folderId: 'folder-id',
-      workspaceId: 'workspace-id',
-      limit: 20,
-      type: 'TEXT',
-      q: undefined,
-      searchTarget: undefined,
-      likedOnly: true,
-      cursor: 'cursor-id',
-    });
     expect(result.items).toHaveLength(20);
     expect(result.hasMore).toBe(true);
-    expect(result.nextCursor).toBe('liked-20');
+    expect(result.nextCursor).toBe('older-18');
   });
 
-  it('커서가 좋아요되지 않은 클립을 가리키면 일반 목록을 이어 조회한다', async () => {
+  it('커서가 있어도 좋아요 상태 조회 없이 최신순 조회를 이어간다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({
       id: 'folder-id',
@@ -141,8 +75,7 @@ describe('ListFolderClipsUseCase', () => {
       folderId: 'folder-id',
       workspaceId: 'workspace-id',
     } as never);
-    repo.isClipLikedByUser.mockResolvedValue(false);
-    repo.findClips.mockResolvedValue([{ id: 'normal-1' }] as never);
+    repo.findClips.mockResolvedValue([{ id: 'after-cursor' }] as never);
 
     const usecase = new ListFolderClipsUseCase(repo);
     const result = await usecase.execute('user-id', {
@@ -159,10 +92,10 @@ describe('ListFolderClipsUseCase', () => {
       type: 'TEXT',
       q: undefined,
       searchTarget: undefined,
-      likedOnly: false,
       cursor: 'cursor-id',
     });
-    expect(result.items.map((item) => item.id)).toEqual(['normal-1']);
+    expect(repo.isClipLikedByUser).not.toHaveBeenCalled();
+    expect(result.items.map((item) => item.id)).toEqual(['after-cursor']);
     expect(result.hasMore).toBe(false);
     expect(result.nextCursor).toBeNull();
   });
@@ -191,7 +124,6 @@ describe('ListFolderClipsUseCase', () => {
       type: undefined,
       q: 'keyword',
       searchTarget: 'title',
-      likedOnly: undefined,
     });
     expect(repo.findClips).toHaveBeenCalledWith({
       userId: 'user-id',
@@ -201,73 +133,9 @@ describe('ListFolderClipsUseCase', () => {
       type: undefined,
       q: 'keyword',
       searchTarget: 'tag',
-      likedOnly: true,
       cursor: undefined,
     });
     expect(result.items).toHaveLength(20);
     expect(result.nextCursor).toBe('clip-20');
-  });
-
-  it('좋아요된 클립이 limit만큼이고 다음 일반 클립이 있으면 커서를 유지한다', async () => {
-    const repo = createRepository();
-    repo.findPersonalFolderById.mockResolvedValue({
-      id: 'folder-id',
-      workspaceId: 'workspace-id',
-    } as never);
-    repo.findClips
-      .mockResolvedValueOnce(createClips(20, 'liked') as never)
-      .mockResolvedValueOnce([{ id: 'normal-1' }] as never);
-
-    const usecase = new ListFolderClipsUseCase(repo);
-    const result = await usecase.execute('user-id', {
-      folderId: 'folder-id',
-      cursor: '',
-      type: 'ALL',
-    });
-
-    expect(repo.findClips).toHaveBeenNthCalledWith(1, {
-      userId: 'user-id',
-      folderId: 'folder-id',
-      workspaceId: 'workspace-id',
-      limit: 20,
-      type: undefined,
-      q: undefined,
-      searchTarget: undefined,
-      likedOnly: true,
-      cursor: undefined,
-    });
-    expect(repo.findClips).toHaveBeenNthCalledWith(2, {
-      userId: 'user-id',
-      folderId: 'folder-id',
-      workspaceId: 'workspace-id',
-      limit: 1,
-      type: undefined,
-      q: undefined,
-      searchTarget: undefined,
-      likedOnly: false,
-    });
-    expect(result.items.map((item) => item.id)).toEqual([
-      'liked-1',
-      'liked-2',
-      'liked-3',
-      'liked-4',
-      'liked-5',
-      'liked-6',
-      'liked-7',
-      'liked-8',
-      'liked-9',
-      'liked-10',
-      'liked-11',
-      'liked-12',
-      'liked-13',
-      'liked-14',
-      'liked-15',
-      'liked-16',
-      'liked-17',
-      'liked-18',
-      'liked-19',
-      'liked-20',
-    ]);
-    expect(result.nextCursor).toBe('liked-20');
   });
 });

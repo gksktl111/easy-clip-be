@@ -87,8 +87,19 @@ export class ClipsController {
   @ApiOperation({ summary: '클립 목록 조회' })
   @ApiQuery({ name: 'folderId', required: false })
   @ApiQuery({ name: 'cursor', required: false })
-  @ApiQuery({ name: 'favorite', required: false, enum: ['true'] })
-  @ApiQuery({ name: 'recent', required: false, enum: ['true'] })
+  @ApiQuery({
+    name: 'favorite',
+    required: false,
+    enum: ['true'],
+    description: '명시한 경우에만 좋아요 목록을 조회합니다.',
+  })
+  @ApiQuery({
+    name: 'recent',
+    required: false,
+    enum: ['true'],
+    description:
+      '좋아요 목록을 명시하지 않은 기본 조회는 최근 클립 목록을 반환합니다.',
+  })
   @ApiQuery({
     name: 'type',
     required: true,
@@ -97,7 +108,7 @@ export class ClipsController {
   @ApiQuery({ name: 'q', required: false })
   @ApiOkResponse({
     description:
-      '폴더, 좋아요, 최근 기준의 커서 페이지네이션 결과를 반환합니다.',
+      '폴더, 좋아요, 최근 기준의 커서 페이지네이션 결과를 반환합니다. 기본 조회는 최근 클립 목록입니다.',
     type: ClipCursorPageResponseDto,
   })
   getClips(
@@ -124,7 +135,7 @@ export class ClipsController {
       });
     }
 
-    if (favorite === recent) {
+    if (favorite && recent) {
       throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
     }
 

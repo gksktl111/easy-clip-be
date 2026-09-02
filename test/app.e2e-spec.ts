@@ -1,12 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, type ExecutionContext } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
+import { JwtAccessGuard } from '../src/shared/presentation/guards/jwt-access.guard';
+import { ListRecentClipsUseCase } from '../src/clips/application/usecases/list-recent-clips.usecase';
+
+type AuthenticatedRequest = {
+  user?: {
+    userId: string;
+  };
+};
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
+  const listRecentClipsUseCase = {
+    execute: jest.fn(),
+  };
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -17,6 +28,18 @@ describe('AppController (e2e)', () => {
         onModuleInit: () => Promise.resolve(),
         onModuleDestroy: () => Promise.resolve(),
       })
+      .overrideGuard(JwtAccessGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          const request = context
+            .switchToHttp()
+            .getRequest<AuthenticatedRequest>();
+          request.user = { userId: 'user-id' };
+          return true;
+        },
+      })
+      .overrideProvider(ListRecentClipsUseCase)
+      .useValue(listRecentClipsUseCase)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -51,5 +74,26 @@ describe('AppController (e2e)', () => {
     );
     expect(response.text).toContain('easy_clip_db_query_duration_seconds');
     expect(response.text).toContain('easy_clip_process_cpu_user_seconds_total');
+  });
+
+  it('/clips (GET)은 favorite를 생략하면 최근 클립 목록을 반환한다', async () => {
+    listRecentClipsUseCase.execute.mockResolvedValue({
+      items: [],
+      hasMore: false,
+      nextCursor: null,
+    });
+    const instance = app.getHttpAdapter().getInstance() as unknown as App;
+
+    await request(instance)
+      .get('/clips')
+      .query({ type: 'ALL' })
+      .expect(200)
+      .expect({ items: [], hasMore: false, nextCursor: null });
+
+    expect(listRecentClipsUseCase.execute).toHaveBeenCalledWith('user-id', {
+      cursor: undefined,
+      type: 'ALL',
+      q: undefined,
+    });
   });
 });

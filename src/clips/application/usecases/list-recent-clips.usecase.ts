@@ -8,11 +8,13 @@ import type { ClipsRepository } from '../../domain/clips.repository';
 import { ClipCursorPageOutput } from '../dtos/clip-cursor-page-output.dto';
 import { ListRecentClipsInput } from '../dtos/list-recent-clips-input.dto';
 import { ClipsError } from '../errors/clips.error';
-import { normalizeCursor, normalizeType } from './list-clips.common';
 import {
-  listRecentClipsWithLikedPriority,
-  resolveRecentClipSearchTarget,
-} from './list-clips.helper';
+  LIST_CLIPS_LIMIT,
+  buildRecentPage,
+  normalizeCursor,
+  normalizeType,
+} from './list-clips.common';
+import { resolveRecentClipSearchTarget } from './list-clips.helper';
 
 @Injectable()
 export class ListRecentClipsUseCase {
@@ -38,7 +40,7 @@ export class ListRecentClipsUseCase {
       },
     );
 
-    const cursorLiked = await this.resolveCursorLiked({
+    await this.assertCursorMatches({
       userId,
       cursor,
       type,
@@ -46,18 +48,29 @@ export class ListRecentClipsUseCase {
       searchTarget,
     });
 
-    return listRecentClipsWithLikedPriority({
-      clipsRepository: this.clipsRepository,
-      userId,
-      cursor,
-      cursorLiked,
-      type,
-      q: query,
-      searchTarget,
-    });
+    const page = buildRecentPage(
+      await this.clipsRepository.findRecentClips({
+        userId,
+        cursor,
+        limit: LIST_CLIPS_LIMIT,
+        type,
+        q: query,
+        searchTarget,
+      }),
+      LIST_CLIPS_LIMIT,
+    );
+
+    return {
+      items: page.items.map(({ viewId, ...clip }) => {
+        void viewId;
+        return clip;
+      }),
+      hasMore: page.hasMore,
+      nextCursor: page.nextCursor,
+    };
   }
 
-  private async resolveCursorLiked({
+  private async assertCursorMatches({
     userId,
     cursor,
     type,
@@ -69,26 +82,25 @@ export class ListRecentClipsUseCase {
     type?: ClipType;
     q?: string;
     searchTarget?: ClipSearchTarget;
-  }): Promise<boolean | null> {
+  }): Promise<void> {
     if (!cursor) {
-      return null;
+      return;
     }
 
-    const cursorMeta = await this.clipsRepository.isRecentCursorMatchingQuery({
-      userId,
-      viewId: cursor,
-      type,
-      q,
-      searchTarget: searchTarget ?? 'title',
-    });
+    const cursorMatches =
+      await this.clipsRepository.isRecentCursorMatchingQuery({
+        userId,
+        viewId: cursor,
+        type,
+        q,
+        searchTarget: searchTarget ?? 'title',
+      });
 
-    if (!cursorMeta) {
+    if (!cursorMatches) {
       throw new ClipsError(
         'NOT_FOUND',
         '커서에 해당하는 클립을 찾을 수 없습니다.',
       );
     }
-
-    return cursorMeta.liked;
   }
 }
