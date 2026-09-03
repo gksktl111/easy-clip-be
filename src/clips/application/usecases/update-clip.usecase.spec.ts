@@ -112,6 +112,46 @@ describe('UpdateClipUseCase', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
+  it('다른 폴더로 이동하면 기존 태그 연결 해제를 요청한다', async () => {
+    const repo = createRepository();
+    repo.findClipByIdForUser.mockResolvedValue({
+      id: 'clip-id',
+      type: 'TEXT',
+      folderId: 'old-folder-id',
+      workspaceId: 'old-workspace-id',
+      title: 'old-text',
+      textContent: 'old-text',
+      colorHex: null,
+      imageUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+    repo.findPersonalFolderById.mockResolvedValue({
+      id: 'new-folder-id',
+      workspaceId: 'new-workspace-id',
+    } as never);
+    repo.updateClip.mockResolvedValue({ id: 'clip-id' } as never);
+    const imageStorage = createImageStorage();
+
+    const usecase = new UpdateClipUseCase(repo, imageStorage);
+    await usecase.execute('user-id', {
+      clipId: 'clip-id',
+      folderId: 'new-folder-id',
+    });
+
+    expect(repo.updateClip).toHaveBeenCalledWith('clip-id', {
+      type: 'TEXT',
+      title: 'old-text',
+      folderId: 'new-folder-id',
+      workspaceId: 'new-workspace-id',
+      textContent: 'old-text',
+      colorHex: null,
+      imageUrl: null,
+      clearTags: true,
+    });
+  });
+
   it('text와 file이 모두 없으면 기존 데이터를 유지한다', async () => {
     const repo = createRepository();
     repo.findClipByIdForUser.mockResolvedValue({

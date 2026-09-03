@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Request,
   UploadedFile,
@@ -17,6 +18,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBadRequestResponse,
   ApiBody,
   ApiConsumes,
   ApiNoContentResponse,
@@ -34,6 +36,7 @@ import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/appl
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { DeleteClipsDto } from './dtos/delete-clips.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
+import { ReplaceClipTagsDto } from './dtos/replace-clip-tags.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
 import type { MulterFile } from 'src/shared/types/multer-file.type';
 import {
@@ -42,6 +45,7 @@ import {
   DeleteClipsResponseDto,
   LikeClipResponseDto,
   RecentViewedClipListResponseDto,
+  ReplaceClipTagsResponseDto,
 } from './dtos/clip-response.dto';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
 import { DeleteAllClipsUseCase } from '../application/usecases/delete-all-clips.usecase';
@@ -55,6 +59,7 @@ import { LikeClipUseCase } from '../application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
+import { ReplaceClipTagsUseCase } from '../application/usecases/replace-clip-tags.usecase';
 import { ClipsError } from '../application/errors/clips.error';
 import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 
@@ -80,6 +85,7 @@ export class ClipsController {
     private readonly unlikeClipUseCase: UnlikeClipUseCase,
     private readonly recordClipViewUseCase: RecordClipViewUseCase,
     private readonly listRecentViewedClipsUseCase: ListRecentViewedClipsUseCase,
+    private readonly replaceClipTagsUseCase: ReplaceClipTagsUseCase,
   ) {}
 
   @Get()
@@ -163,6 +169,34 @@ export class ClipsController {
   })
   getRecentViewedClips(@Request() req: { user: AuthContext }) {
     return this.listRecentViewedClipsUseCase.execute(req.user.userId);
+  }
+
+  @Put(':clipId/tags')
+  @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 태그 전체 교체' })
+  @ApiParam({ name: 'clipId', description: '클립 ID' })
+  @ApiBody({ type: ReplaceClipTagsDto })
+  @ApiOkResponse({
+    description: '교체 후 클립 태그 목록을 반환합니다.',
+    type: ReplaceClipTagsResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: '태그명이 유효하지 않습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: '클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
+  replaceClipTags(
+    @Request() req: { user: AuthContext },
+    @Param('clipId') clipId: string,
+    @Body() dto: ReplaceClipTagsDto,
+  ) {
+    return this.replaceClipTagsUseCase.execute(req.user.userId, {
+      clipId,
+      tags: dto.tags,
+    });
   }
 
   @Post()

@@ -6,6 +6,7 @@ import {
   CreateFolderTagParams,
   FolderOrderParams,
   FoldersRepository,
+  UpdateFolderTagParams,
 } from '../domain/folders.repository';
 import { Folder } from '../domain/folder.types';
 import { FolderTag } from '../domain/folder-tag.types';
@@ -172,6 +173,7 @@ export class PrismaFoldersRepository implements FoldersRepository {
       data: {
         folderId: params.folderId,
         name: params.name,
+        backgroundColor: params.backgroundColor,
       },
     });
   }
@@ -183,14 +185,17 @@ export class PrismaFoldersRepository implements FoldersRepository {
     });
   }
 
-  async updateFolderTagName(tagId: string, name: string): Promise<FolderTag> {
+  async updateFolderTag(
+    tagId: string,
+    params: UpdateFolderTagParams,
+  ): Promise<FolderTag> {
     return (
       this.prisma.tag as unknown as {
         update(args: unknown): Promise<FolderTag>;
       }
     ).update({
       where: { id: tagId },
-      data: { name },
+      data: params,
     });
   }
 

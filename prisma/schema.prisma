@@ -192,6 +192,18 @@ enum ClipType {
   IMAGE
 }
 
+enum TagBackgroundColor {
+  GRAY
+  BROWN
+  ORANGE
+  YELLOW
+  GREEN
+  BLUE
+  PURPLE
+  PINK
+  RED
+}
+
 model Folder {
   id    String @id @default(cuid()) // 폴더 고유 ID
   name  String                     // 폴더 이름
@@ -244,8 +256,9 @@ model Clip {
 
 // 노션 데이터베이스 같은 태그 모델 (하나의 태그 생성이 이를 같은 폴더내의 다른 클립에도 적용이 가능)
 model Tag {
-  id   String @id @default(cuid()) // 태그 고유 ID
-  name String                      // 태그 이름
+  id              String             @id @default(cuid()) // 태그 고유 ID
+  name            String                             // 태그 이름
+  backgroundColor TagBackgroundColor @default(GRAY)  // 태그 배경색
 
   folderId String
   folder   Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)

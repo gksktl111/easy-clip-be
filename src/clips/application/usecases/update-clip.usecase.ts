@@ -56,6 +56,7 @@ export class UpdateClipUseCase {
       ...clipData,
       folderId: folder.id,
       workspaceId: folder.workspaceId,
+      ...(folder.id !== clip.folderId ? { clearTags: true } : {}),
     });
 
     await this.deletePreviousImageIfReplaced(

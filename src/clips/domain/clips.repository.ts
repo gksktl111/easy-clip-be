@@ -4,6 +4,7 @@ import {
   ClipType,
   PersonalFolder,
   RecentClipItem,
+  Tag,
 } from './clip.types';
 
 export const CLIPS_REPOSITORY = Symbol('CLIPS_REPOSITORY');
@@ -21,7 +22,15 @@ export type CreateClipParams = {
   imageUrl: string | null;
 };
 
-export type UpdateClipParams = CreateClipParams;
+export type UpdateClipParams = CreateClipParams & {
+  clearTags?: boolean;
+};
+
+export type ReplaceClipTagsParams = {
+  clipId: string;
+  folderId: string;
+  tagNames: string[];
+};
 
 export type FindClipsParams = {
   userId: string;
@@ -83,6 +92,7 @@ export interface ClipsRepository {
   deleteClipLike(userId: string, clipId: string): Promise<void>;
   createClip(params: CreateClipParams): Promise<Clip>;
   updateClip(clipId: string, params: UpdateClipParams): Promise<Clip>;
+  replaceClipTags(params: ReplaceClipTagsParams): Promise<Tag[]>;
   softDeleteClip(clipId: string): Promise<Clip>;
   softDeleteClips(clipIds: string[]): Promise<number>;
   softDeleteAllClipsInFolder(userId: string, folderId: string): Promise<number>;

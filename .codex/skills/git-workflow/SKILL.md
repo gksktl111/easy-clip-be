@@ -104,6 +104,13 @@ If the user says not to commit, do not stage or commit.
 
 ## Push and Merge
 
+- Before every push, reproduce the checks in `.github/workflows/ci.yml` locally. Point `DATABASE_URL` at an isolated local `test_db`; never run the CI migration against the data-bearing local application database or a production database.
+  1. Run `pnpm install --frozen-lockfile`.
+  2. Run `pnpm prisma generate` and `pnpm prisma migrate deploy`.
+  3. Run `pnpm test`, `pnpm lint`, and `pnpm build`.
+  4. Run `pnpm test:e2e` as well when the change affects an integration path, even though it is not currently a CI workflow step.
+- `pnpm lint` currently includes `--fix`. Inspect the resulting diff, include only in-scope fixes, and rerun the affected checks before pushing.
+- Do not push when a required local CI check fails or the isolated test database is unavailable. Report the failure and request direction if it cannot be resolved within the task scope.
 - Inspect the remote difference, commit range, and working-tree state before pushing.
 - Use `git push -u origin <branch>` for the first push.
 - Merge feature PRs into `dev` after review and CI pass.

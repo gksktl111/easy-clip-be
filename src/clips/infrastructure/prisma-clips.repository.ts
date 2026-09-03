@@ -7,6 +7,7 @@ import {
   CreateClipParams,
   FindClipsParams,
   FindRecentClipsParams,
+  ReplaceClipTagsParams,
   UpdateClipParams,
 } from '../domain/clips.repository';
 import {
@@ -14,7 +15,17 @@ import {
   ClipListItem,
   PersonalFolder,
   RecentClipItem,
+  Tag,
 } from '../domain/clip.types';
+
+type ClipTagDelegate = {
+  deleteMany(args: unknown): Promise<unknown>;
+  createMany(args: unknown): Promise<unknown>;
+};
+
+type TagDelegate = {
+  upsert(args: unknown): Promise<Tag>;
+};
 
 @Injectable()
 export class PrismaClipsRepository implements ClipsRepository {
@@ -78,6 +89,7 @@ export class PrismaClipsRepository implements ClipsRepository {
               select: {
                 id: true,
                 name: true,
+                backgroundColor: true,
               },
             },
           },
@@ -129,6 +141,7 @@ export class PrismaClipsRepository implements ClipsRepository {
                   select: {
                     id: true,
                     name: true,
+                    backgroundColor: true,
                   },
                 },
               },
@@ -205,6 +218,7 @@ export class PrismaClipsRepository implements ClipsRepository {
               select: {
                 id: true,
                 name: true,
+                backgroundColor: true,
               },
             },
           },
@@ -364,17 +378,80 @@ export class PrismaClipsRepository implements ClipsRepository {
   }
 
   async updateClip(clipId: string, params: UpdateClipParams): Promise<Clip> {
-    return this.prisma.clip.update({
-      where: { id: clipId },
-      data: {
-        type: params.type,
-        title: params.title,
-        folderId: params.folderId,
-        workspaceId: params.workspaceId,
-        textContent: params.textContent,
-        colorHex: params.colorHex,
-        imageUrl: params.imageUrl,
-      },
+    const data = {
+      type: params.type,
+      title: params.title,
+      folderId: params.folderId,
+      workspaceId: params.workspaceId,
+      textContent: params.textContent,
+      colorHex: params.colorHex,
+      imageUrl: params.imageUrl,
+    };
+
+    if (!params.clearTags) {
+      return this.prisma.clip.update({
+        where: { id: clipId },
+        data,
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedClip = await tx.clip.update({
+        where: { id: clipId },
+        data,
+      });
+      const clipTag = (tx as unknown as { clipTag: ClipTagDelegate }).clipTag;
+
+      await clipTag.deleteMany({ where: { clipId } });
+
+      return updatedClip;
+    });
+  }
+
+  async replaceClipTags(params: ReplaceClipTagsParams): Promise<Tag[]> {
+    const { clipId, folderId, tagNames } = params;
+
+    return this.prisma.$transaction(async (tx) => {
+      const transaction = tx as unknown as {
+        clipTag: ClipTagDelegate;
+        tag: TagDelegate;
+      };
+      const tagsByName = new Map<string, Tag>();
+
+      for (const tagName of tagNames) {
+        const tag = await transaction.tag.upsert({
+          where: {
+            folderId_name: {
+              folderId,
+              name: tagName,
+            },
+          },
+          create: {
+            folderId,
+            name: tagName,
+          },
+          update: {},
+          select: {
+            id: true,
+            name: true,
+            backgroundColor: true,
+          },
+        });
+
+        tagsByName.set(tagName, tag);
+      }
+
+      const tags = tagNames.map((tagName) => tagsByName.get(tagName)!);
+
+      await transaction.clipTag.deleteMany({ where: { clipId } });
+
+      if (tags.length > 0) {
+        await transaction.clipTag.createMany({
+          data: tags.map((tag) => ({ clipId, tagId: tag.id })),
+        });
+      }
+
+      return tags;
     });
   }
 
