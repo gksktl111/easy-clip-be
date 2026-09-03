@@ -1,3 +1,5 @@
+import type { TagBackgroundColor } from 'src/shared/application/tag-background-color.helper';
+
 export type ClipType = 'TEXT' | 'COLOR' | 'IMAGE';
 
 export type Clip = {
@@ -17,6 +19,7 @@ export type Clip = {
 export type Tag = {
   id: string;
   name: string;
+  backgroundColor: TagBackgroundColor;
 };
 
 export type ClipListItem = Clip & {

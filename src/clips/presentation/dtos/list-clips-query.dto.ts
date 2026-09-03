@@ -37,7 +37,8 @@ export class ListClipsQueryDto {
     example: 'TEXT',
   })
   @IsIn(['TEXT', 'COLOR', 'IMAGE', 'ALL'])
-  type: 'TEXT' | 'COLOR' | 'IMAGE' | 'ALL';
+  // 런타임 필수 속성
+  type!: 'TEXT' | 'COLOR' | 'IMAGE' | 'ALL';
 
   @ApiPropertyOptional({
     example: '회의',

@@ -15,6 +15,7 @@ import { LikeClipUseCase } from './application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from './application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from './application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from './application/usecases/list-recent-viewed-clips.usecase';
+import { ReplaceClipTagsUseCase } from './application/usecases/replace-clip-tags.usecase';
 import { CLIP_IMAGE_STORAGE_PORT } from 'src/shared/application/ports/clip-image-storage.port';
 import { R2ClipImageStorageService } from 'src/shared/infrastructure/r2-clip-image-storage.service';
 
@@ -35,6 +36,7 @@ import { R2ClipImageStorageService } from 'src/shared/infrastructure/r2-clip-ima
     UnlikeClipUseCase,
     RecordClipViewUseCase,
     ListRecentViewedClipsUseCase,
+    ReplaceClipTagsUseCase,
     JwtAccessGuard,
   ],
 })

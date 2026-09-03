@@ -17,6 +17,7 @@ export const createClipsRepositoryMock = (): jest.Mocked<ClipsRepository> => ({
   deleteClipLike: jest.fn(),
   createClip: jest.fn(),
   updateClip: jest.fn(),
+  replaceClipTags: jest.fn(),
   softDeleteClip: jest.fn(),
   softDeleteClips: jest.fn(),
   softDeleteAllClipsInFolder: jest.fn(),

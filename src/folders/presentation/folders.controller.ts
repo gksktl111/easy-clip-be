@@ -148,6 +148,7 @@ export class FoldersController {
     return this.createFolderTagUseCase.execute(req.user.userId, {
       folderId,
       name: dto.name,
+      backgroundColor: dto.backgroundColor,
     });
   }
 
@@ -218,6 +219,7 @@ export class FoldersController {
       folderId,
       tagId,
       name: dto.name,
+      backgroundColor: dto.backgroundColor,
     });
   }
 
