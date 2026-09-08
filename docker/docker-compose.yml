@@ -32,7 +32,7 @@ services:
     command:
       - sh
       - -c
-      - 'DATABASE_URL="postgresql://postgres:$${POSTGRES_PASSWORD}@postgres:5432/app_db?schema=public" node dist/src/main.js'
+      - 'export DATABASE_URL="postgresql://postgres:$${POSTGRES_PASSWORD}@postgres:5432/app_db?schema=public"; pnpm prisma migrate deploy && exec node dist/src/main.js'
     ports:
       - '127.0.0.1:${LOCAL_API_PORT:-3000}:3000'
     depends_on:
