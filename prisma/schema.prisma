@@ -116,6 +116,11 @@ model Workspace {
   name String
   ownerUserId String @unique
 
+  // Free 접근 선택은 구독 기간별로 고정한다. 삭제 후에도 선택 이력을 보존한다.
+  freeAccessibleFolderId String?
+  freeAccessInitialized Boolean @default(false)
+  freeAccessPeriodEnd DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

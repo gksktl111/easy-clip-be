@@ -15,6 +15,7 @@ export class DeleteFolderUseCase {
     const folder = await this.foldersRepository.findPersonalFolderById(
       userId,
       folderId,
+      { allowLocked: true },
     );
 
     if (!folder) {

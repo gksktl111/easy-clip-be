@@ -46,7 +46,7 @@ describe('DeleteClipUseCase', () => {
     const usecase = new DeleteClipUseCase(repo);
     const result = await usecase.execute('user-id', 'clip-id');
 
-    expect(repo.softDeleteClip).toHaveBeenCalledWith('clip-id');
+    expect(repo.softDeleteClip).toHaveBeenCalledWith('user-id', 'clip-id');
     expect(result.id).toBe('clip-id');
   });
 });

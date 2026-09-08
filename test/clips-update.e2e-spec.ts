@@ -110,8 +110,8 @@ describe('Clip content updates (PostgreSQL integration)', () => {
             name: 'Clip test',
             folders: {
               create: [
-                { id: folderId, name: 'Source' },
-                { id: otherFolderId, name: 'Other' },
+                { id: folderId, name: 'Source', order: 0 },
+                { id: otherFolderId, name: 'Other', order: 1 },
               ],
             },
           },

@@ -2,6 +2,7 @@ import {
   ClipSearchTarget,
   ClipsRepository,
 } from '../../domain/clips.repository';
+import { ApplicationError } from 'src/shared/application/application.error';
 import { ClipType } from '../../domain/clip.types';
 import { ClipsError } from '../errors/clips.error';
 
@@ -62,7 +63,13 @@ export const validateClipCursor = async ({
     return;
   }
 
-  const cursorClip = await clipsRepository.findClipByIdForUser(userId, cursor);
+  const cursorClip = await clipsRepository
+    .findClipByIdForUser(userId, cursor)
+    .catch((error: unknown) => {
+      if (error instanceof ApplicationError && error.code === 'FORBIDDEN')
+        throwCursorNotFound();
+      throw error;
+    });
 
   if (!cursorClip) {
     throwCursorNotFound();

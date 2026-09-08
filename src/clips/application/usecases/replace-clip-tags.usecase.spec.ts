@@ -33,7 +33,7 @@ describe('ReplaceClipTagsUseCase', () => {
 
     expect(repo.replaceClipTags).toHaveBeenCalledWith({
       clipId: 'clip-id',
-      folderId: 'folder-id',
+      userId: 'user-id',
       tagNames: ['frontend', 'backend'],
     });
     expect(result).toEqual({
@@ -57,7 +57,7 @@ describe('ReplaceClipTagsUseCase', () => {
 
     expect(repo.replaceClipTags).toHaveBeenCalledWith({
       clipId: 'clip-id',
-      folderId: 'folder-id',
+      userId: 'user-id',
       tagNames: [],
     });
     expect(result).toEqual({ tags: [] });
@@ -79,7 +79,7 @@ describe('ReplaceClipTagsUseCase', () => {
 
     expect(repo.replaceClipTags).toHaveBeenCalledWith({
       clipId: 'clip-id',
-      folderId: 'folder-id',
+      userId: 'user-id',
       tagNames: ['Backend', 'backend '],
     });
   });
@@ -100,7 +100,7 @@ describe('ReplaceClipTagsUseCase', () => {
 
     expect(repo.replaceClipTags).toHaveBeenCalledWith({
       clipId: 'clip-id',
-      folderId: 'folder-id',
+      userId: 'user-id',
       tagNames: [tagName],
     });
   });

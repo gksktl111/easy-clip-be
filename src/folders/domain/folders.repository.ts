@@ -34,6 +34,7 @@ export interface FoldersRepository {
   findPersonalFolderById(
     userId: string,
     folderId: string,
+    options?: { allowLocked?: boolean },
   ): Promise<Folder | null>;
   findFolderById(folderId: string): Promise<Folder | null>;
   findFolderByIdInWorkspace(

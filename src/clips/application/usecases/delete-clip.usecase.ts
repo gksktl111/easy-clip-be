@@ -17,6 +17,6 @@ export class DeleteClipUseCase {
       throw new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.');
     }
 
-    return this.clipsRepository.softDeleteClip(clip.id);
+    return this.clipsRepository.softDeleteClip(userId, clip.id);
   }
 }

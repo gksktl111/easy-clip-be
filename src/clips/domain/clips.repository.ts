@@ -33,8 +33,8 @@ export type UpdatedClip = {
 };
 
 export type ReplaceClipTagsParams = {
+  userId: string;
   clipId: string;
-  folderId: string;
   tagNames: string[];
 };
 
@@ -96,15 +96,16 @@ export interface ClipsRepository {
   isClipLikedByUser(userId: string, clipId: string): Promise<boolean>;
   createClipLike(userId: string, clipId: string): Promise<void>;
   deleteClipLike(userId: string, clipId: string): Promise<void>;
-  createClip(params: CreateClipParams): Promise<Clip>;
+  createClip(userId: string, params: CreateClipParams): Promise<Clip>;
   updateClip(
     userId: string,
     clipId: string,
     params: UpdateClipParams,
   ): Promise<UpdatedClip | null>;
+  isCreatedImageReferenced(userId: string, imageUrl: string): Promise<boolean>;
   isClipImageReferenced(clipId: string, imageUrl: string): Promise<boolean>;
   replaceClipTags(params: ReplaceClipTagsParams): Promise<Tag[]>;
-  softDeleteClip(clipId: string): Promise<Clip>;
-  softDeleteClips(clipIds: string[]): Promise<number>;
+  softDeleteClip(userId: string, clipId: string): Promise<Clip>;
+  softDeleteClips(userId: string, clipIds: string[]): Promise<number>;
   softDeleteAllClipsInFolder(userId: string, folderId: string): Promise<number>;
 }
