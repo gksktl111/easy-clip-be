@@ -18,7 +18,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiBody,
   ApiConsumes,
   ApiNoContentResponse,
@@ -63,6 +65,10 @@ import { ReplaceClipTagsUseCase } from '../application/usecases/replace-clip-tag
 import { ClipsError } from '../application/errors/clips.error';
 import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 
+@ApiForbiddenResponse({
+  description: 'Free 접근 폴더 이외의 콘텐츠 접근 또는 제한된 폴더 작업입니다.',
+  type: ErrorResponseDto,
+})
 @Controller('clips')
 @UseFilters(ApplicationExceptionFilter)
 @ApiTags('Clips')
@@ -203,6 +209,10 @@ export class ClipsController {
   @UseGuards(JwtAccessGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: '클립 생성' })
+  @ApiConflictResponse({
+    description: '유효 플랜의 폴더별 클립 한도를 초과했습니다.',
+    type: ErrorResponseDto,
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateClipDto })
   @ApiOkResponse({

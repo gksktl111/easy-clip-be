@@ -12,6 +12,7 @@ import {
 import {
   ApiConflictResponse,
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -35,6 +36,10 @@ import {
   TrashRestoreResponseDto,
 } from './dtos/trash-response.dto';
 
+@ApiForbiddenResponse({
+  description: 'Free 접근 폴더 이외의 콘텐츠 접근 또는 제한된 폴더 작업입니다.',
+  type: ErrorResponseDto,
+})
 @Controller('trash')
 @UseFilters(ApplicationExceptionFilter)
 @ApiTags('Trash')
@@ -88,7 +93,8 @@ export class TrashController {
     type: ErrorResponseDto,
   })
   @ApiConflictResponse({
-    description: '삭제된 폴더에 속한 클립은 단독으로 복구할 수 없습니다.',
+    description:
+      '부모 폴더 복구가 필요하거나 유효 플랜의 클립 한도를 초과했습니다.',
     type: ErrorResponseDto,
   })
   restoreTrashItems(

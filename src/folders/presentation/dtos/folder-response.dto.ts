@@ -1,6 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class FolderResponseDto {
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Free에서 접근이 제한된 폴더인지 여부',
+  })
+  isLocked?: boolean;
+
   @ApiProperty({ example: 'cmfolder123' })
   id: string;
 

@@ -1,3 +1,13 @@
+import { assertClipIncrease } from 'src/shared/application/clip-limit';
+import { lockClipQuota } from 'src/shared/infrastructure/prisma-clip-limit';
+import {
+  assertFolderAccess,
+  FolderAccess,
+  lockWorkspaceAccess,
+  resolveFolderAccess,
+  withClipAccess,
+} from 'src/shared/infrastructure/prisma-folder-access';
+import { ApplicationError } from 'src/shared/application/application.error';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -19,15 +29,6 @@ import {
   Tag,
 } from '../domain/clip.types';
 
-type ClipTagDelegate = {
-  deleteMany(args: unknown): Promise<unknown>;
-  createMany(args: unknown): Promise<unknown>;
-};
-
-type TagDelegate = {
-  upsert(args: unknown): Promise<Tag>;
-};
-
 @Injectable()
 export class PrismaClipsRepository implements ClipsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -36,18 +37,17 @@ export class PrismaClipsRepository implements ClipsRepository {
     userId: string,
     folderId: string,
   ): Promise<PersonalFolder | null> {
-    return this.prisma.folder.findFirst({
-      where: {
-        id: folderId,
-        deletedAt: null,
-        workspace: {
-          ownerUserId: userId,
+    return this.withReadAccess(userId, null, async (tx, access) => {
+      const folder = await tx.folder.findFirst({
+        where: {
+          id: folderId,
+          workspaceId: access.workspaceId,
+          deletedAt: null,
         },
-      },
-      select: {
-        id: true,
-        workspaceId: true,
-      },
+        select: { id: true, workspaceId: true },
+      });
+      if (folder) assertFolderAccess(access, folder.id);
+      return folder;
     });
   }
 
@@ -55,219 +55,165 @@ export class PrismaClipsRepository implements ClipsRepository {
     userId: string,
     clipId: string,
   ): Promise<Clip | null> {
-    return this.prisma.clip.findFirst({
-      where: {
-        id: clipId,
-        deletedAt: null,
-        folder: {
+    return this.withReadAccess(userId, null, async (tx, access) => {
+      const clip = await tx.clip.findFirst({
+        where: {
+          id: clipId,
+          workspaceId: access.workspaceId,
           deletedAt: null,
+          folder: { deletedAt: null },
         },
-        workspace: {
-          ownerUserId: userId,
-        },
-      },
+      });
+      if (clip) assertFolderAccess(access, clip.folderId);
+      return clip;
     });
   }
 
   async findClips(params: FindClipsParams): Promise<ClipListItem[]> {
-    const { userId, cursor, limit } = params;
-    const where = this.buildWhere(params);
-
-    const clips = await this.prisma.clip.findMany({
-      where,
-      ...(cursor
-        ? {
-            cursor: { id: cursor },
-            skip: 1,
-          }
-        : {}),
-      take: limit + 1,
-      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-      include: {
-        tags: {
-          select: {
-            tag: {
-              select: {
-                id: true,
-                name: true,
-                backgroundColor: true,
-              },
-            },
+    return this.withReadAccess(params.userId, [], async (tx, access) => {
+      if (params.folderId) {
+        const folder = await tx.folder.findFirst({
+          where: {
+            id: params.folderId,
+            workspaceId: access.workspaceId,
+            deletedAt: null,
           },
-        },
-        likes: {
-          where: { userId },
+        });
+        if (!folder)
+          throw new ApplicationError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
+        assertFolderAccess(access, folder.id);
+      }
+      const searchTarget = await this.resolveSearchTarget(tx, access, params);
+      const where = this.buildWhere({ ...params, searchTarget }, access);
+      if (
+        params.cursor &&
+        !(await tx.clip.findFirst({
+          where: { ...where, id: params.cursor },
           select: { id: true },
-        },
-      },
+        }))
+      ) {
+        throw new ApplicationError(
+          'NOT_FOUND',
+          '커서에 해당하는 클립을 찾을 수 없습니다.',
+        );
+      }
+      const clips = await tx.clip.findMany({
+        where,
+        ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+        take: params.limit + 1,
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        include: this.clipIncludes(params.userId),
+      });
+      return clips.map(({ tags, likes, ...clip }) => ({
+        ...clip,
+        tags: tags.map((tag) => tag.tag),
+        likeByMe: likes.length > 0,
+      }));
     });
-
-    return clips.map(({ tags, likes, ...clip }) => ({
-      ...clip,
-      tags: tags.map((tag) => tag.tag),
-      likeByMe: likes.length > 0,
-    }));
   }
 
   async findRecentClips(
     params: FindRecentClipsParams,
   ): Promise<RecentClipItem[]> {
-    const { userId, cursor, limit } = params;
-    const clipWhere = this.buildWhere({
-      userId,
-      type: params.type,
-      q: params.q,
-      searchTarget: params.searchTarget,
+    return this.withReadAccess(params.userId, [], async (tx, access) => {
+      const searchTarget = await this.resolveSearchTarget(
+        tx,
+        access,
+        params,
+        true,
+      );
+      const where = {
+        userId: params.userId,
+        clip: this.buildWhere({ ...params, searchTarget }, access),
+      };
+      if (
+        params.cursor &&
+        !(await tx.clipView.findFirst({
+          where: { ...where, id: params.cursor },
+          select: { id: true },
+        }))
+      ) {
+        throw new ApplicationError(
+          'NOT_FOUND',
+          '커서에 해당하는 클립을 찾을 수 없습니다.',
+        );
+      }
+      const views = await tx.clipView.findMany({
+        where,
+        ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+        take: params.limit + 1,
+        orderBy: [{ viewedAt: 'desc' }, { id: 'desc' }],
+        include: { clip: { include: this.clipIncludes(params.userId) } },
+      });
+      return views.map(({ id, clip: { tags, likes, ...clip } }) => ({
+        viewId: id,
+        ...clip,
+        tags: tags.map((tag) => tag.tag),
+        likeByMe: likes.length > 0,
+      }));
     });
-
-    const views = await this.prisma.clipView.findMany({
-      where: {
-        userId,
-        clip: clipWhere,
-      },
-      ...(cursor
-        ? {
-            cursor: { id: cursor },
-            skip: 1,
-          }
-        : {}),
-      take: limit + 1,
-      orderBy: [{ viewedAt: 'desc' }, { id: 'desc' }],
-      include: {
-        clip: {
-          include: {
-            tags: {
-              select: {
-                tag: {
-                  select: {
-                    id: true,
-                    name: true,
-                    backgroundColor: true,
-                  },
-                },
-              },
-            },
-            likes: {
-              where: { userId },
-              select: { id: true },
-            },
-          },
-        },
-      },
-    });
-
-    return views.map(({ id, clip }) => ({
-      viewId: id,
-      ...clip,
-      tags: clip.tags.map((tag) => tag.tag),
-      likeByMe: clip.likes.length > 0,
-    }));
   }
 
   async findRecentViewedClipIds(
     userId: string,
     limit: number,
   ): Promise<string[]> {
-    const views = await this.prisma.clipView.findMany({
-      where: {
-        userId,
-        clip: {
-          deletedAt: null,
-          folder: {
-            deletedAt: null,
-          },
-          workspace: {
-            ownerUserId: userId,
-          },
-        },
-      },
-      orderBy: [{ viewedAt: 'desc' }, { clipId: 'desc' }],
-      take: limit,
-      select: {
-        clipId: true,
-      },
+    return this.withReadAccess(userId, [], async (tx, access) => {
+      const views = await tx.clipView.findMany({
+        where: { userId, clip: this.buildWhere({ userId }, access) },
+        orderBy: [{ viewedAt: 'desc' }, { clipId: 'desc' }],
+        take: limit,
+        select: { clipId: true },
+      });
+      return views.map((view) => view.clipId);
     });
-
-    return views.map((view) => view.clipId);
   }
 
   async findClipsByIdsForUser(
     userId: string,
     clipIds: string[],
   ): Promise<ClipListItem[]> {
-    if (clipIds.length === 0) {
-      return [];
-    }
-
-    const clips = await this.prisma.clip.findMany({
-      where: {
-        id: {
-          in: clipIds,
-        },
-        deletedAt: null,
-        folder: {
-          deletedAt: null,
-        },
-        workspace: {
-          ownerUserId: userId,
-        },
-      },
-      include: {
-        tags: {
-          select: {
-            tag: {
-              select: {
-                id: true,
-                name: true,
-                backgroundColor: true,
-              },
-            },
-          },
-        },
-        likes: {
-          where: { userId },
-          select: { id: true },
-        },
-      },
+    if (!clipIds.length) return [];
+    return this.withReadAccess(userId, [], async (tx, access) => {
+      const clips = await tx.clip.findMany({
+        where: { ...this.buildWhere({ userId }, access), id: { in: clipIds } },
+        include: this.clipIncludes(userId),
+      });
+      return clips.map(({ tags, likes, ...clip }) => ({
+        ...clip,
+        tags: tags.map((tag) => tag.tag),
+        likeByMe: likes.length > 0,
+      }));
     });
-
-    return clips.map(({ tags, likes, ...clip }) => ({
-      ...clip,
-      tags: tags.map((tag) => tag.tag),
-      likeByMe: likes.length > 0,
-    }));
   }
 
   async hasTitleMatches(
     params: Omit<FindClipsParams, 'cursor' | 'limit'> & { q: string },
   ): Promise<boolean> {
-    const where = this.buildWhere({ ...params, searchTarget: 'title' });
-    const match = await this.prisma.clip.findFirst({
-      where,
-      select: { id: true },
-    });
-
-    return Boolean(match);
+    return this.withReadAccess(params.userId, false, async (tx, access) =>
+      Boolean(
+        await tx.clip.findFirst({
+          where: this.buildWhere({ ...params, searchTarget: 'title' }, access),
+          select: { id: true },
+        }),
+      ),
+    );
   }
 
   async hasRecentTitleMatches(
     params: Omit<FindRecentClipsParams, 'cursor' | 'limit'> & { q: string },
   ): Promise<boolean> {
-    const clipWhere = this.buildWhere({
-      userId: params.userId,
-      type: params.type,
-      q: params.q,
-      searchTarget: 'title',
-    });
-    const match = await this.prisma.clipView.findFirst({
-      where: {
-        userId: params.userId,
-        clip: clipWhere,
-      },
-      select: { id: true },
-    });
-
-    return Boolean(match);
+    return this.withReadAccess(params.userId, false, async (tx, access) =>
+      Boolean(
+        await tx.clipView.findFirst({
+          where: {
+            userId: params.userId,
+            clip: this.buildWhere({ ...params, searchTarget: 'title' }, access),
+          },
+          select: { id: true },
+        }),
+      ),
+    );
   }
 
   async isClipMatchingQuery(
@@ -276,16 +222,14 @@ export class PrismaClipsRepository implements ClipsRepository {
       searchTarget: ClipSearchTarget;
     },
   ): Promise<boolean> {
-    const where = this.buildWhere(params);
-    const match = await this.prisma.clip.findFirst({
-      where: {
-        ...where,
-        id: params.clipId,
-      },
-      select: { id: true },
-    });
-
-    return Boolean(match);
+    return this.withReadAccess(params.userId, false, async (tx, access) =>
+      Boolean(
+        await tx.clip.findFirst({
+          where: { ...this.buildWhere(params, access), id: params.clipId },
+          select: { id: true },
+        }),
+      ),
+    );
   }
 
   async isRecentCursorMatchingQuery(
@@ -294,87 +238,113 @@ export class PrismaClipsRepository implements ClipsRepository {
       searchTarget: ClipSearchTarget;
     },
   ): Promise<boolean> {
-    const clipWhere = this.buildWhere({
-      userId: params.userId,
-      type: params.type,
-      q: params.q,
-      searchTarget: params.searchTarget,
-    });
-    const match = await this.prisma.clipView.findFirst({
-      where: {
-        id: params.viewId,
-        userId: params.userId,
-        clip: clipWhere,
-      },
-      select: { id: true },
-    });
-
-    return Boolean(match);
+    return this.withReadAccess(params.userId, false, async (tx, access) =>
+      Boolean(
+        await tx.clipView.findFirst({
+          where: {
+            userId: params.userId,
+            id: params.viewId,
+            clip: this.buildWhere(params, access),
+          },
+          select: { id: true },
+        }),
+      ),
+    );
   }
 
   async createClipView(userId: string, clipId: string): Promise<void> {
-    await this.prisma.clipView.upsert({
-      where: {
-        userId_clipId: {
-          userId,
-          clipId,
-        },
+    await withClipAccess(
+      this.prisma,
+      clipId,
+      async (tx) => {
+        await tx.clipView.upsert({
+          where: { userId_clipId: { userId, clipId } },
+          create: { userId, clipId, viewedAt: new Date() },
+          update: { viewedAt: new Date() },
+        });
       },
-      create: {
-        userId,
-        clipId,
-        viewedAt: new Date(),
-      },
-      update: {
-        viewedAt: new Date(),
-      },
-    });
+      userId,
+    );
   }
 
   async isClipLikedByUser(userId: string, clipId: string): Promise<boolean> {
-    const like = await this.prisma.clipLike.findUnique({
-      where: {
-        userId_clipId: {
-          userId,
-          clipId,
-        },
-      },
-      select: { id: true },
-    });
-
-    return Boolean(like);
+    return this.withReadAccess(userId, false, async (tx, access) =>
+      Boolean(
+        await tx.clipLike.findFirst({
+          where: { userId, clipId, clip: this.buildWhere({ userId }, access) },
+          select: { id: true },
+        }),
+      ),
+    );
   }
 
   async createClipLike(userId: string, clipId: string): Promise<void> {
-    await this.prisma.clipLike.createMany({
-      data: {
-        userId,
-        clipId,
+    await withClipAccess(
+      this.prisma,
+      clipId,
+      async (tx) => {
+        await tx.clipLike.createMany({
+          data: { userId, clipId },
+          skipDuplicates: true,
+        });
       },
-      skipDuplicates: true,
-    });
+      userId,
+    );
   }
 
   async deleteClipLike(userId: string, clipId: string): Promise<void> {
-    await this.prisma.clipLike.deleteMany({
-      where: {
-        userId,
-        clipId,
+    await withClipAccess(
+      this.prisma,
+      clipId,
+      async (tx) => {
+        await tx.clipLike.deleteMany({ where: { userId, clipId } });
       },
+      userId,
+    );
+  }
+
+  async createClip(userId: string, params: CreateClipParams): Promise<Clip> {
+    return this.prisma.$transaction(async (tx) => {
+      const workspaceId = await lockClipQuota(tx, userId);
+      await tx.$queryRaw`SELECT "id" FROM "Folder" WHERE "id" = ${params.folderId} FOR UPDATE`;
+      const folder = await tx.folder.findFirst({
+        where: { id: params.folderId, workspaceId, deletedAt: null },
+      });
+      if (!folder || params.workspaceId !== workspaceId)
+        throw new ApplicationError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
+      const quota = await resolveFolderAccess(tx, workspaceId);
+      assertFolderAccess(quota, folder.id);
+      const count = await tx.clip.count({
+        where: { folderId: folder.id, deletedAt: null },
+      });
+      assertClipIncrease(quota, folder.id, count, 1);
+      return tx.clip.create({
+        data: {
+          type: params.type,
+          title: params.title,
+          folderId: folder.id,
+          workspaceId,
+          textContent: params.textContent,
+          colorHex: params.colorHex,
+          imageUrl: params.imageUrl,
+        },
+      });
     });
   }
 
-  async createClip(params: CreateClipParams): Promise<Clip> {
-    return this.prisma.clip.create({
-      data: {
-        type: params.type,
-        title: params.title,
-        folderId: params.folderId,
-        workspaceId: params.workspaceId,
-        textContent: params.textContent,
-        colorHex: params.colorHex,
-        imageUrl: params.imageUrl,
-      },
+  async isCreatedImageReferenced(
+    userId: string,
+    imageUrl: string,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      // 신규 클립 INSERT는 아직 보이지 않을 수 있으므로 생성과 같은 구독 잠금을 기다린다.
+      const workspaceId = await lockClipQuota(tx, userId);
+      return (
+        (await tx.clip.findFirst({
+          where: { workspaceId, imageUrl },
+          select: { id: true },
+        })) !== null
+      );
     });
   }
 
@@ -383,30 +353,25 @@ export class PrismaClipsRepository implements ClipsRepository {
     clipId: string,
     params: UpdateClipParams,
   ): Promise<UpdatedClip | null> {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "Clip" WHERE "id" = ${clipId} FOR UPDATE`;
-      const previous = await tx.clip.findFirst({
-        where: {
-          id: clipId,
-          deletedAt: null,
-          folder: { deletedAt: null },
-          workspace: { ownerUserId: userId },
-        },
-      });
-      if (!previous) return null;
-      const clip = await tx.clip.update({
-        where: { id: clipId },
-        // 소속과 태그는 변경하지 않는다. 런타임 입력도 명시한 콘텐츠 필드만 저장한다.
-        data: {
-          type: params.type,
-          title: params.title,
-          textContent: params.textContent,
-          colorHex: params.colorHex,
-          imageUrl: params.imageUrl,
-        },
-      });
-      return { clip, previousImageUrl: previous.imageUrl };
-    });
+    return withClipAccess(
+      this.prisma,
+      clipId,
+      async (tx, _access, previous) => {
+        const clip = await tx.clip.update({
+          where: { id: clipId },
+          // 소속과 태그는 변경하지 않는다. 런타임 입력도 명시한 콘텐츠 필드만 저장한다.
+          data: {
+            type: params.type,
+            title: params.title,
+            textContent: params.textContent,
+            colorHex: params.colorHex,
+            imageUrl: params.imageUrl,
+          },
+        });
+        return { clip, previousImageUrl: previous.imageUrl };
+      },
+      userId,
+    );
   }
 
   async isClipImageReferenced(
@@ -425,124 +390,184 @@ export class PrismaClipsRepository implements ClipsRepository {
   }
 
   async replaceClipTags(params: ReplaceClipTagsParams): Promise<Tag[]> {
-    const { clipId, folderId, tagNames } = params;
-
-    return this.prisma.$transaction(async (tx) => {
-      const transaction = tx as unknown as {
-        clipTag: ClipTagDelegate;
-        tag: TagDelegate;
-      };
-      const tagsByName = new Map<string, Tag>();
-
-      for (const tagName of tagNames) {
-        const tag = await transaction.tag.upsert({
-          where: {
-            folderId_name: {
-              folderId,
-              name: tagName,
-            },
-          },
-          create: {
-            folderId,
-            name: tagName,
-          },
-          update: {},
-          select: {
-            id: true,
-            name: true,
-            backgroundColor: true,
-          },
-        });
-
-        tagsByName.set(tagName, tag);
-      }
-
-      const tags = tagNames.map((tagName) => tagsByName.get(tagName)!);
-
-      await transaction.clipTag.deleteMany({ where: { clipId } });
-
-      if (tags.length > 0) {
-        await transaction.clipTag.createMany({
-          data: tags.map((tag) => ({ clipId, tagId: tag.id })),
-        });
-      }
-
-      return tags;
-    });
-  }
-
-  async softDeleteClip(clipId: string): Promise<Clip> {
-    return this.prisma.clip.update({
-      where: { id: clipId },
-      data: { deletedAt: new Date() },
-    });
-  }
-
-  async softDeleteClips(clipIds: string[]): Promise<number> {
-    const result = await this.prisma.clip.updateMany({
-      where: {
-        id: {
-          in: clipIds,
-        },
-        deletedAt: null,
-        folder: {
-          deletedAt: null,
-        },
+    return withClipAccess(
+      this.prisma,
+      params.clipId,
+      async (tx, _access, clip) => {
+        const tags: Tag[] = [];
+        for (const name of params.tagNames) {
+          tags.push(
+            await tx.tag.upsert({
+              where: { folderId_name: { folderId: clip.folderId, name } },
+              create: { folderId: clip.folderId, name },
+              update: {},
+              select: { id: true, name: true, backgroundColor: true },
+            }),
+          );
+        }
+        await tx.clipTag.deleteMany({ where: { clipId: clip.id } });
+        if (tags.length)
+          await tx.clipTag.createMany({
+            data: tags.map((tag) => ({ clipId: clip.id, tagId: tag.id })),
+          });
+        return tags;
       },
-      data: { deletedAt: new Date() },
-    });
+      params.userId,
+    );
+  }
 
-    return result.count;
+  async softDeleteClip(userId: string, clipId: string): Promise<Clip> {
+    return withClipAccess(
+      this.prisma,
+      clipId,
+      (tx) =>
+        tx.clip.update({
+          where: { id: clipId },
+          data: { deletedAt: new Date() },
+        }),
+      userId,
+    );
+  }
+
+  async softDeleteClips(userId: string, clipIds: string[]): Promise<number> {
+    if (!clipIds.length) return 0;
+    return this.prisma.$transaction(async (tx) => {
+      const workspaceId = await lockClipQuota(tx, userId);
+      const ids = [...new Set(clipIds)];
+      const candidates = await tx.clip.findMany({
+        where: { id: { in: ids }, workspaceId },
+        select: { id: true, folderId: true },
+      });
+      if (candidates.length !== ids.length)
+        throw new ApplicationError('NOT_FOUND', '클립을 찾을 수 없습니다.');
+      const folderIds = [...new Set(candidates.map((clip) => clip.folderId))];
+      await tx.$queryRaw`SELECT "id" FROM "Folder" WHERE "id" IN (${Prisma.join(folderIds)}) ORDER BY "id" FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "Clip" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR UPDATE`;
+      const clips = await tx.clip.findMany({
+        where: {
+          id: { in: ids },
+          workspaceId,
+          deletedAt: null,
+          folder: { deletedAt: null },
+        },
+      });
+      if (clips.length !== ids.length)
+        throw new ApplicationError('NOT_FOUND', '클립을 찾을 수 없습니다.');
+      const access = await resolveFolderAccess(tx, workspaceId);
+      for (const clip of clips) assertFolderAccess(access, clip.folderId);
+      const result = await tx.clip.updateMany({
+        where: { id: { in: ids }, workspaceId },
+        data: { deletedAt: new Date() },
+      });
+      return result.count;
+    });
   }
 
   async softDeleteAllClipsInFolder(
     userId: string,
     folderId: string,
   ): Promise<number> {
-    const result = await this.prisma.clip.updateMany({
-      where: {
-        folderId,
-        deletedAt: null,
-        folder: {
-          deletedAt: null,
-          workspace: {
-            ownerUserId: userId,
-          },
-        },
-        workspace: {
-          ownerUserId: userId,
+    return this.prisma.$transaction(async (tx) => {
+      const workspaceId = await lockClipQuota(tx, userId);
+      const candidate = await tx.folder.findFirst({
+        where: { id: folderId, workspaceId },
+        select: { id: true },
+      });
+      if (!candidate)
+        throw new ApplicationError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
+      await tx.$queryRaw`SELECT "id" FROM "Folder" WHERE "id" = ${folderId} FOR UPDATE`;
+      const folder = await tx.folder.findFirst({
+        where: { id: folderId, workspaceId, deletedAt: null },
+      });
+      if (!folder)
+        throw new ApplicationError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
+      const access = await resolveFolderAccess(tx, workspaceId);
+      assertFolderAccess(access, folderId);
+      const candidates = await tx.clip.findMany({
+        where: { folderId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!candidates.length) return 0;
+      await tx.$queryRaw`SELECT "id" FROM "Clip" WHERE "id" IN (${Prisma.join(candidates.map((clip) => clip.id))}) ORDER BY "id" FOR UPDATE`;
+      const result = await tx.clip.updateMany({
+        where: { folderId, workspaceId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+      return result.count;
+    });
+  }
+
+  private async withReadAccess<T>(
+    userId: string,
+    missing: T,
+    read: (tx: Prisma.TransactionClient, access: FolderAccess) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(async (tx) => {
+      const workspace = await tx.workspace.findUnique({
+        where: { ownerUserId: userId },
+        select: { id: true },
+      });
+      if (!workspace) return missing;
+      const access = await lockWorkspaceAccess(tx, workspace.id);
+      return read(tx, access);
+    });
+  }
+
+  private clipIncludes(userId: string) {
+    return {
+      tags: {
+        select: {
+          tag: { select: { id: true, name: true, backgroundColor: true } },
         },
       },
-      data: { deletedAt: new Date() },
-    });
+      likes: { where: { userId }, select: { id: true } },
+    } as const;
+  }
 
-    return result.count;
+  private async resolveSearchTarget(
+    tx: Prisma.TransactionClient,
+    access: FolderAccess,
+    params: Omit<FindClipsParams, 'cursor' | 'limit'>,
+    recent = false,
+  ): Promise<ClipSearchTarget | undefined> {
+    if (!params.q) return undefined;
+    const where = this.buildWhere({ ...params, searchTarget: 'title' }, access);
+    const match = recent
+      ? await tx.clipView.findFirst({
+          where: { userId: params.userId, clip: where },
+          select: { id: true },
+        })
+      : await tx.clip.findFirst({ where, select: { id: true } });
+    return match ? 'title' : 'tag';
   }
 
   private buildWhere(
     params: Omit<FindClipsParams, 'cursor' | 'limit'>,
+    access: FolderAccess,
   ): Prisma.ClipWhereInput {
     const { userId, folderId, workspaceId, type, q, searchTarget, likedOnly } =
       params;
 
     const where: Prisma.ClipWhereInput = {
       deletedAt: null,
-      ...(folderId
-        ? {
-            folderId,
-            ...(workspaceId ? { workspaceId } : {}),
-            folder: {
-              deletedAt: null,
-            },
-          }
-        : {
-            workspace: {
-              ownerUserId: userId,
-            },
-            folder: {
-              deletedAt: null,
-            },
-          }),
+      workspaceId: access.workspaceId,
+      workspace: { ownerUserId: userId },
+      folder: { deletedAt: null },
+      AND: [
+        ...(folderId ? [{ folderId }] : []),
+        ...(workspaceId ? [{ workspaceId }] : []),
+        ...(access.effectivePlan === 'FREE'
+          ? [
+              {
+                folderId: {
+                  in: access.accessibleFolderId
+                    ? [access.accessibleFolderId]
+                    : [],
+                },
+              },
+            ]
+          : []),
+      ],
       ...(type ? { type } : {}),
       ...(q && searchTarget === 'title'
         ? {

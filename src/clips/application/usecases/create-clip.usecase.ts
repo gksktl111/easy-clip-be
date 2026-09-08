@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
 import type { Clip } from '../../domain/clip.types';
 import type { ClipsRepository } from '../../domain/clips.repository';
@@ -15,6 +15,7 @@ import type { ClipImageStoragePort } from 'src/shared/application/ports/clip-ima
 
 @Injectable()
 export class CreateClipUseCase {
+  private readonly logger = new Logger(CreateClipUseCase.name);
   constructor(
     @Inject(CLIPS_REPOSITORY)
     private readonly clipsRepository: ClipsRepository,
@@ -40,11 +41,31 @@ export class CreateClipUseCase {
       ? await this.uploadImageAndResolveClipData(userId, file)
       : resolveClipData(input.text);
 
-    return this.clipsRepository.createClip({
-      ...clipData,
-      folderId: folder.id,
-      workspaceId: folder.workspaceId,
-    });
+    try {
+      return await this.clipsRepository.createClip(userId, {
+        ...clipData,
+        folderId: folder.id,
+        workspaceId: folder.workspaceId,
+      });
+    } catch (error) {
+      if (file && clipData.imageUrl) {
+        try {
+          if (
+            !(await this.clipsRepository.isCreatedImageReferenced(
+              userId,
+              clipData.imageUrl,
+            ))
+          ) {
+            await this.clipImageStoragePort.deleteImage(clipData.imageUrl);
+          }
+        } catch {
+          this.logger.warn(
+            `생성 실패 이미지 정리를 완료하지 못했습니다. userId=${userId} imageUrl=${clipData.imageUrl}`,
+          );
+        }
+      }
+      throw error;
+    }
   }
 
   private async uploadImageAndResolveClipData(

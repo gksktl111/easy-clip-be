@@ -37,7 +37,7 @@ export class ReplaceClipTagsUseCase {
 
     const tags = await this.clipsRepository.replaceClipTags({
       clipId: clip.id,
-      folderId: clip.folderId,
+      userId,
       tagNames,
     });
 

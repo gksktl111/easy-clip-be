@@ -1,3 +1,8 @@
+import {
+  lockWorkspaceAccess,
+  withFolderAccess,
+} from 'src/shared/infrastructure/prisma-folder-access';
+import { FolderAccessError } from 'src/shared/application/folder-access';
 import { Injectable } from '@nestjs/common';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -27,6 +32,8 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async getOrCreatePersonalWorkspaceId(userId: string): Promise<string> {
+    const existing = await this.findPersonalWorkspaceId(userId);
+    if (existing) return existing;
     return this.prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.upsert({
         where: {
@@ -59,25 +66,45 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async findFoldersByWorkspaceId(workspaceId: string): Promise<Folder[]> {
-    return this.prisma.folder.findMany({
-      where: { workspaceId, deletedAt: null },
-      orderBy: { order: 'asc' },
+    return this.prisma.$transaction(async (tx) => {
+      const access = await lockWorkspaceAccess(tx, workspaceId);
+      const folders = await tx.folder.findMany({
+        where: { workspaceId, deletedAt: null },
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+      });
+      return folders.map((folder) => ({
+        ...folder,
+        isLocked:
+          access.effectivePlan === 'FREE' &&
+          folder.id !== access.accessibleFolderId,
+      }));
     });
   }
 
   async findPersonalFolderById(
     userId: string,
     folderId: string,
+    options?: { allowLocked?: boolean },
   ): Promise<Folder | null> {
-    return this.prisma.folder.findFirst({
+    const folder = await this.prisma.folder.findFirst({
       where: {
         id: folderId,
         deletedAt: null,
-        workspace: {
-          ownerUserId: userId,
-        },
+        workspace: { ownerUserId: userId },
       },
     });
+    if (!folder) return null;
+    return withFolderAccess(
+      this.prisma,
+      folderId,
+      async (tx, access) => ({
+        ...(await tx.folder.findUniqueOrThrow({ where: { id: folderId } })),
+        isLocked:
+          access.effectivePlan === 'FREE' &&
+          access.accessibleFolderId !== folderId,
+      }),
+      options,
+    );
   }
 
   async findFolderById(folderId: string): Promise<Folder | null> {
@@ -100,15 +127,17 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async findTagsByFolderId(folderId: string): Promise<FolderTag[]> {
-    return (
-      this.prisma.tag as unknown as {
-        findMany(args: unknown): Promise<FolderTag[]>;
-      }
-    ).findMany({
-      where: {
-        folderId,
-      },
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    return withFolderAccess(this.prisma, folderId, async (tx) => {
+      return (
+        tx.tag as unknown as {
+          findMany(args: unknown): Promise<FolderTag[]>;
+        }
+      ).findMany({
+        where: {
+          folderId,
+        },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      });
     });
   }
 
@@ -116,15 +145,17 @@ export class PrismaFoldersRepository implements FoldersRepository {
     folderId: string,
     tagId: string,
   ): Promise<FolderTag | null> {
-    return (
-      this.prisma.tag as unknown as {
-        findFirst(args: unknown): Promise<FolderTag | null>;
-      }
-    ).findFirst({
-      where: {
-        id: tagId,
-        folderId,
-      },
+    return withFolderAccess(this.prisma, folderId, async (tx) => {
+      return (
+        tx.tag as unknown as {
+          findFirst(args: unknown): Promise<FolderTag | null>;
+        }
+      ).findFirst({
+        where: {
+          id: tagId,
+          folderId,
+        },
+      });
     });
   }
 
@@ -132,15 +163,17 @@ export class PrismaFoldersRepository implements FoldersRepository {
     folderId: string,
     name: string,
   ): Promise<FolderTag | null> {
-    return (
-      this.prisma.tag as unknown as {
-        findFirst(args: unknown): Promise<FolderTag | null>;
-      }
-    ).findFirst({
-      where: {
-        folderId,
-        name,
-      },
+    return withFolderAccess(this.prisma, folderId, async (tx) => {
+      return (
+        tx.tag as unknown as {
+          findFirst(args: unknown): Promise<FolderTag | null>;
+        }
+      ).findFirst({
+        where: {
+          folderId,
+          name,
+        },
+      });
     });
   }
 
@@ -155,33 +188,58 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async createFolder(params: CreateFolderParams): Promise<Folder> {
-    return this.prisma.folder.create({
-      data: {
-        name: params.name,
-        order: params.order,
-        workspaceId: params.workspaceId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const access = await lockWorkspaceAccess(tx, params.workspaceId);
+      if (access.effectivePlan === 'FREE') {
+        const count = await tx.folder.count({
+          where: { workspaceId: params.workspaceId, deletedAt: null },
+        });
+        if (count > 0 || access.accessibleFolderId) {
+          throw new FolderAccessError(
+            'PLAN_LIMIT_EXCEEDED',
+            'Free에서는 활성 폴더 1개만 만들 수 있습니다. 삭제한 접근 폴더가 있으면 먼저 복구해 주세요.',
+          );
+        }
+      }
+      const folder = await tx.folder.create({
+        data: {
+          name: params.name,
+          order: params.order,
+          workspaceId: params.workspaceId,
+        },
+      });
+      if (access.effectivePlan === 'FREE') {
+        await tx.workspace.update({
+          where: { id: params.workspaceId },
+          data: { freeAccessibleFolderId: folder.id },
+        });
+      }
+      return { ...folder, isLocked: false };
     });
   }
 
   async createFolderTag(params: CreateFolderTagParams): Promise<FolderTag> {
-    return (
-      this.prisma.tag as unknown as {
-        create(args: unknown): Promise<FolderTag>;
-      }
-    ).create({
-      data: {
-        folderId: params.folderId,
-        name: params.name,
-        backgroundColor: params.backgroundColor,
-      },
+    return withFolderAccess(this.prisma, params.folderId, async (tx) => {
+      return (
+        tx.tag as unknown as {
+          create(args: unknown): Promise<FolderTag>;
+        }
+      ).create({
+        data: {
+          folderId: params.folderId,
+          name: params.name,
+          backgroundColor: params.backgroundColor,
+        },
+      });
     });
   }
 
   async updateFolderName(folderId: string, name: string): Promise<Folder> {
-    return this.prisma.folder.update({
-      where: { id: folderId },
-      data: { name },
+    return withFolderAccess(this.prisma, folderId, async (tx) => {
+      return tx.folder.update({
+        where: { id: folderId },
+        data: { name },
+      });
     });
   }
 
@@ -189,34 +247,60 @@ export class PrismaFoldersRepository implements FoldersRepository {
     tagId: string,
     params: UpdateFolderTagParams,
   ): Promise<FolderTag> {
-    return (
-      this.prisma.tag as unknown as {
-        update(args: unknown): Promise<FolderTag>;
-      }
-    ).update({
+    const tag = await this.prisma.tag.findUniqueOrThrow({
       where: { id: tagId },
-      data: params,
+      select: { folderId: true },
+    });
+    return withFolderAccess(this.prisma, tag.folderId, async (tx) => {
+      return (
+        tx.tag as unknown as {
+          update(args: unknown): Promise<FolderTag>;
+        }
+      ).update({
+        where: { id: tagId },
+        data: params,
+      });
     });
   }
 
   async updateFolderOrder(folderId: string, order: number): Promise<Folder> {
-    return this.prisma.folder.update({
-      where: { id: folderId },
-      data: { order },
+    return withFolderAccess(this.prisma, folderId, async (tx, access) => {
+      if (access.effectivePlan === 'FREE')
+        throw new FolderAccessError(
+          'FEATURE_NOT_AVAILABLE',
+          'Free에서는 폴더 순서를 변경할 수 없습니다.',
+        );
+      return tx.folder.update({
+        where: { id: folderId },
+        data: { order },
+      });
     });
   }
 
   async deleteFolderTag(tagId: string): Promise<void> {
-    await this.prisma.tag.delete({
+    const tag = await this.prisma.tag.findUniqueOrThrow({
       where: { id: tagId },
+      select: { folderId: true },
+    });
+    return withFolderAccess(this.prisma, tag.folderId, async (tx) => {
+      await tx.tag.delete({
+        where: { id: tagId },
+      });
     });
   }
 
   async softDeleteFolder(folderId: string): Promise<Folder> {
-    return this.prisma.folder.update({
-      where: { id: folderId },
-      data: { deletedAt: new Date() },
-    });
+    return withFolderAccess(
+      this.prisma,
+      folderId,
+      async (tx) => {
+        return tx.folder.update({
+          where: { id: folderId },
+          data: { deletedAt: new Date() },
+        });
+      },
+      { allowLocked: true },
+    );
   }
 
   async findPreviousFolderOrder(
