@@ -86,6 +86,36 @@ describe('UpdateClipUseCase', () => {
     },
   );
 
+  it.each(['가'.repeat(15), '😀'.repeat(15)])(
+    'trim 후 15자 이름을 허용한다',
+    async (title) => {
+      const { repo, usecase } = setup();
+      await usecase.execute('user-id', {
+        clipId: 'clip-id',
+        title: ` \t${title}\n `,
+      });
+      expect(repo.updateClip).toHaveBeenCalledWith('user-id', 'clip-id', {
+        title,
+      });
+    },
+  );
+
+  it.each(['가'.repeat(16), '😀'.repeat(16)])(
+    'trim 후 16자 이름은 업로드·저장 전에 거부한다',
+    async (title) => {
+      const { repo, storage, usecase } = setup();
+      await expect(
+        usecase.execute(
+          'user-id',
+          { clipId: 'clip-id', title: ` ${title} ` },
+          file,
+        ),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(repo.updateClip).not.toHaveBeenCalled();
+      expect(storage.uploadImage).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(['', '   ', null, 123])(
     '잘못된 이름 %s는 업로드 전에 거부한다',
     async (title) => {

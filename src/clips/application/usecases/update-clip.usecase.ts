@@ -1,3 +1,5 @@
+import { normalizeBoundedName } from 'src/shared/application/name-normalization.helper';
+import { CLIP_TITLE_MAX_LENGTH } from '../constants/clip-title.constants';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
 import type { Clip } from '../../domain/clip.types';
@@ -39,16 +41,20 @@ export class UpdateClipUseCase {
         '클립의 소속 폴더는 변경할 수 없습니다.',
       );
     }
-    if (
-      input.title !== undefined &&
-      (typeof input.title !== 'string' || input.title.trim().length === 0)
-    ) {
-      throw new ClipsError(
-        'BAD_REQUEST',
-        'title은 공백이 아닌 문자열이어야 합니다.',
-      );
+    let title: string | undefined;
+    if (input.title !== undefined) {
+      const normalized =
+        typeof input.title === 'string'
+          ? normalizeBoundedName(input.title, CLIP_TITLE_MAX_LENGTH)
+          : null;
+      if (!normalized?.ok) {
+        throw new ClipsError(
+          'BAD_REQUEST',
+          `클립 이름은 앞뒤 공백 제거 후 1자 이상 ${CLIP_TITLE_MAX_LENGTH}자 이하여야 합니다.`,
+        );
+      }
+      title = normalized.value;
     }
-    const title = input.title?.trim();
     const hasContent = Boolean(file) || input.text !== undefined;
     if (!hasContent && title === undefined) {
       throw new ClipsError(

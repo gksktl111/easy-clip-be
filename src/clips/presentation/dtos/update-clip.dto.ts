@@ -1,14 +1,29 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Allow, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { CLIP_TITLE_MAX_LENGTH } from '../../application/constants/clip-title.constants';
+import {
+  Allow,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateClipDto {
   @ApiPropertyOptional({
     example: '새 이름',
-    description: '클립 표시 이름. 단독 변경 시 기존 콘텐츠를 보존합니다.',
+    description:
+      '앞뒤 공백 제거 후 1~15자 클립 표시 이름. 단독 변경 시 기존 콘텐츠를 보존합니다.',
+    minLength: 1,
+    maxLength: CLIP_TITLE_MAX_LENGTH,
   })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @IsNotEmpty()
+  @MaxLength(CLIP_TITLE_MAX_LENGTH)
   title?: string;
 
   @ApiPropertyOptional({

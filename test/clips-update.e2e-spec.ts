@@ -197,6 +197,35 @@ describe('Clip content updates (PostgreSQL integration)', () => {
     expect((await row()).title).toBe('새 이미지 이름');
   });
 
+  it('validates title length after trimming over JSON and multipart', async () => {
+    for (const title of ['가'.repeat(15), '😀'.repeat(15)]) {
+      await request(app.getHttpServer())
+        .patch(`/clips/${clipId}`)
+        .send({ title: ` ${title} ` })
+        .expect(200);
+      expect((await row()).title).toBe(title);
+      await request(app.getHttpServer())
+        .patch(`/clips/${clipId}`)
+        .field('title', ` ${title} `)
+        .expect(200);
+      expect((await row()).title).toBe(title);
+    }
+    const before = await row();
+    for (const title of ['가'.repeat(16), '😀'.repeat(16), '   ']) {
+      await request(app.getHttpServer())
+        .patch(`/clips/${clipId}`)
+        .send({ title: ` ${title} ` })
+        .expect(400);
+      await request(app.getHttpServer())
+        .patch(`/clips/${clipId}`)
+        .field('title', ` ${title} `)
+        .expect(400);
+    }
+    expect(await row()).toEqual(before);
+    expect(storage.uploadImage).not.toHaveBeenCalled();
+    expect(storage.deleteImage).not.toHaveBeenCalled();
+  });
+
   it('preserves an image replaced between the rename read and write', async () => {
     const original = repository.updateClip.bind(
       repository,
