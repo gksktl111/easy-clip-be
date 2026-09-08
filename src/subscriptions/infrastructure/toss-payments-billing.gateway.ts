@@ -66,6 +66,9 @@ export class TossPaymentsBillingGateway implements BillingPaymentGateway {
         orderName: params.orderName,
         currency: params.currency,
       },
+      params.timeoutMs === undefined
+        ? undefined
+        : AbortSignal.timeout(params.timeoutMs),
     );
 
     return {
@@ -145,9 +148,11 @@ export class TossPaymentsBillingGateway implements BillingPaymentGateway {
   private async request<TResponse>(
     path: string,
     body: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<TResponse> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
+      signal,
       headers: this.getRequestHeaders(),
       body: JSON.stringify(body),
     });

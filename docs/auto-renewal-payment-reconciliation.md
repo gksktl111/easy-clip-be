@@ -15,7 +15,7 @@
 
 구독 조회의 만료 저장도 읽었던 기간과 자동갱신 상태가 그대로일 때만 수행해, 지연된 만료 요청이 복구한 Pro를 덮어쓰지 않게 한다.
 
-DB 잠금은 최종 반영에만 사용한다. 결제 조회 요청은 10초 제한이 있고 DB 트랜잭션 밖에서 수행한다. 기존 과금 POST의 타임아웃 정책은 변경하지 않는다. 성공 메일은 반영을 선점한 실행에서만 시도하되, 메일의 정확히 한 번 전달이나 프로세스 종료 후 발송 복구는 보장하지 않는다.
+DB 잠금은 청구 선점·해지·재개·최종 반영의 짧은 트랜잭션에서 사용한다. 결제 조회 요청은 10초 제한이 있고 DB 트랜잭션 밖에서 수행한다. #148에서 자동갱신 과금 POST에도 10초 제한을 적용한다. 성공 메일은 반영을 선점한 실행에서만 시도하되, 메일의 정확히 한 번 전달이나 프로세스 종료 후 발송 복구는 보장하지 않는다.
 
 API 근거: [토스 결제 조회 API](https://docs.tosspayments.com/reference), [결제 조회 오류 코드](https://docs.tosspayments.com/reference/error-codes). HTTP 404와 `NOT_FOUND_PAYMENT` 조합만 결제 미발견으로 처리한다. 인증 오류·다른 404·서버 오류·네트워크 오류는 미발견이나 결제 실패로 확정하지 않는다.
 
@@ -30,11 +30,11 @@ API 근거: [토스 결제 조회 API](https://docs.tosspayments.com/reference),
 
 ## 배치 응답 및 관측
 
-기존 `processed`, `succeeded`, `failed`는 이번 실행의 신규 자동갱신 대상·권한 반영·미완료 건수다. `failed`에는 결제 거절뿐 아니라 응답 불확실성과 DB 반영 오류도 포함하므로 청구가 없었다는 근거로 사용하지 않는다. 대사는 별도 `reconciliation` 객체로 반환한다.
+`processed`, `succeeded`, `failed`는 이번 실행의 신규 자동갱신 후보·권한 반영·미완료 건수다. #148은 `skipped`를 추가하며 상세 집계는 [배치 진행 문서](auto-renewal-batch-progress.md)를 따른다. `failed`에는 결제 거절뿐 아니라 응답 불확실성과 DB 반영 오류도 포함하므로 청구가 없었다는 근거로 사용하지 않는다. 대사는 별도 `reconciliation` 객체로 반환한다.
 
 | 필드                          | 의미                                   |
 | ----------------------------- | -------------------------------------- |
-| `reconciliation.processed`    | 이번 실행에서 대사 선점을 얻은 주문 수 |
+| `reconciliation.processed`    | 이번 실행에서 조회한 대사 후보 수 (#148 기준) |
 | `reconciliation.succeeded`    | 이번 실행이 성공 반영을 선점한 주문 수 |
 | `reconciliation.deferred`     | 다음 자동 확인을 예약한 주문 수        |
 | `reconciliation.manualReview` | 운영 확인 전환을 요청한 주문 수        |
@@ -68,7 +68,7 @@ ORDER BY "manualReviewAt", "id";
 
 - #146은 자동갱신의 미확정 결과 조회와 원자적 권한 복구를 담당한다. 최초 결제의 주문 선점·복구, 환불 정책, 실패 결제의 새 청구 재시도는 포함하지 않는다.
 - [#147](https://github.com/gksktl111/easy-clip-be/issues/147)의 청구 선점·해지 순서, 미확정 결제 안내, 재개 처리는 [해지 정책 문서](auto-renewal-cancellation-policy.md)를 따른다. 선점 후 이번 청구는 완료될 수 있으며 다음 자동결제를 중단한다. 자동 환불은 포함하지 않는다.
-- [#148](https://github.com/gksktl111/easy-clip-be/issues/148)과 관련해 미확정 주문은 대사 큐로 분리하고 신규 조회에서 제외한다. 기존 `FAILED` 주문의 재시도·종료와 전체 배치 운영 정책은 별도 후속 범위다.
+- [#148](https://github.com/gksktl111/easy-clip-be/issues/148)은 기존 주문을 건너뛰는 페이지 조회, 항목 오류 격리, 과거 자동갱신 `FAILED`의 대사·운영 확인 이행을 구현한다. [배치 진행 문서](auto-renewal-batch-progress.md)를 따른다. 실패 후 새 주문으로 자동 과금하는 정책은 포함하지 않는다.
 - 플랜 기반 폴더 잠금은 구현하지 않는다. [잠금 정책 문서](subscription-plan-limits-and-folder-locking.md)의 정책 결정과 전체 API 적용은 별도 작업이다.
 
 ## 구현 검증

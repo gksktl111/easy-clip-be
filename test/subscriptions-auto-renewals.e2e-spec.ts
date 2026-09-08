@@ -7,7 +7,10 @@ import { PrometheusMetricsService } from '../src/shared/infrastructure/prometheu
 import { ProcessDueAutoRenewalsUseCase } from '../src/subscriptions/application/usecases/process-due-auto-renewals.usecase';
 import { UpdateMySubscriptionUseCase } from '../src/subscriptions/application/usecases/update-my-subscription.usecase';
 import { ConfirmBillingAuthUseCase } from '../src/subscriptions/application/usecases/confirm-billing-auth.usecase';
-import { createAutoRenewalSubscriptionOrderId } from '../src/subscriptions/application/helpers/customer-key.helper';
+import {
+  createAutoRenewalSubscriptionOrderId,
+  createSubscriptionOrderId,
+} from '../src/subscriptions/application/helpers/customer-key.helper';
 import { PrismaSubscriptionsRepository } from '../src/subscriptions/infrastructure/prisma-subscriptions.repository';
 import { TossPaymentsBillingGateway } from '../src/subscriptions/infrastructure/toss-payments-billing.gateway';
 
@@ -28,6 +31,7 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
   let subscriptionId: string;
   let orderId: string;
   let paymentKey: string;
+  let extraUserIds: string[] = [];
   const mailer = {
     sendPaymentSuccess: jest.fn().mockResolvedValue(undefined),
     sendSubscriptionResumed: jest.fn().mockResolvedValue(undefined),
@@ -102,6 +106,101 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
       type: 'CANCEL',
     });
 
+  async function createBatchFixtures(
+    entries: Array<{
+      due: Date;
+      status?: 'FAILED' | 'PENDING';
+      previousFailureDue?: Date;
+    }>,
+  ) {
+    const prefix = `batch-${randomUUID()}`;
+    const fixtures = entries.map((entry, index) => {
+      const id = `${prefix}-${String(index).padStart(3, '0')}`;
+      extraUserIds.push(id);
+      return {
+        ...entry,
+        id,
+        orderId: createAutoRenewalSubscriptionOrderId(id, entry.due),
+      };
+    });
+    await prisma.$transaction(async (tx) => {
+      await tx.user.createMany({ data: fixtures.map(({ id }) => ({ id })) });
+      await tx.workspace.createMany({
+        data: fixtures.map(({ id }) => ({
+          id,
+          ownerUserId: id,
+          name: 'Batch regression fixture',
+        })),
+      });
+      await tx.subscription.createMany({
+        data: fixtures.map(({ id, due }) => ({
+          id,
+          workspaceId: id,
+          plan: 'PRO' as const,
+          status: 'ACTIVE' as const,
+          autoRenew: true,
+          currentPeriodEnd: due,
+          nextBillingAt: due,
+          provider: 'TOSS_PAYMENTS' as const,
+          externalBillingKey: `billing-${id}`,
+          externalCustomerKey: `customer-${id}`,
+        })),
+      });
+      const payments = fixtures.flatMap((fixture) => {
+        const paymentDue = fixture.previousFailureDue ?? fixture.due;
+        const status =
+          fixture.status ?? (fixture.previousFailureDue ? 'FAILED' : undefined);
+        return status
+          ? [
+              {
+                subscriptionId: fixture.id,
+                provider: 'TOSS_PAYMENTS' as const,
+                status,
+                externalOrderId: createAutoRenewalSubscriptionOrderId(
+                  fixture.id,
+                  paymentDue,
+                ),
+                amount: 4900,
+                currency: 'KRW',
+                renewalDueAt: paymentDue,
+                renewalPeriodEnd: paymentDue,
+                reconciliationNextAt: status === 'PENDING' ? recoveryAt : null,
+                failedAt: status === 'FAILED' ? paymentDue : null,
+              },
+            ]
+          : [];
+      });
+      if (payments.length > 0) {
+        await tx.subscriptionPayment.createMany({ data: payments });
+      }
+    });
+    return fixtures;
+  }
+
+  function mockSuccessfulBatchCharges() {
+    fetchMock.mockImplementation((_url, options) => {
+      const request = JSON.parse(options?.body as string) as {
+        orderId: string;
+      };
+      return Promise.resolve(
+        jsonResponse(
+          paymentResponse({
+            orderId: request.orderId,
+            paymentKey: `payment-${request.orderId}`,
+          }),
+        ),
+      );
+    });
+  }
+
+  const postedOrderIds = () =>
+    fetchMock.mock.calls
+      .filter(([, options]) => options?.method === 'POST')
+      .map(
+        ([, options]) =>
+          (JSON.parse(options?.body as string) as { orderId: string }).orderId,
+      );
+
   async function withinTimeout<T>(promise: Promise<T>): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -138,6 +237,7 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
   });
 
   beforeEach(async () => {
+    extraUserIds = [];
     userId = randomUUID();
     subscriptionId = randomUUID();
     orderId = createAutoRenewalSubscriptionOrderId(subscriptionId, dueAt);
@@ -184,12 +284,166 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
   afterEach(async () => {
     jest.restoreAllMocks();
     if (prisma && userId) {
-      await prisma.user.deleteMany({ where: { id: userId } });
+      await prisma.user.deleteMany({
+        where: { id: { in: [userId, ...extraUserIds] } },
+      });
     }
   });
 
   afterAll(async () => {
     await Promise.all([prisma?.$disconnect(), secondPrisma?.$disconnect()]);
+  });
+
+  it('fills the healthy batch past more than 50 failed and pending orders, including tied billing dates', async () => {
+    const earlierDue = new Date('2026-01-31T00:00:00.000Z');
+    const failedAndHealthy = await createBatchFixtures(
+      Array.from({ length: 53 }, (_, index) => ({
+        due: earlierDue,
+        // Healthy rows straddle a page containing failed rows at the same date.
+        ...(index === 25 || index === 52 ? {} : { status: 'FAILED' as const }),
+      })),
+    );
+    const pending = await createBatchFixtures(
+      Array.from({ length: 51 }, () => ({
+        due: new Date('2026-01-30T00:00:00.000Z'),
+        status: 'PENDING' as const,
+      })),
+    );
+    mockSuccessfulBatchCharges();
+
+    expect(await createUseCase().execute(input())).toMatchObject({
+      processed: 3,
+      succeeded: 3,
+      failed: 0,
+      skipped: 0,
+      reconciliation: { processed: 0 },
+    });
+    const healthyOrderIds = [
+      failedAndHealthy[25].orderId,
+      failedAndHealthy[52].orderId,
+      orderId,
+    ];
+    expect(postedOrderIds()).toEqual(healthyOrderIds);
+    const retained = await prisma.subscriptionPayment.findMany({
+      where: {
+        subscriptionId: {
+          in: [
+            ...failedAndHealthy.filter(({ status }) => status === 'FAILED'),
+            ...pending,
+          ].map(({ id }) => id),
+        },
+      },
+    });
+    expect(retained.filter(({ status }) => status === 'FAILED')).toHaveLength(
+      51,
+    );
+    expect(retained.filter(({ status }) => status === 'PENDING')).toHaveLength(
+      51,
+    );
+
+    expect(
+      await createUseCase(secondRepository).execute(input()),
+    ).toMatchObject({
+      processed: 0,
+    });
+    expect(postedOrderIds()).toEqual(healthyOrderIds);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('charges each healthy cycle once across concurrent and repeated batches despite a historical failure', async () => {
+    const [healthy] = await createBatchFixtures([
+      {
+        due: dueAt,
+        previousFailureDue: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ]);
+    mockSuccessfulBatchCharges();
+    const results = await Promise.all([
+      createUseCase().execute(input()),
+      createUseCase(secondRepository).execute(input()),
+    ]);
+    expect(results.reduce((sum, result) => sum + result.succeeded, 0)).toBe(2);
+    await createUseCase().execute(input());
+    await createUseCase(secondRepository).execute(input());
+    expect(postedOrderIds().sort()).toEqual([healthy.orderId, orderId].sort());
+    const payments = await prisma.subscriptionPayment.findMany({
+      where: { subscriptionId: healthy.id },
+    });
+    expect(payments).toHaveLength(2);
+    expect(payments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: 'FAILED' }),
+        expect.objectContaining({
+          status: 'DONE',
+          externalOrderId: healthy.orderId,
+        }),
+      ]),
+    );
+    expect(await paymentRow()).toMatchObject({ status: 'DONE' });
+  });
+
+  it.each(['network', 'timeout'])(
+    'preserves a %s-failed charge as pending and continues to the next healthy subscription',
+    async (failure) => {
+      const [uncertain] = await createBatchFixtures([
+        {
+          due: new Date('2026-01-31T00:00:00.000Z'),
+        },
+      ]);
+      mockSuccessfulBatchCharges();
+      if (failure === 'network') {
+        fetchMock.mockRejectedValueOnce(
+          new TypeError('network connection lost'),
+        );
+      } else {
+        const timeout = jest
+          .spyOn(AbortSignal, 'timeout')
+          .mockReturnValueOnce(
+            AbortSignal.abort(
+              new DOMException('request timed out', 'TimeoutError'),
+            ),
+          );
+        fetchMock.mockImplementationOnce((_url, options) => {
+          expect(timeout).toHaveBeenCalledWith(10_000);
+          expect(options?.signal?.aborted).toBe(true);
+          return Promise.reject(options!.signal!.reason as Error);
+        });
+      }
+
+      expect(await createUseCase().execute(input())).toMatchObject({
+        processed: 2,
+        succeeded: 1,
+        failed: 1,
+        skipped: 0,
+      });
+      expect(postedOrderIds()).toEqual([uncertain.orderId, orderId]);
+      expect(
+        await prisma.subscriptionPayment.findUniqueOrThrow({
+          where: { externalOrderId: uncertain.orderId },
+        }),
+      ).toMatchObject({ status: 'PENDING', externalPaymentKey: null });
+      expect(await paymentRow()).toMatchObject({ status: 'DONE' });
+      expect(
+        await createUseCase(secondRepository).execute(input()),
+      ).toMatchObject({
+        processed: 0,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('does not impose the renewal timeout on a charge without a recovery timeout', async () => {
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    await new TossPaymentsBillingGateway(config).chargeBilling({
+      billingKey: 'initial-billing-key',
+      customerKey: 'initial-customer-key',
+      orderId: `sub_${subscriptionId}_${Date.now()}_${randomUUID()}`,
+      orderName: 'Initial purchase',
+      amount: 4900,
+      currency: 'KRW',
+    });
+    expect(timeout).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeUndefined();
   });
 
   it.each(['database failure', 'transport uncertainty', 'canceled renewal'])(
@@ -570,6 +824,152 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
     expect(fetchMock.mock.calls.map(([, options]) => options?.method)).toEqual([
       'GET',
     ]);
+  });
+
+  it('migrates only unreviewed legacy auto-renewal failures and recovers a verified payment once without charging', async () => {
+    const [missingSnapshot, initialPayment, wrongPrefix, reviewed] =
+      await createBatchFixtures(
+        Array.from({ length: 4 }, () => ({
+          due: dueAt,
+          status: 'FAILED' as const,
+        })),
+      );
+    await createPendingPayment();
+    const evidence = {
+      failedAt: dueAt,
+      failureCode: 'LEGACY_TRANSPORT_ERROR',
+      failureMessage: 'Legacy response was uncertain',
+      rawData: { legacy: true, requestOrderId: orderId },
+    };
+    await prisma.subscriptionPayment.update({
+      where: { externalOrderId: orderId },
+      data: { status: 'FAILED', ...evidence },
+    });
+    await prisma.subscriptionPayment.update({
+      where: { externalOrderId: missingSnapshot.orderId },
+      data: {
+        renewalDueAt: null,
+        renewalPeriodEnd: null,
+        ...evidence,
+      },
+    });
+    const initialOrderId = createSubscriptionOrderId(initialPayment.id);
+    const wrongOrderId = `sub_${wrongPrefix.id}other_20260201000000`;
+    await prisma.subscriptionPayment.update({
+      where: { externalOrderId: initialPayment.orderId },
+      data: { externalOrderId: initialOrderId },
+    });
+    await prisma.subscriptionPayment.update({
+      where: { externalOrderId: wrongPrefix.orderId },
+      data: { externalOrderId: wrongOrderId },
+    });
+    await prisma.subscriptionPayment.update({
+      where: { externalOrderId: reviewed.orderId },
+      data: {
+        manualReviewAt: dueAt,
+        reconciliationError: 'OPERATOR_CONFIRMED',
+      },
+    });
+    const ids = [
+      subscriptionId,
+      missingSnapshot.id,
+      initialPayment.id,
+      wrongPrefix.id,
+      reviewed.id,
+    ];
+    // Historical recovery must also work after cancellation, without scheduling
+    // a current charge merely because the migration runs after the paid period.
+    await prisma.subscription.updateMany({
+      where: { id: { in: ids } },
+      data: { autoRenew: false, status: 'CANCELED', nextBillingAt: null },
+    });
+    const before = await prisma.subscriptionPayment.findMany({
+      where: { subscriptionId: { in: ids } },
+    });
+    const migration = readFileSync(
+      join(
+        __dirname,
+        '../prisma/migrations/20260908070000_recover_failed_auto_renewals/migration.sql',
+      ),
+      'utf8',
+    );
+    // The schema migration already created the index; exercise its data update.
+    const update = migration
+      .split(';')
+      .find((sql) => sql.includes('UPDATE "SubscriptionPayment"'))!;
+    const migrated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(update);
+      return tx.subscriptionPayment.findMany({
+        where: { subscriptionId: { in: ids } },
+      });
+    });
+    for (const previous of before) {
+      expect(migrated.find(({ id }) => id === previous.id)).toMatchObject({
+        id: previous.id,
+        externalOrderId: previous.externalOrderId,
+        failedAt: previous.failedAt,
+        failureCode: previous.failureCode,
+        failureMessage: previous.failureMessage,
+        rawData: previous.rawData,
+      });
+    }
+    const recoverable = migrated.find(
+      ({ externalOrderId }) => externalOrderId === orderId,
+    )!;
+    expect(recoverable).toMatchObject({
+      status: 'PENDING',
+      reconciliationAttempts: 0,
+      reconciliationError: 'LEGACY_FAILED_REQUIRES_RECONCILIATION',
+      manualReviewAt: null,
+    });
+    expect(recoverable.reconciliationNextAt).toBeInstanceOf(Date);
+    const manual = migrated.find(
+      ({ subscriptionId: id }) => id === missingSnapshot.id,
+    )!;
+    expect(manual).toMatchObject({
+      status: 'PENDING',
+      reconciliationNextAt: null,
+      reconciliationError: 'LEGACY_FAILED_PERIOD_SNAPSHOT_MISSING',
+    });
+    expect(manual.manualReviewAt).toBeInstanceOf(Date);
+    for (const unchangedId of [
+      initialPayment.id,
+      wrongPrefix.id,
+      reviewed.id,
+    ]) {
+      expect(
+        migrated.find(({ subscriptionId: id }) => id === unchangedId),
+      ).toEqual(before.find(({ subscriptionId: id }) => id === unchangedId));
+    }
+
+    const now = new Date(recoverable.reconciliationNextAt!.getTime() + 1);
+    expect(await createUseCase().execute(input(now))).toMatchObject({
+      processed: 0,
+      reconciliation: { processed: 1, succeeded: 1 },
+    });
+    expect(await paymentRow()).toMatchObject({ status: 'DONE' });
+    expect(await subscriptionRow()).toMatchObject({
+      currentPeriodEnd: recoveredPeriodEnd,
+      autoRenew: false,
+      nextBillingAt: null,
+    });
+    expect(
+      await createUseCase(secondRepository).execute(input(now)),
+    ).toMatchObject({
+      processed: 0,
+      reconciliation: { processed: 0 },
+    });
+    expect(
+      await prisma.subscriptionPayment.findUniqueOrThrow({
+        where: { id: manual.id },
+      }),
+    ).toEqual(manual);
+    expect(fetchMock.mock.calls.map(([, options]) => options?.method)).toEqual([
+      'GET',
+    ]);
+    expect((await subscriptionRow()).currentPeriodEnd).toEqual(
+      recoveredPeriodEnd,
+    );
   });
 
   it('preserves legacy pending orders for manual review during migration', async () => {

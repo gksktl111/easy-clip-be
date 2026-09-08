@@ -26,11 +26,14 @@ export type ProcessDueAutoRenewalsOutput = {
   processed: number;
   succeeded: number;
   failed: number;
+  skipped: number;
   reconciliation: {
     processed: number;
     succeeded: number;
     deferred: number;
     manualReview: number;
+    failed: number;
+    skipped: number;
   };
 };
 
@@ -79,49 +82,52 @@ export class ProcessDueAutoRenewalsUseCase {
 
     let succeeded = 0;
     let failed = 0;
+    let skipped = 0;
 
     for (const subscription of subscriptions) {
-      if (
-        !subscription.externalBillingKey ||
-        !subscription.externalCustomerKey
-      ) {
-        failed += 1;
-        continue;
-      }
-
-      const amount = this.getProPlanAmount();
-      const currency = this.configService.get<string>(
-        'TOSS_PAYMENTS_CURRENCY',
-        'KRW',
-      );
-      const orderId = createAutoRenewalSubscriptionOrderId(
-        subscription.id,
-        subscription.nextBillingAt ?? now,
-      );
-
-      const claimed =
-        await this.subscriptionsRepository.claimAutoRenewalPayment({
-          subscriptionId: subscription.id,
-          provider: PaymentProvider.TOSS_PAYMENTS,
-          externalOrderId: orderId,
-          amount,
-          currency,
-          renewalDueAt: subscription.nextBillingAt!,
-          expectedBillingKey: subscription.externalBillingKey,
-          expectedCustomerKey: subscription.externalCustomerKey,
-          now,
-          renewalPeriodEnd: subscription.currentPeriodEnd,
-          reconciliationNextAt: new Date(
-            now.getTime() + RECONCILIATION_DELAY_MS,
-          ),
-        });
-
-      if (!claimed) {
-        continue;
-      }
-
       try {
+        if (
+          !subscription.externalBillingKey ||
+          !subscription.externalCustomerKey
+        ) {
+          failed += 1;
+          continue;
+        }
+
+        const amount = this.getProPlanAmount();
+        const currency = this.configService.get<string>(
+          'TOSS_PAYMENTS_CURRENCY',
+          'KRW',
+        );
+        const orderId = createAutoRenewalSubscriptionOrderId(
+          subscription.id,
+          subscription.nextBillingAt ?? now,
+        );
+
+        const claimed =
+          await this.subscriptionsRepository.claimAutoRenewalPayment({
+            subscriptionId: subscription.id,
+            provider: PaymentProvider.TOSS_PAYMENTS,
+            externalOrderId: orderId,
+            amount,
+            currency,
+            renewalDueAt: subscription.nextBillingAt!,
+            expectedBillingKey: subscription.externalBillingKey,
+            expectedCustomerKey: subscription.externalCustomerKey,
+            now,
+            renewalPeriodEnd: subscription.currentPeriodEnd,
+            reconciliationNextAt: new Date(
+              now.getTime() + RECONCILIATION_DELAY_MS,
+            ),
+          });
+
+        if (!claimed) {
+          skipped += 1;
+          continue;
+        }
+
         const paymentResult = await this.billingPaymentGateway.chargeBilling({
+          timeoutMs: 10_000,
           billingKey: subscription.externalBillingKey,
           customerKey: subscription.externalCustomerKey,
           orderId,
@@ -165,11 +171,13 @@ export class ProcessDueAutoRenewalsUseCase {
             nextBillingAt: updated.nextBillingAt,
           });
           succeeded += 1;
+        } else {
+          skipped += 1;
         }
       } catch (error) {
-        // 과금 응답 유실·DB 반영 실패는 재과금하지 않고 영속화된 주문으로 대사한다.
+        // 선점 실패도 다음 항목과 격리한다. 선점 후 오류는 남아 있는 주문으로 대사한다.
         this.logger.warn(
-          `자동결제 결과 대사가 필요합니다. subscriptionId=${subscription.id} error=${resolveErrorName(error)}`,
+          `자동결제 항목 처리에 실패했습니다. subscriptionId=${subscription.id} error=${resolveErrorName(error)}`,
         );
         failed += 1;
       }
@@ -179,6 +187,7 @@ export class ProcessDueAutoRenewalsUseCase {
       processed: subscriptions.length,
       succeeded,
       failed,
+      skipped,
       reconciliation,
     };
   }
@@ -187,96 +196,118 @@ export class ProcessDueAutoRenewalsUseCase {
     now: Date,
     limit: number,
   ): Promise<ProcessDueAutoRenewalsOutput['reconciliation']> {
-    const result = { processed: 0, succeeded: 0, deferred: 0, manualReview: 0 };
+    const result = {
+      processed: 0,
+      succeeded: 0,
+      deferred: 0,
+      manualReview: 0,
+      failed: 0,
+      skipped: 0,
+    };
     const candidates =
       await this.subscriptionsRepository.findAutoRenewalPaymentsToReconcile(
         now,
         limit,
       );
     for (const candidate of candidates) {
-      const nextAttemptAt = new Date(now.getTime() + RECONCILIATION_DELAY_MS);
-      const payment =
-        await this.subscriptionsRepository.claimAutoRenewalReconciliation(
-          candidate.id,
-          now,
-          nextAttemptAt,
-        );
-      if (!payment) continue;
       result.processed += 1;
-      let reason = 'PAYMENT_NOT_FOUND';
-      let needsReview =
-        !payment.renewalDueAt ||
-        payment.reconciliationAttempts > MAX_RECONCILIATION_ATTEMPTS;
-      if (needsReview) {
-        reason = payment.renewalDueAt
-          ? 'RECONCILIATION_EXHAUSTED'
-          : 'LEGACY_PERIOD_SNAPSHOT_MISSING';
-      } else {
-        try {
-          const response =
-            await this.billingPaymentGateway.findPaymentByOrderId(
-              payment.externalOrderId,
-            );
-          if (response && this.isVerifiedPayment(response, payment)) {
-            const paidAt = response.approvedAt!;
-            const period = resolveNextPeriod(payment.renewalPeriodEnd, paidAt);
-            const updated =
-              await this.subscriptionsRepository.completeAutoRenewalPayment({
-                externalOrderId: payment.externalOrderId,
-                externalPaymentKey: response.paymentKey,
-                amount: payment.amount,
-                currency: payment.currency,
-                approvedAt: paidAt,
-                currentPeriodEnd: period.currentPeriodEnd,
-                rawData: response.rawData,
-              });
-            if (updated) {
-              result.succeeded += 1;
-              await this.sendPaymentSuccessMail({
-                subscriptionId: updated.id,
-                amount: payment.amount,
-                currency: payment.currency,
-                approvedAt: paidAt,
-                currentPeriodEnd: updated.currentPeriodEnd!,
-                nextBillingAt: updated.nextBillingAt,
-              });
-            }
-            continue;
-          }
-          if (response) {
-            reason =
-              response.status === 'DONE'
-                ? 'PAYMENT_MISMATCH'
-                : 'PAYMENT_NOT_DONE';
-            needsReview =
-              response.status === 'DONE' ||
-              ['CANCELED', 'PARTIAL_CANCELED', 'ABORTED', 'EXPIRED'].includes(
-                response.status,
-              );
-          }
-        } catch (error) {
-          reason = 'RECONCILIATION_ERROR';
-          this.logger.warn(
-            `자동결제 대사를 완료하지 못했습니다. paymentId=${payment.id} error=${resolveErrorName(error)}`,
+      try {
+        const nextAttemptAt = new Date(now.getTime() + RECONCILIATION_DELAY_MS);
+        const payment =
+          await this.subscriptionsRepository.claimAutoRenewalReconciliation(
+            candidate.id,
+            now,
+            nextAttemptAt,
           );
+        if (!payment) {
+          result.skipped += 1;
+          continue;
         }
-      }
-      needsReview ||=
-        payment.reconciliationAttempts >= MAX_RECONCILIATION_ATTEMPTS;
-      await this.subscriptionsRepository.deferAutoRenewalReconciliation({
-        paymentId: payment.id,
-        attempt: payment.reconciliationAttempts,
-        nextAttemptAt: needsReview ? null : nextAttemptAt,
-        error: reason,
-        ...(needsReview ? { manualReviewAt: now } : {}),
-      });
-      if (needsReview) {
-        result.manualReview += 1;
+        let reason = 'PAYMENT_NOT_FOUND';
+        let needsReview =
+          !payment.renewalDueAt ||
+          payment.reconciliationAttempts > MAX_RECONCILIATION_ATTEMPTS;
+        if (needsReview) {
+          reason = payment.renewalDueAt
+            ? 'RECONCILIATION_EXHAUSTED'
+            : 'LEGACY_PERIOD_SNAPSHOT_MISSING';
+        } else {
+          try {
+            const response =
+              await this.billingPaymentGateway.findPaymentByOrderId(
+                payment.externalOrderId,
+              );
+            if (response && this.isVerifiedPayment(response, payment)) {
+              const paidAt = response.approvedAt!;
+              const period = resolveNextPeriod(
+                payment.renewalPeriodEnd,
+                paidAt,
+              );
+              const updated =
+                await this.subscriptionsRepository.completeAutoRenewalPayment({
+                  externalOrderId: payment.externalOrderId,
+                  externalPaymentKey: response.paymentKey,
+                  amount: payment.amount,
+                  currency: payment.currency,
+                  approvedAt: paidAt,
+                  currentPeriodEnd: period.currentPeriodEnd,
+                  rawData: response.rawData,
+                });
+              if (updated) {
+                result.succeeded += 1;
+                await this.sendPaymentSuccessMail({
+                  subscriptionId: updated.id,
+                  amount: payment.amount,
+                  currency: payment.currency,
+                  approvedAt: paidAt,
+                  currentPeriodEnd: updated.currentPeriodEnd!,
+                  nextBillingAt: updated.nextBillingAt,
+                });
+              } else {
+                result.skipped += 1;
+              }
+              continue;
+            }
+            if (response) {
+              reason =
+                response.status === 'DONE'
+                  ? 'PAYMENT_MISMATCH'
+                  : 'PAYMENT_NOT_DONE';
+              needsReview =
+                response.status === 'DONE' ||
+                ['CANCELED', 'PARTIAL_CANCELED', 'ABORTED', 'EXPIRED'].includes(
+                  response.status,
+                );
+            }
+          } catch (error) {
+            reason = 'RECONCILIATION_ERROR';
+            this.logger.warn(
+              `자동결제 대사를 완료하지 못했습니다. paymentId=${payment.id} error=${resolveErrorName(error)}`,
+            );
+          }
+        }
+        needsReview ||=
+          payment.reconciliationAttempts >= MAX_RECONCILIATION_ATTEMPTS;
+        await this.subscriptionsRepository.deferAutoRenewalReconciliation({
+          paymentId: payment.id,
+          attempt: payment.reconciliationAttempts,
+          nextAttemptAt: needsReview ? null : nextAttemptAt,
+          error: reason,
+          ...(needsReview ? { manualReviewAt: now } : {}),
+        });
+        if (needsReview) {
+          result.manualReview += 1;
+          this.logger.warn(
+            `자동결제 운영 확인이 필요합니다. paymentId=${payment.id} reason=${reason}`,
+          );
+        } else {
+          result.deferred += 1;
+        }
+      } catch (error) {
+        result.failed += 1;
         this.logger.warn(
-          `자동결제 운영 확인이 필요합니다. paymentId=${payment.id} reason=${reason}`,
+          `자동결제 대사 항목 처리에 실패했습니다. paymentId=${candidate.id} error=${resolveErrorName(error)}`,
         );
-      } else {
-        result.deferred += 1;
       }
     }
     return result;
