@@ -19,6 +19,8 @@ export type ChargeBillingParams = {
   orderName: string;
   amount: number;
   currency: string;
+  // 결과 유실을 대사할 수 있는 호출에서만 명시한다.
+  timeoutMs?: number;
 };
 
 export type ChargeBillingResult = {

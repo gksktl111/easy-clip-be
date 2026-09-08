@@ -201,11 +201,14 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       processed: 1,
       succeeded: 1,
       failed: 0,
+      skipped: 0,
       reconciliation: {
         processed: 0,
         succeeded: 0,
         deferred: 0,
         manualReview: 0,
+        failed: 0,
+        skipped: 0,
       },
     });
     expect(mailer.sendPaymentSuccess).toHaveBeenCalledWith({
@@ -257,11 +260,14 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       processed: 1,
       succeeded: 0,
       failed: 1,
+      skipped: 0,
       reconciliation: {
         processed: 0,
         succeeded: 0,
         deferred: 0,
         manualReview: 0,
+        failed: 0,
+        skipped: 0,
       },
     });
   });
@@ -306,11 +312,14 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       processed: 1,
       succeeded: 0,
       failed: 0,
+      skipped: 1,
       reconciliation: {
         processed: 0,
         succeeded: 0,
         deferred: 0,
         manualReview: 0,
+        failed: 0,
+        skipped: 0,
       },
     });
   });
@@ -359,12 +368,175 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       processed: 1,
       succeeded: 1,
       failed: 0,
+      skipped: 0,
       reconciliation: {
         processed: 0,
         succeeded: 0,
         deferred: 0,
         manualReview: 0,
+        failed: 0,
+        skipped: 0,
       },
     });
+  });
+
+  it.each(['claim', 'gateway'])(
+    '%s 오류 이후 다음 구독의 결제를 계속한다',
+    async (stage) => {
+      const repo = createRepository();
+      const gateway = createGateway();
+      const now = createInput().now;
+      repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
+        createSubscription({ id: 'first' }),
+        createSubscription({ id: 'second' }),
+      ]);
+      repo.claimAutoRenewalPayment.mockResolvedValue(true);
+      gateway.chargeBilling.mockImplementation((params) =>
+        Promise.resolve({
+          paymentKey: 'paid-key',
+          orderId: params.orderId,
+          status: 'DONE',
+          totalAmount: 4900,
+          currency: 'KRW',
+          approvedAt: now,
+          failureCode: null,
+          failureMessage: null,
+          rawData: {},
+        }),
+      );
+      if (stage === 'claim')
+        repo.claimAutoRenewalPayment.mockRejectedValueOnce(
+          new Error('claim failed'),
+        );
+      else
+        gateway.chargeBilling.mockRejectedValueOnce(
+          new Error('transport failed'),
+        );
+      repo.completeAutoRenewalPayment.mockResolvedValue(
+        createSubscription({ id: 'second' }),
+      );
+      const result = await new ProcessDueAutoRenewalsUseCase(
+        repo,
+        gateway,
+        createMailer(),
+        createConfig(),
+      ).execute(createInput());
+      expect(result).toMatchObject({
+        processed: 2,
+        succeeded: 1,
+        failed: 1,
+        skipped: 0,
+      });
+      expect(gateway.chargeBilling).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orderId: 'sub_second_20260201000000' }),
+      );
+      expect(repo.completeAutoRenewalPayment).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['claim', 'defer'])(
+    '대사 %s 오류가 다음 대사와 신규 결제를 중단하지 않는다',
+    async (stage) => {
+      const repo = createRepository();
+      const gateway = createGateway();
+      const candidate = (id: string) => ({
+        id,
+        subscriptionId: id,
+        externalOrderId: `order-${id}`,
+        amount: 4900,
+        currency: 'KRW',
+        renewalDueAt: createInput().now,
+        renewalPeriodEnd: createInput().now,
+        reconciliationAttempts: 1,
+      });
+      repo.findAutoRenewalPaymentsToReconcile.mockResolvedValue([
+        candidate('first'),
+        candidate('second'),
+      ]);
+      repo.claimAutoRenewalReconciliation.mockImplementation((id) =>
+        Promise.resolve(candidate(id)),
+      );
+      gateway.findPaymentByOrderId.mockResolvedValue(null);
+      if (stage === 'claim')
+        repo.claimAutoRenewalReconciliation.mockRejectedValueOnce(
+          new Error('claim failed'),
+        );
+      else
+        repo.deferAutoRenewalReconciliation.mockRejectedValueOnce(
+          new Error('defer failed'),
+        );
+      repo.findDueAutoRenewalSubscriptions.mockResolvedValue([
+        createSubscription(),
+      ]);
+      repo.claimAutoRenewalPayment.mockResolvedValue(true);
+      gateway.chargeBilling.mockResolvedValue({
+        paymentKey: 'paid-key',
+        orderId: 'sub_subscription-id_20260201000000',
+        status: 'DONE',
+        totalAmount: 4900,
+        currency: 'KRW',
+        approvedAt: createInput().now,
+        failureCode: null,
+        failureMessage: null,
+        rawData: {},
+      });
+      repo.completeAutoRenewalPayment.mockResolvedValue(createSubscription());
+      const result = await new ProcessDueAutoRenewalsUseCase(
+        repo,
+        gateway,
+        createMailer(),
+        createConfig(),
+      ).execute(createInput());
+      expect(result).toMatchObject({
+        processed: 1,
+        succeeded: 1,
+        failed: 0,
+        skipped: 0,
+        reconciliation: {
+          processed: 2,
+          succeeded: 0,
+          deferred: 1,
+          manualReview: 0,
+          failed: 1,
+          skipped: 0,
+        },
+      });
+      expect(repo.deferAutoRenewalReconciliation).toHaveBeenLastCalledWith(
+        expect.objectContaining({ paymentId: 'second' }),
+      );
+    },
+  );
+
+  it('다른 실행이 선점한 대사는 skipped로 집계한다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    repo.findAutoRenewalPaymentsToReconcile.mockResolvedValue([
+      {
+        id: 'payment-id',
+        subscriptionId: 'subscription-id',
+        externalOrderId: 'order-id',
+        amount: 4900,
+        currency: 'KRW',
+        renewalDueAt: createInput().now,
+        renewalPeriodEnd: createInput().now,
+        reconciliationAttempts: 0,
+      },
+    ]);
+    repo.claimAutoRenewalReconciliation.mockResolvedValue(null);
+    const result = await new ProcessDueAutoRenewalsUseCase(
+      repo,
+      gateway,
+      createMailer(),
+      createConfig(),
+    ).execute(createInput());
+    expect(result.reconciliation).toEqual({
+      processed: 1,
+      succeeded: 0,
+      deferred: 0,
+      manualReview: 0,
+      failed: 0,
+      skipped: 1,
+    });
+    expect(gateway.findPaymentByOrderId).not.toHaveBeenCalled();
   });
 });

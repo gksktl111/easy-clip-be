@@ -20,6 +20,7 @@ import {
   UpdateSubscriptionParams,
 } from '../domain/subscriptions.repository';
 import { Subscription } from '../domain/subscription.types';
+import { createAutoRenewalSubscriptionOrderId } from '../application/helpers/customer-key.helper';
 
 const subscriptionSelect = {
   id: true,
@@ -350,30 +351,70 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
     now: Date,
     limit: number,
   ): Promise<Subscription[]> {
-    return this.prisma.subscription.findMany({
-      where: {
-        plan: PrismaSubscriptionPlan.PRO,
-        status: PrismaSubscriptionStatus.ACTIVE,
-        autoRenew: true,
-        // 미확정 주문은 구독 상태와 별도의 대사 큐에서 처리한다.
-        // 기간이 변경돼도 결과 확인 전에 새 주문을 과금하지 않는다.
-        payments: { none: { status: PrismaSubscriptionPaymentStatus.PENDING } },
-        externalBillingKey: {
-          not: null,
+    const subscriptions: Subscription[] = [];
+    const pageSize = Math.min(limit, 100);
+    let cursor: { nextBillingAt: Date; id: string } | undefined;
+
+    while (subscriptions.length < limit) {
+      const page = await this.prisma.subscription.findMany({
+        where: {
+          plan: PrismaSubscriptionPlan.PRO,
+          status: PrismaSubscriptionStatus.ACTIVE,
+          autoRenew: true,
+          provider: PrismaPaymentProvider.TOSS_PAYMENTS,
+          // 미확정 주문은 구독 상태와 별도의 대사 큐에서 처리한다.
+          // 기간이 변경돼도 결과 확인 전에 새 주문을 과금하지 않는다.
+          payments: {
+            none: { status: PrismaSubscriptionPaymentStatus.PENDING },
+          },
+          externalBillingKey: { not: null, notIn: [''] },
+          externalCustomerKey: { not: null, notIn: [''] },
+          nextBillingAt: { lte: now },
+          ...(cursor
+            ? {
+                OR: [
+                  { nextBillingAt: { gt: cursor.nextBillingAt } },
+                  {
+                    nextBillingAt: cursor.nextBillingAt,
+                    id: { gt: cursor.id },
+                  },
+                ],
+              }
+            : {}),
         },
-        externalCustomerKey: {
-          not: null,
-        },
-        nextBillingAt: {
-          lte: now,
-        },
-      },
-      orderBy: {
-        nextBillingAt: 'asc',
-      },
-      take: limit,
-      select: subscriptionSelect,
-    });
+        orderBy: [{ nextBillingAt: 'asc' }, { id: 'asc' }],
+        take: pageSize,
+        select: subscriptionSelect,
+      });
+      if (page.length === 0) break;
+
+      const orderIds = page.map((subscription) =>
+        createAutoRenewalSubscriptionOrderId(
+          subscription.id,
+          subscription.nextBillingAt!,
+        ),
+      );
+      const existingPayments = await this.prisma.subscriptionPayment.findMany({
+        where: { externalOrderId: { in: orderIds } },
+        select: { externalOrderId: true },
+      });
+      const existingOrderIds = new Set(
+        existingPayments.map((payment) => payment.externalOrderId),
+      );
+      for (let index = 0; index < page.length; index += 1) {
+        if (!existingOrderIds.has(orderIds[index])) {
+          subscriptions.push(page[index]);
+          if (subscriptions.length === limit) break;
+        }
+      }
+
+      // 충돌로 제외한 행도 커서를 전진시켜 오래된 실패 주문을 다시 읽지 않는다.
+      const last = page[page.length - 1];
+      cursor = { nextBillingAt: last.nextBillingAt!, id: last.id };
+      if (page.length < pageSize) break;
+    }
+
+    return subscriptions;
   }
 
   async findAutoRenewalPaymentsToReconcile(

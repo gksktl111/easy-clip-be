@@ -152,6 +152,8 @@ model Subscription {
   workspaceId String @unique
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   payments    SubscriptionPayment[]
+
+  @@index([plan, status, autoRenew, nextBillingAt, id], map: "Subscription_auto_renewal_due_idx")
 }
 
 model SubscriptionPayment {

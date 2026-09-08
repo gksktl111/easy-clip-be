@@ -67,6 +67,12 @@ export class PaymentReconciliationResponseDto {
 
   @ApiProperty({ example: 0 })
   manualReview: number;
+
+  @ApiProperty({ example: 0 })
+  failed: number;
+
+  @ApiProperty({ example: 0 })
+  skipped: number;
 }
 
 export class ProcessDueAutoRenewalsResponseDto {
@@ -78,6 +84,9 @@ export class ProcessDueAutoRenewalsResponseDto {
 
   @ApiProperty({ example: 1 })
   failed: number;
+
+  @ApiProperty({ example: 0 })
+  skipped: number;
 
   @ApiProperty({ type: PaymentReconciliationResponseDto })
   reconciliation: PaymentReconciliationResponseDto;
