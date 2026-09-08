@@ -2,12 +2,6 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Allow, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpdateClipDto {
-  @ApiPropertyOptional({ example: 'cmfolder123' })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  folderId?: string;
-
   @ApiPropertyOptional({
     example: '#FF5733',
     description: 'TEXT 또는 COLOR 값 수정 시 사용합니다.',

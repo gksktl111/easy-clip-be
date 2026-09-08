@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
 import type { Clip } from '../../domain/clip.types';
+import type { UpdatedClip } from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
 import { MulterFile } from 'src/shared/types/multer-file.type';
 import { UpdateClipInput } from '../dtos/update-clip-input.dto';
@@ -29,66 +30,63 @@ export class UpdateClipUseCase {
     input: UpdateClipInput,
     file?: MulterFile,
   ): Promise<Clip> {
+    if ('folderId' in input || 'workspaceId' in input) {
+      throw new ClipsError(
+        'BAD_REQUEST',
+        '클립의 소속 폴더는 변경할 수 없습니다.',
+      );
+    }
+    if (!file && !input.text) {
+      throw new ClipsError(
+        'BAD_REQUEST',
+        'text 또는 file 중 하나는 필요합니다.',
+      );
+    }
     const clip = await this.clipsRepository.findClipByIdForUser(
       userId,
       input.clipId,
     );
+    if (!clip) throw new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.');
 
-    if (!clip) {
-      throw new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.');
+    const clipData = file
+      ? await this.uploadImageAndResolveClipData(userId, file)
+      : resolveClipData(input.text);
+    let updated: UpdatedClip | null;
+    try {
+      updated = await this.clipsRepository.updateClip(
+        userId,
+        clip.id,
+        clipData,
+      );
+      if (!updated)
+        throw new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.');
+    } catch (error) {
+      if (file && clipData.imageUrl) {
+        await this.deleteUnreferencedUpload(clip.id, clipData.imageUrl);
+      }
+      throw error;
     }
-
-    const folder = await this.resolveFolder(userId, input.folderId, clip);
-    const clipData =
-      !file && !input.text
-        ? {
-            type: clip.type,
-            title: clip.title,
-            textContent: clip.textContent,
-            colorHex: clip.colorHex,
-            imageUrl: clip.imageUrl,
-          }
-        : file
-          ? await this.uploadImageAndResolveClipData(userId, file)
-          : resolveClipData(input.text);
-
-    const updatedClip = await this.clipsRepository.updateClip(clip.id, {
-      ...clipData,
-      folderId: folder.id,
-      workspaceId: folder.workspaceId,
-      ...(folder.id !== clip.folderId ? { clearTags: true } : {}),
-    });
-
     await this.deletePreviousImageIfReplaced(
-      clip.imageUrl,
-      updatedClip.imageUrl,
+      updated.previousImageUrl,
+      updated.clip.imageUrl,
     );
-
-    return updatedClip;
+    return updated.clip;
   }
 
-  private async resolveFolder(
-    userId: string,
-    folderId: string | undefined,
-    clip: Awaited<ReturnType<ClipsRepository['findClipByIdForUser']>>,
-  ) {
-    if (folderId) {
-      const folder = await this.clipsRepository.findPersonalFolderById(
-        userId,
-        folderId,
+  private async deleteUnreferencedUpload(
+    clipId: string,
+    imageUrl: string,
+  ): Promise<void> {
+    try {
+      if (await this.clipsRepository.isClipImageReferenced(clipId, imageUrl))
+        return;
+      await this.clipImageStoragePort.deleteImage(imageUrl);
+    } catch {
+      // DB 결과를 확인할 수 없으면 참조 중일 수 있는 이미지를 삭제하지 않는다.
+      this.logger.warn(
+        `미사용 업로드 이미지 정리를 완료하지 못했습니다. clipId=${clipId} imageUrl=${imageUrl}`,
       );
-
-      if (!folder) {
-        throw new ClipsError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
-      }
-
-      return folder;
     }
-
-    return {
-      id: clip!.folderId,
-      workspaceId: clip!.workspaceId,
-    };
   }
 
   private async uploadImageAndResolveClipData(
