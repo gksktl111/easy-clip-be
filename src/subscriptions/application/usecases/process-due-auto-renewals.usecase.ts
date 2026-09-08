@@ -107,6 +107,9 @@ export class ProcessDueAutoRenewalsUseCase {
           amount,
           currency,
           renewalDueAt: subscription.nextBillingAt!,
+          expectedBillingKey: subscription.externalBillingKey,
+          expectedCustomerKey: subscription.externalCustomerKey,
+          now,
           renewalPeriodEnd: subscription.currentPeriodEnd,
           reconciliationNextAt: new Date(
             now.getTime() + RECONCILIATION_DELAY_MS,

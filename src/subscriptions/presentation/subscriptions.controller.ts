@@ -35,6 +35,7 @@ import {
   BillingAuthRequestResponseDto,
   MySubscriptionResponseDto,
   ProcessDueAutoRenewalsResponseDto,
+  UpdateMySubscriptionResponseDto,
 } from './dtos/subscription-response.dto';
 import { UpdateMySubscriptionDto } from './dtos/update-my-subscription.dto';
 
@@ -73,7 +74,7 @@ export class SubscriptionsController {
   @ApiBody({ type: UpdateMySubscriptionDto })
   @ApiOkResponse({
     description: '변경 후 구독 상태를 반환합니다.',
-    type: MySubscriptionResponseDto,
+    type: UpdateMySubscriptionResponseDto,
   })
   updateMySubscription(
     @Request() req: { user: AuthContext },

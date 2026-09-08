@@ -180,6 +180,9 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       amount: 4900,
       currency: 'KRW',
       renewalDueAt: now,
+      expectedBillingKey: 'billing-key',
+      expectedCustomerKey: 'customer-key',
+      now,
       renewalPeriodEnd: now,
       reconciliationNextAt: new Date(now.getTime() + 5 * 60 * 1000),
     });
@@ -289,6 +292,9 @@ describe('ProcessDueAutoRenewalsUseCase', () => {
       amount: 4900,
       currency: 'KRW',
       renewalDueAt: now,
+      expectedBillingKey: 'billing-key',
+      expectedCustomerKey: 'customer-key',
+      now,
       renewalPeriodEnd: now,
       reconciliationNextAt: new Date(now.getTime() + 5 * 60 * 1000),
     });

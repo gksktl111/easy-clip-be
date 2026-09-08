@@ -12,3 +12,10 @@ export type MySubscriptionOutput = {
   nextBillingAt: Date | null;
   provider: PaymentProvider | null;
 };
+
+export type UpdateMySubscriptionOutput = MySubscriptionOutput & {
+  cancellation?: {
+    pendingRenewalPayment: boolean;
+    message: string;
+  };
+};

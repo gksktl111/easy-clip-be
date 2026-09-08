@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class MySubscriptionResponseDto {
   @ApiProperty({ enum: ['FREE', 'PRO'], example: 'FREE' })
@@ -18,6 +18,24 @@ export class MySubscriptionResponseDto {
 
   @ApiProperty({ enum: ['TOSS_PAYMENTS'], example: null, nullable: true })
   provider: 'TOSS_PAYMENTS' | null;
+}
+
+export class SubscriptionCancellationResponseDto {
+  @ApiProperty({
+    description: '이미 시작되어 아직 결과가 확정되지 않은 자동결제 유무',
+  })
+  pendingRenewalPayment: boolean;
+
+  @ApiProperty({ description: '해지와 진행 중 결제에 대한 안내' })
+  message: string;
+}
+
+export class UpdateMySubscriptionResponseDto extends MySubscriptionResponseDto {
+  @ApiPropertyOptional({
+    type: SubscriptionCancellationResponseDto,
+    description: '해지 요청 성공 시 제공하며, 결과 시점의 스냅샷입니다.',
+  })
+  cancellation?: SubscriptionCancellationResponseDto;
 }
 
 export class BillingAuthRequestResponseDto {

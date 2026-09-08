@@ -55,6 +55,14 @@ export type ClaimAutoRenewalPaymentParams = {
   renewalDueAt: Date;
   renewalPeriodEnd: Date | null;
   reconciliationNextAt: Date;
+  expectedBillingKey: string;
+  expectedCustomerKey: string;
+  now: Date;
+};
+
+export type CancelAutoRenewalResult = {
+  subscription: Subscription;
+  pendingRenewalPayment: boolean;
 };
 
 export type AutoRenewalPayment = {
@@ -105,6 +113,14 @@ export interface SubscriptionsRepository {
     subscriptionId: string,
     params: UpdateSubscriptionParams,
   ): Promise<Subscription>;
+
+  cancelAutoRenewal(
+    subscriptionId: string,
+  ): Promise<CancelAutoRenewalResult | null>;
+
+  resumeAutoRenewal(subscriptionId: string): Promise<Subscription | null>;
+
+  hasPendingAutoRenewalPayment(subscriptionId: string): Promise<boolean>;
 
   expireSubscriptionIfUnchanged(
     subscriptionId: string,
