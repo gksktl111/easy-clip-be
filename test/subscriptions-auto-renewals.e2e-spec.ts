@@ -5,6 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PrometheusMetricsService } from '../src/shared/infrastructure/prometheus/prometheus-metrics.service';
 import { ProcessDueAutoRenewalsUseCase } from '../src/subscriptions/application/usecases/process-due-auto-renewals.usecase';
+import { UpdateMySubscriptionUseCase } from '../src/subscriptions/application/usecases/update-my-subscription.usecase';
+import { ConfirmBillingAuthUseCase } from '../src/subscriptions/application/usecases/confirm-billing-auth.usecase';
 import { createAutoRenewalSubscriptionOrderId } from '../src/subscriptions/application/helpers/customer-key.helper';
 import { PrismaSubscriptionsRepository } from '../src/subscriptions/infrastructure/prisma-subscriptions.repository';
 import { TossPaymentsBillingGateway } from '../src/subscriptions/infrastructure/toss-payments-billing.gateway';
@@ -78,17 +80,44 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
   const subscriptionRow = () =>
     prisma.subscription.findUniqueOrThrow({ where: { id: subscriptionId } });
 
+  const claimParams = () => ({
+    subscriptionId,
+    provider: 'TOSS_PAYMENTS' as const,
+    externalOrderId: orderId,
+    amount: 4900,
+    currency: 'KRW',
+    renewalDueAt: dueAt,
+    renewalPeriodEnd: dueAt,
+    reconciliationNextAt: recoveryAt,
+    expectedBillingKey: `billing-${userId}`,
+    expectedCustomerKey: `customer-${userId}`,
+    now: dueAt,
+  });
+
   const createPendingPayment = () =>
-    repository.claimAutoRenewalPayment({
-      subscriptionId,
-      provider: 'TOSS_PAYMENTS',
-      externalOrderId: orderId,
-      amount: 4900,
-      currency: 'KRW',
-      renewalDueAt: dueAt,
-      renewalPeriodEnd: dueAt,
-      reconciliationNextAt: recoveryAt,
+    repository.claimAutoRenewalPayment(claimParams());
+
+  const cancelSubscription = () =>
+    new UpdateMySubscriptionUseCase(secondRepository, mailer).execute(userId, {
+      type: 'CANCEL',
     });
+
+  async function withinTimeout<T>(promise: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('Concurrency barrier timed out')),
+            3000,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   beforeAll(async () => {
     const databaseUrl = process.env.DATABASE_URL;
@@ -184,9 +213,9 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
       expect(mailer.sendPaymentSuccess).not.toHaveBeenCalled();
 
       if (scenario === 'canceled renewal') {
-        await repository.updateSubscription(subscriptionId, {
+        expect(await cancelSubscription()).toMatchObject({
           autoRenew: false,
-          nextBillingAt: null,
+          cancellation: { pendingRenewalPayment: true },
         });
       }
 
@@ -221,6 +250,224 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
       );
     },
   );
+
+  it('does not claim or charge a stale candidate after cancellation completes', async () => {
+    const candidates = await repository.findDueAutoRenewalSubscriptions(
+      dueAt,
+      50,
+    );
+    expect(candidates.map((subscription) => subscription.id)).toContain(
+      subscriptionId,
+    );
+    jest
+      .spyOn(repository, 'findDueAutoRenewalSubscriptions')
+      .mockImplementationOnce(async () => {
+        expect(await cancelSubscription()).toMatchObject({
+          autoRenew: false,
+          cancellation: { pendingRenewalPayment: false },
+        });
+        return candidates;
+      });
+
+    await createUseCase().execute(input());
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      await prisma.subscriptionPayment.count({ where: { subscriptionId } }),
+    ).toBe(0);
+    expect(await subscriptionRow()).toMatchObject({
+      status: 'CANCELED',
+      autoRenew: false,
+      nextBillingAt: null,
+      currentPeriodEnd: dueAt,
+    });
+  });
+
+  it('cancels during an in-flight charge without waiting for its response', async () => {
+    let signalPostStarted!: () => void;
+    const postStarted = new Promise<void>((resolve) => {
+      signalPostStarted = resolve;
+    });
+    let releaseResponse!: (response: Response) => void;
+    const response = new Promise<Response>((resolve) => {
+      releaseResponse = resolve;
+    });
+    fetchMock.mockImplementationOnce(() => {
+      signalPostStarted();
+      return response;
+    });
+    const batch = createUseCase().execute(input());
+    let cancellation: ReturnType<typeof cancelSubscription> | undefined;
+    try {
+      await withinTimeout(postStarted);
+      cancellation = cancelSubscription();
+      expect(await withinTimeout(cancellation)).toMatchObject({
+        status: 'CANCELED',
+        autoRenew: false,
+        nextBillingAt: null,
+        currentPeriodEnd: dueAt,
+        cancellation: { pendingRenewalPayment: true },
+      });
+      releaseResponse(jsonResponse(paymentResponse()));
+      expect(await batch).toMatchObject({ succeeded: 1 });
+      expect(await paymentRow()).toMatchObject({ status: 'DONE' });
+      expect(await subscriptionRow()).toMatchObject({
+        status: 'CANCELED',
+        autoRenew: false,
+        nextBillingAt: null,
+        currentPeriodEnd: recoveredPeriodEnd,
+      });
+      expect(
+        fetchMock.mock.calls.map(([, options]) => options?.method),
+      ).toEqual(['POST']);
+    } finally {
+      releaseResponse(jsonResponse(paymentResponse()));
+      await Promise.allSettled([
+        batch,
+        ...(cancellation ? [cancellation] : []),
+      ]);
+    }
+  });
+
+  it('cancels after completion without losing the paid period or reporting a pending charge', async () => {
+    expect(await createUseCase().execute(input())).toMatchObject({
+      succeeded: 1,
+    });
+
+    expect(await cancelSubscription()).toMatchObject({
+      status: 'CANCELED',
+      autoRenew: false,
+      nextBillingAt: null,
+      currentPeriodEnd: recoveredPeriodEnd,
+      cancellation: { pendingRenewalPayment: false },
+    });
+    expect(await subscriptionRow()).toMatchObject({
+      autoRenew: false,
+      nextBillingAt: null,
+      currentPeriodEnd: recoveredPeriodEnd,
+    });
+    expect(await paymentRow()).toMatchObject({ status: 'DONE' });
+  });
+
+  it.each(['subscription update', 'billing auth'])(
+    'resumes with the latest paid period through %s despite a stale read',
+    async (path) => {
+      const previousEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const extendedEnd = new Date(
+        previousEnd.getTime() + 30 * 24 * 60 * 60 * 1000,
+      );
+      const staleSubscription = await repository.updateSubscription(
+        subscriptionId,
+        {
+          status: 'CANCELED',
+          autoRenew: false,
+          nextBillingAt: null,
+          currentPeriodEnd: previousEnd,
+        },
+      );
+      await secondRepository.updateSubscription(subscriptionId, {
+        currentPeriodEnd: extendedEnd,
+      });
+      jest
+        .spyOn(repository, 'getOrCreatePersonalSubscription')
+        .mockResolvedValueOnce(staleSubscription);
+
+      const result =
+        path === 'subscription update'
+          ? await new UpdateMySubscriptionUseCase(repository, mailer).execute(
+              userId,
+              { type: 'RESUME' },
+            )
+          : await new ConfirmBillingAuthUseCase(
+              repository,
+              new TossPaymentsBillingGateway(config),
+              mailer,
+              config,
+            ).execute(userId, {
+              authKey: 'unused-resume-auth-key',
+              customerKey: `customer-${userId}`,
+            });
+
+      expect(result).toMatchObject({
+        autoRenew: true,
+        currentPeriodEnd: extendedEnd,
+        nextBillingAt: extendedEnd,
+      });
+      expect(await subscriptionRow()).toMatchObject({
+        autoRenew: true,
+        currentPeriodEnd: extendedEnd,
+        nextBillingAt: extendedEnd,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['billing key', 'customer key', 'billing date'])(
+    'rejects a claim with a stale %s',
+    async (field) => {
+      const params = claimParams();
+      await secondRepository.updateSubscription(
+        subscriptionId,
+        field === 'billing key'
+          ? { externalBillingKey: 'replaced-billing-key' }
+          : field === 'customer key'
+            ? { externalCustomerKey: 'replaced-customer-key' }
+            : { nextBillingAt: new Date(dueAt.getTime() - 1000) },
+      );
+
+      expect(await repository.claimAutoRenewalPayment(params)).toBe(false);
+      expect(
+        await prisma.subscriptionPayment.count({ where: { subscriptionId } }),
+      ).toBe(0);
+    },
+  );
+
+  it('rejects a different order while a renewal payment remains pending', async () => {
+    expect(await createPendingPayment()).toBe(true);
+    expect(
+      await secondRepository.claimAutoRenewalPayment({
+        ...claimParams(),
+        externalOrderId: `other-${orderId}`,
+      }),
+    ).toBe(false);
+    expect(
+      await prisma.subscriptionPayment.count({ where: { subscriptionId } }),
+    ).toBe(1);
+    expect(await paymentRow()).toMatchObject({ status: 'PENDING' });
+  });
+
+  it('rejects billing authentication for an expired canceled period with an unresolved renewal', async () => {
+    expect(await createPendingPayment()).toBe(true);
+    expect(await cancelSubscription()).toMatchObject({
+      status: 'CANCELED',
+      currentPeriodEnd: dueAt,
+      cancellation: { pendingRenewalPayment: true },
+    });
+
+    await expect(
+      new ConfirmBillingAuthUseCase(
+        repository,
+        new TossPaymentsBillingGateway(config),
+        mailer,
+        config,
+      ).execute(userId, {
+        authKey: 'unused-pending-renewal-auth-key',
+        customerKey: `customer-${userId}`,
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await subscriptionRow()).toMatchObject({
+      status: 'CANCELED',
+      autoRenew: false,
+      nextBillingAt: null,
+      currentPeriodEnd: dueAt,
+    });
+    expect(await paymentRow()).toMatchObject({ status: 'PENDING' });
+    expect(
+      await prisma.subscriptionPayment.count({ where: { subscriptionId } }),
+    ).toBe(1);
+  });
 
   it('allows only one completion through independent database connections', async () => {
     await createPendingPayment();

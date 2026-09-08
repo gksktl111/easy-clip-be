@@ -33,49 +33,50 @@ const createSubscription = (
 });
 
 describe('UpdateMySubscriptionUseCase', () => {
-  it('해지 시 자동갱신만 중단하고 현재 기간은 유지한다', async () => {
-    const repo = createRepository();
-    const currentPeriodEnd = new Date('2099-03-01T00:00:00.000Z');
+  it.each([false, true])(
+    '해지 시 현재 기간과 미확정 결제 안내를 보존한다 (pending=%s)',
+    async (pendingRenewalPayment) => {
+      const repo = createRepository();
+      const currentPeriodEnd = new Date('2099-03-01T00:00:00.000Z');
 
-    repo.getOrCreatePersonalSubscription.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.ACTIVE,
-        autoRenew: true,
-        currentPeriodEnd,
-        nextBillingAt: currentPeriodEnd,
-        provider: PaymentProvider.TOSS_PAYMENTS,
-        externalBillingKey: 'billing-key',
-        externalCustomerKey: 'customer-key',
-      }),
-    );
-    repo.updateSubscription.mockResolvedValue(
-      createSubscription({
+      repo.getOrCreatePersonalSubscription.mockResolvedValue(
+        createSubscription({
+          plan: SubscriptionPlan.PRO,
+          status: SubscriptionStatus.ACTIVE,
+          autoRenew: true,
+          currentPeriodEnd,
+          nextBillingAt: currentPeriodEnd,
+          provider: PaymentProvider.TOSS_PAYMENTS,
+          externalBillingKey: 'billing-key',
+          externalCustomerKey: 'customer-key',
+        }),
+      );
+      repo.cancelAutoRenewal.mockResolvedValue({
+        subscription: createSubscription({
+          plan: SubscriptionPlan.PRO,
+          status: SubscriptionStatus.CANCELED,
+          autoRenew: false,
+          currentPeriodEnd,
+          nextBillingAt: null,
+        }),
+        pendingRenewalPayment,
+      });
+
+      const usecase = new UpdateMySubscriptionUseCase(repo, createMailer());
+      const result = await usecase.execute('user-id', {
+        type: SubscriptionAction.CANCEL,
+      });
+
+      expect(repo.cancelAutoRenewal).toHaveBeenCalledWith('subscription-id');
+      expect(result.cancellation).toMatchObject({ pendingRenewalPayment });
+      expect(result).toMatchObject({
         plan: SubscriptionPlan.PRO,
         status: SubscriptionStatus.CANCELED,
         autoRenew: false,
         currentPeriodEnd,
-        nextBillingAt: null,
-      }),
-    );
-
-    const usecase = new UpdateMySubscriptionUseCase(repo, createMailer());
-    const result = await usecase.execute('user-id', {
-      type: SubscriptionAction.CANCEL,
-    });
-
-    expect(repo.updateSubscription).toHaveBeenCalledWith('subscription-id', {
-      status: SubscriptionStatus.CANCELED,
-      autoRenew: false,
-      nextBillingAt: null,
-    });
-    expect(result).toMatchObject({
-      plan: SubscriptionPlan.PRO,
-      status: SubscriptionStatus.CANCELED,
-      autoRenew: false,
-      currentPeriodEnd,
-    });
-  });
+      });
+    },
+  );
 
   it('빌링키가 있는 해지 구독은 자동갱신을 재개할 수 있다', async () => {
     const repo = createRepository();
@@ -93,7 +94,7 @@ describe('UpdateMySubscriptionUseCase', () => {
         externalCustomerKey: 'customer-key',
       }),
     );
-    repo.updateSubscription.mockResolvedValue(
+    repo.resumeAutoRenewal.mockResolvedValue(
       createSubscription({
         plan: SubscriptionPlan.PRO,
         status: SubscriptionStatus.ACTIVE,
@@ -111,11 +112,7 @@ describe('UpdateMySubscriptionUseCase', () => {
       type: SubscriptionAction.RESUME,
     });
 
-    expect(repo.updateSubscription).toHaveBeenCalledWith('subscription-id', {
-      status: SubscriptionStatus.ACTIVE,
-      autoRenew: true,
-      nextBillingAt: currentPeriodEnd,
-    });
+    expect(repo.resumeAutoRenewal).toHaveBeenCalledWith('subscription-id');
     expect(mailer.sendSubscriptionResumed).toHaveBeenCalledWith({
       recipientEmail: 'user@example.com',
       plan: SubscriptionPlan.PRO,
@@ -140,7 +137,7 @@ describe('UpdateMySubscriptionUseCase', () => {
         externalCustomerKey: 'customer-key',
       }),
     );
-    repo.updateSubscription.mockResolvedValue(
+    repo.resumeAutoRenewal.mockResolvedValue(
       createSubscription({
         plan: SubscriptionPlan.PRO,
         status: SubscriptionStatus.ACTIVE,
@@ -182,5 +179,26 @@ describe('UpdateMySubscriptionUseCase', () => {
         type: SubscriptionAction.CANCEL,
       }),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+  it('조회 후 재개 조건이 바뀌면 재개와 메일 발송을 거부한다', async () => {
+    const repo = createRepository();
+    const mailer = createMailer();
+    repo.getOrCreatePersonalSubscription.mockResolvedValue(
+      createSubscription({
+        plan: SubscriptionPlan.PRO,
+        status: SubscriptionStatus.CANCELED,
+        currentPeriodEnd: new Date('2099-03-01'),
+        externalBillingKey: 'billing-key',
+        externalCustomerKey: 'customer-key',
+      }),
+    );
+    repo.resumeAutoRenewal.mockResolvedValue(null);
+    await expect(
+      new UpdateMySubscriptionUseCase(repo, mailer).execute('user-id', {
+        type: SubscriptionAction.RESUME,
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(repo.updateSubscription).not.toHaveBeenCalled();
+    expect(mailer.sendSubscriptionResumed).not.toHaveBeenCalled();
   });
 });

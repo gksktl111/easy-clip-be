@@ -67,7 +67,7 @@ ORDER BY "manualReviewAt", "id";
 ## 범위와 후속 작업
 
 - #146은 자동갱신의 미확정 결과 조회와 원자적 권한 복구를 담당한다. 최초 결제의 주문 선점·복구, 환불 정책, 실패 결제의 새 청구 재시도는 포함하지 않는다.
-- [#147](https://github.com/gksktl111/easy-clip-be/issues/147)의 최신 해지 보존은 성공 반영 경로에 적용하지만, 청구 선점 전후 해지의 제품 정책 전체를 확정한 것은 아니다.
+- [#147](https://github.com/gksktl111/easy-clip-be/issues/147)의 청구 선점·해지 순서, 미확정 결제 안내, 재개 처리는 [해지 정책 문서](auto-renewal-cancellation-policy.md)를 따른다. 선점 후 이번 청구는 완료될 수 있으며 다음 자동결제를 중단한다. 자동 환불은 포함하지 않는다.
 - [#148](https://github.com/gksktl111/easy-clip-be/issues/148)과 관련해 미확정 주문은 대사 큐로 분리하고 신규 조회에서 제외한다. 기존 `FAILED` 주문의 재시도·종료와 전체 배치 운영 정책은 별도 후속 범위다.
 - 플랜 기반 폴더 잠금은 구현하지 않는다. [잠금 정책 문서](subscription-plan-limits-and-folder-locking.md)의 정책 결정과 전체 API 적용은 별도 작업이다.
 

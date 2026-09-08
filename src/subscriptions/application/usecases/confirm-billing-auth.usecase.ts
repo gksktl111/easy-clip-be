@@ -50,14 +50,14 @@ export class ConfirmBillingAuthUseCase {
     }
 
     if (this.canResumeWithoutImmediatePayment(subscription)) {
-      const updated = await this.subscriptionsRepository.updateSubscription(
+      const updated = await this.subscriptionsRepository.resumeAutoRenewal(
         subscription.id,
-        {
-          status: SubscriptionStatus.ACTIVE,
-          autoRenew: true,
-          nextBillingAt: subscription.currentPeriodEnd,
-        },
       );
+      if (!updated)
+        throw new SubscriptionsError(
+          'CONFLICT',
+          '구독 상태가 변경되어 자동갱신을 재개할 수 없습니다.',
+        );
 
       await this.sendSubscriptionResumedMail({
         userId,
@@ -66,6 +66,17 @@ export class ConfirmBillingAuthUseCase {
       });
 
       return toMySubscriptionResponse(updated);
+    }
+
+    if (
+      await this.subscriptionsRepository.hasPendingAutoRenewalPayment(
+        subscription.id,
+      )
+    ) {
+      throw new SubscriptionsError(
+        'CONFLICT',
+        '이전 자동결제 결과를 확인 중입니다. 결과 확인 후 다시 시도해주세요.',
+      );
     }
 
     const amount = this.getProPlanAmount();
