@@ -231,6 +231,10 @@ export class ClipsController {
   @UseGuards(JwtAccessGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: '클립 수정' })
+  @ApiBadRequestResponse({
+    description: '소속 변경 필드가 있거나 수정할 콘텐츠가 없으면 거부합니다.',
+    type: ErrorResponseDto,
+  })
   @ApiParam({ name: 'id', description: '클립 ID' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UpdateClipDto })

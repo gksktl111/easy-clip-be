@@ -9,6 +9,7 @@ import {
   FindRecentClipsParams,
   ReplaceClipTagsParams,
   UpdateClipParams,
+  UpdatedClip,
 } from '../domain/clips.repository';
 import {
   Clip,
@@ -377,34 +378,49 @@ export class PrismaClipsRepository implements ClipsRepository {
     });
   }
 
-  async updateClip(clipId: string, params: UpdateClipParams): Promise<Clip> {
-    const data = {
-      type: params.type,
-      title: params.title,
-      folderId: params.folderId,
-      workspaceId: params.workspaceId,
-      textContent: params.textContent,
-      colorHex: params.colorHex,
-      imageUrl: params.imageUrl,
-    };
-
-    if (!params.clearTags) {
-      return this.prisma.clip.update({
-        where: { id: clipId },
-        data,
-      });
-    }
-
+  async updateClip(
+    userId: string,
+    clipId: string,
+    params: UpdateClipParams,
+  ): Promise<UpdatedClip | null> {
     return this.prisma.$transaction(async (tx) => {
-      const updatedClip = await tx.clip.update({
-        where: { id: clipId },
-        data,
+      await tx.$queryRaw`SELECT "id" FROM "Clip" WHERE "id" = ${clipId} FOR UPDATE`;
+      const previous = await tx.clip.findFirst({
+        where: {
+          id: clipId,
+          deletedAt: null,
+          folder: { deletedAt: null },
+          workspace: { ownerUserId: userId },
+        },
       });
-      const clipTag = (tx as unknown as { clipTag: ClipTagDelegate }).clipTag;
+      if (!previous) return null;
+      const clip = await tx.clip.update({
+        where: { id: clipId },
+        // 소속과 태그는 변경하지 않는다. 런타임 입력도 명시한 콘텐츠 필드만 저장한다.
+        data: {
+          type: params.type,
+          title: params.title,
+          textContent: params.textContent,
+          colorHex: params.colorHex,
+          imageUrl: params.imageUrl,
+        },
+      });
+      return { clip, previousImageUrl: previous.imageUrl };
+    });
+  }
 
-      await clipTag.deleteMany({ where: { clipId } });
-
-      return updatedClip;
+  async isClipImageReferenced(
+    clipId: string,
+    imageUrl: string,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      // 저장 응답이 유실돼도 앞선 쓰기의 커밋/롤백이 끝난 뒤 참조를 확인한다.
+      await tx.$queryRaw`SELECT "id" FROM "Clip" WHERE "id" = ${clipId} FOR UPDATE`;
+      const clip = await tx.clip.findUnique({
+        where: { id: clipId },
+        select: { imageUrl: true },
+      });
+      return clip?.imageUrl === imageUrl;
     });
   }
 

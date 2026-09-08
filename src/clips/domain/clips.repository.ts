@@ -22,8 +22,14 @@ export type CreateClipParams = {
   imageUrl: string | null;
 };
 
-export type UpdateClipParams = CreateClipParams & {
-  clearTags?: boolean;
+export type UpdateClipParams = Omit<
+  CreateClipParams,
+  'folderId' | 'workspaceId'
+>;
+
+export type UpdatedClip = {
+  clip: Clip;
+  previousImageUrl: string | null;
 };
 
 export type ReplaceClipTagsParams = {
@@ -91,7 +97,12 @@ export interface ClipsRepository {
   createClipLike(userId: string, clipId: string): Promise<void>;
   deleteClipLike(userId: string, clipId: string): Promise<void>;
   createClip(params: CreateClipParams): Promise<Clip>;
-  updateClip(clipId: string, params: UpdateClipParams): Promise<Clip>;
+  updateClip(
+    userId: string,
+    clipId: string,
+    params: UpdateClipParams,
+  ): Promise<UpdatedClip | null>;
+  isClipImageReferenced(clipId: string, imageUrl: string): Promise<boolean>;
   replaceClipTags(params: ReplaceClipTagsParams): Promise<Tag[]>;
   softDeleteClip(clipId: string): Promise<Clip>;
   softDeleteClips(clipIds: string[]): Promise<number>;
