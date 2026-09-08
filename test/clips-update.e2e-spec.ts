@@ -170,6 +170,65 @@ describe('Clip content updates (PostgreSQL integration)', () => {
     expect(await prisma.clipTag.count({ where: { clipId } })).toBe(1);
   });
 
+  it('renames over HTTP without replacing content, membership or tags', async () => {
+    const before = await row();
+    await request(app.getHttpServer())
+      .patch(`/clips/${clipId}`)
+      .send({ title: '새 이미지 이름' })
+      .expect(200);
+    expect(await row()).toMatchObject({
+      title: '새 이미지 이름',
+      type: before.type,
+      textContent: before.textContent,
+      colorHex: before.colorHex,
+      imageUrl: before.imageUrl,
+      folderId,
+      workspaceId,
+    });
+    expect(await prisma.clipTag.count({ where: { clipId } })).toBe(1);
+    expect(storage.uploadImage).not.toHaveBeenCalled();
+    expect(storage.deleteImage).not.toHaveBeenCalled();
+    for (const title of ['', '   ', null, 123]) {
+      await request(app.getHttpServer())
+        .patch(`/clips/${clipId}`)
+        .send({ title })
+        .expect(400);
+    }
+    expect((await row()).title).toBe('새 이미지 이름');
+  });
+
+  it('preserves an image replaced between the rename read and write', async () => {
+    const original = repository.updateClip.bind(
+      repository,
+    ) as PrismaClipsRepository['updateClip'];
+    let replacedUrl: string | null = null;
+    jest
+      .spyOn(repository, 'updateClip')
+      .mockImplementationOnce(async (...args) => {
+        const replaced = await useCase(secondRepository).execute(
+          userId,
+          { clipId },
+          file,
+        );
+        replacedUrl = replaced.imageUrl;
+        return original(...args);
+      });
+    const renamed = await useCase().execute(userId, {
+      clipId,
+      title: '동시 변경 이름',
+    });
+    expect(replacedUrl).not.toBe(oldImage);
+    expect(renamed).toMatchObject({
+      title: '동시 변경 이름',
+      imageUrl: replacedUrl,
+      type: 'IMAGE',
+    });
+    expect((await row()).imageUrl).toBe(replacedUrl);
+    expect(objects).toEqual(new Set([replacedUrl]));
+    expect(storage.deleteImage).toHaveBeenCalledTimes(1);
+    expect(storage.deleteImage).toHaveBeenCalledWith(oldImage);
+  });
+
   it('rejects an empty HTTP update while image replacement proceeds without rewriting old data', async () => {
     const [, updated] = await Promise.all([
       request(app.getHttpServer())

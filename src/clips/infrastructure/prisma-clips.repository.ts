@@ -359,14 +359,17 @@ export class PrismaClipsRepository implements ClipsRepository {
       async (tx, _access, previous) => {
         const clip = await tx.clip.update({
           where: { id: clipId },
-          // 소속과 태그는 변경하지 않는다. 런타임 입력도 명시한 콘텐츠 필드만 저장한다.
-          data: {
-            type: params.type,
-            title: params.title,
-            textContent: params.textContent,
-            colorHex: params.colorHex,
-            imageUrl: params.imageUrl,
-          },
+          // 이름만 바꾸면 콘텐츠를 재저장하지 않는다. 동시 이미지 교체 결과도 보존한다.
+          data:
+            'type' in params
+              ? {
+                  type: params.type,
+                  title: params.title,
+                  textContent: params.textContent,
+                  colorHex: params.colorHex,
+                  imageUrl: params.imageUrl,
+                }
+              : { title: params.title },
         });
         return { clip, previousImageUrl: previous.imageUrl };
       },

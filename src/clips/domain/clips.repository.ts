@@ -22,10 +22,9 @@ export type CreateClipParams = {
   imageUrl: string | null;
 };
 
-export type UpdateClipParams = Omit<
-  CreateClipParams,
-  'folderId' | 'workspaceId'
->;
+export type UpdateClipParams =
+  | Omit<CreateClipParams, 'folderId' | 'workspaceId'>
+  | { title: string };
 
 export type UpdatedClip = {
   clip: Clip;

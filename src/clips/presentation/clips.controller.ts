@@ -242,11 +242,12 @@ export class ClipsController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: '클립 수정' })
   @ApiBadRequestResponse({
-    description: '소속 변경 필드가 있거나 수정할 콘텐츠가 없으면 거부합니다.',
+    description:
+      '소속 변경 필드가 있거나 수정할 이름·콘텐츠가 없으면 거부합니다.',
     type: ErrorResponseDto,
   })
   @ApiParam({ name: 'id', description: '클립 ID' })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('application/json', 'multipart/form-data')
   @ApiBody({ type: UpdateClipDto })
   @ApiOkResponse({
     description: '수정된 클립 정보를 반환합니다.',

@@ -213,6 +213,7 @@ describe('Folder access (PostgreSQL integration)', () => {
       () => clips.findClipByIdForUser(userId, lockedClipId),
       () => clips.findClips({ userId, folderId: lockedId, limit: 10 }),
       () => clips.updateClip(userId, lockedClipId, content),
+      () => clips.updateClip(userId, lockedClipId, { title: 'blocked rename' }),
       () => create(lockedId),
       () => clips.createClipLike(userId, lockedClipId),
       () => clips.deleteClipLike(userId, lockedClipId),

@@ -1,7 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CLIPS_REPOSITORY } from '../../domain/clips.repository';
 import type { Clip } from '../../domain/clip.types';
-import type { UpdatedClip } from '../../domain/clips.repository';
+import type {
+  UpdatedClip,
+  UpdateClipParams,
+} from '../../domain/clips.repository';
 import type { ClipsRepository } from '../../domain/clips.repository';
 import { MulterFile } from 'src/shared/types/multer-file.type';
 import { UpdateClipInput } from '../dtos/update-clip-input.dto';
@@ -36,10 +39,21 @@ export class UpdateClipUseCase {
         '클립의 소속 폴더는 변경할 수 없습니다.',
       );
     }
-    if (!file && !input.text) {
+    if (
+      input.title !== undefined &&
+      (typeof input.title !== 'string' || input.title.trim().length === 0)
+    ) {
       throw new ClipsError(
         'BAD_REQUEST',
-        'text 또는 file 중 하나는 필요합니다.',
+        'title은 공백이 아닌 문자열이어야 합니다.',
+      );
+    }
+    const title = input.title?.trim();
+    const hasContent = Boolean(file) || input.text !== undefined;
+    if (!hasContent && title === undefined) {
+      throw new ClipsError(
+        'BAD_REQUEST',
+        'title, text 또는 file 중 하나는 필요합니다.',
       );
     }
     const clip = await this.clipsRepository.findClipByIdForUser(
@@ -48,9 +62,14 @@ export class UpdateClipUseCase {
     );
     if (!clip) throw new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.');
 
-    const clipData = file
-      ? await this.uploadImageAndResolveClipData(userId, file)
-      : resolveClipData(input.text);
+    const clipData: UpdateClipParams = hasContent
+      ? {
+          ...(file
+            ? await this.uploadImageAndResolveClipData(userId, file)
+            : resolveClipData(input.text)),
+          ...(title !== undefined ? { title } : {}),
+        }
+      : { title: title! };
     let updated: UpdatedClip | null;
     try {
       updated = await this.clipsRepository.updateClip(
@@ -61,15 +80,17 @@ export class UpdateClipUseCase {
       if (!updated)
         throw new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.');
     } catch (error) {
-      if (file && clipData.imageUrl) {
+      if (file && 'imageUrl' in clipData && clipData.imageUrl) {
         await this.deleteUnreferencedUpload(clip.id, clipData.imageUrl);
       }
       throw error;
     }
-    await this.deletePreviousImageIfReplaced(
-      updated.previousImageUrl,
-      updated.clip.imageUrl,
-    );
+    if (hasContent) {
+      await this.deletePreviousImageIfReplaced(
+        updated.previousImageUrl,
+        updated.clip.imageUrl,
+      );
+    }
     return updated.clip;
   }
 

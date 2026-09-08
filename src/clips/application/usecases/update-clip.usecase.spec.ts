@@ -62,6 +62,81 @@ describe('UpdateClipUseCase', () => {
     warnSpy.mockRestore();
   });
 
+  it.each(['TEXT', 'COLOR', 'IMAGE'] as const)(
+    '이름만 변경하면 %s 콘텐츠를 저장하거나 이미지를 정리하지 않는다',
+    async (type) => {
+      const { repo, storage, usecase } = setup(oldImageUrl);
+      const previous = createClip({
+        type,
+        imageUrl: type === 'IMAGE' ? oldImageUrl : null,
+      });
+      repo.findClipByIdForUser.mockResolvedValue(previous);
+      repo.updateClip.mockResolvedValue({
+        clip: { ...previous, title: '새 이름' },
+        previousImageUrl: previous.imageUrl,
+      });
+      await expect(
+        usecase.execute('user-id', { clipId: 'clip-id', title: ' 새 이름 ' }),
+      ).resolves.toEqual({ ...previous, title: '새 이름' });
+      expect(repo.updateClip).toHaveBeenCalledWith('user-id', 'clip-id', {
+        title: '새 이름',
+      });
+      expect(storage.uploadImage).not.toHaveBeenCalled();
+      expect(storage.deleteImage).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['', '   ', null, 123])(
+    '잘못된 이름 %s는 업로드 전에 거부한다',
+    async (title) => {
+      const { repo, storage, usecase } = setup();
+      await expect(
+        usecase.execute(
+          'user-id',
+          { clipId: 'clip-id', title: title as string },
+          file,
+        ),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(repo.updateClip).not.toHaveBeenCalled();
+      expect(storage.uploadImage).not.toHaveBeenCalled();
+    },
+  );
+
+  it('이름과 본문을 함께 보내면 명시한 이름을 저장한다', async () => {
+    const { repo, usecase } = setup();
+    await usecase.execute('user-id', {
+      clipId: 'clip-id',
+      title: '사용자 이름',
+      text: 'new body',
+    });
+    expect(repo.updateClip).toHaveBeenCalledWith(
+      'user-id',
+      'clip-id',
+      expect.objectContaining({
+        title: '사용자 이름',
+        textContent: 'new body',
+      }),
+    );
+  });
+
+  it('이미지 교체와 이름을 함께 보내면 파일명보다 명시한 이름을 우선한다', async () => {
+    const { repo, storage, usecase } = setup(oldImageUrl);
+    await usecase.execute(
+      'user-id',
+      { clipId: 'clip-id', title: '사용자 이미지' },
+      file,
+    );
+    expect(repo.updateClip).toHaveBeenCalledWith(
+      'user-id',
+      'clip-id',
+      expect.objectContaining({
+        title: '사용자 이미지',
+        imageUrl: newImageUrl,
+      }),
+    );
+    expect(storage.deleteImage).toHaveBeenCalledWith(oldImageUrl);
+  });
+
   it.each<[string, ClipData]>([
     [
       'hello',
