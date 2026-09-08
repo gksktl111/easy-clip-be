@@ -267,7 +267,8 @@ export class ResendSubscriptionPaymentMailService implements SubscriptionPayment
     return `${amount.toLocaleString('ko-KR')} ${currency}`;
   }
 
-  private formatDate(value: Date): string {
+  private formatDate(value: Date | null): string {
+    if (!value) return '자동갱신 해지로 예정된 결제 없음';
     return new Intl.DateTimeFormat('ko-KR', {
       timeZone: 'Asia/Seoul',
       dateStyle: 'medium',

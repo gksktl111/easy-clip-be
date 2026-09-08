@@ -11,7 +11,7 @@ export type SendSubscriptionPaymentSuccessMailInput = {
   approvedAt: Date;
   plan: SubscriptionPlan;
   currentPeriodEnd: Date;
-  nextBillingAt: Date;
+  nextBillingAt: Date | null;
   paymentKind: 'INITIAL' | 'AUTO_RENEWAL';
 };
 

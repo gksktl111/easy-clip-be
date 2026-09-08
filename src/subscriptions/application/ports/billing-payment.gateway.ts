@@ -33,10 +33,18 @@ export type ChargeBillingResult = {
   rawData: unknown;
 };
 
+export type LookupBillingPaymentResult = Omit<ChargeBillingResult, 'status'> & {
+  status: string;
+};
+
 export interface BillingPaymentGateway {
   issueBillingKey(
     params: IssueBillingKeyParams,
   ): Promise<IssueBillingKeyResult>;
 
   chargeBilling(params: ChargeBillingParams): Promise<ChargeBillingResult>;
+
+  findPaymentByOrderId(
+    orderId: string,
+  ): Promise<LookupBillingPaymentResult | null>;
 }

@@ -37,6 +37,20 @@ export class BillingAuthRequestResponseDto {
   failUrl: string;
 }
 
+export class PaymentReconciliationResponseDto {
+  @ApiProperty({ example: 1 })
+  processed: number;
+
+  @ApiProperty({ example: 1 })
+  succeeded: number;
+
+  @ApiProperty({ example: 0 })
+  deferred: number;
+
+  @ApiProperty({ example: 0 })
+  manualReview: number;
+}
+
 export class ProcessDueAutoRenewalsResponseDto {
   @ApiProperty({ example: 3 })
   processed: number;
@@ -46,4 +60,7 @@ export class ProcessDueAutoRenewalsResponseDto {
 
   @ApiProperty({ example: 1 })
   failed: number;
+
+  @ApiProperty({ type: PaymentReconciliationResponseDto })
+  reconciliation: PaymentReconciliationResponseDto;
 }

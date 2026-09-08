@@ -9,8 +9,11 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   ActivateSubscriptionPaymentParams,
+  AutoRenewalPayment,
   BillingMailRecipient,
   ClaimAutoRenewalPaymentParams,
+  CompleteAutoRenewalPaymentParams,
+  DeferAutoRenewalReconciliationParams,
   MarkPaymentFailedParams,
   SubscriptionsRepository,
   UpdateSubscriptionParams,
@@ -33,6 +36,17 @@ const subscriptionSelect = {
   externalBillingKey: true,
   externalCustomerKey: true,
 } satisfies Prisma.SubscriptionSelect;
+
+const renewalPaymentSelect = {
+  id: true,
+  subscriptionId: true,
+  externalOrderId: true,
+  amount: true,
+  currency: true,
+  renewalDueAt: true,
+  renewalPeriodEnd: true,
+  reconciliationAttempts: true,
+} satisfies Prisma.SubscriptionPaymentSelect;
 
 @Injectable()
 export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
@@ -116,6 +130,31 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
     });
   }
 
+  async expireSubscriptionIfUnchanged(
+    subscriptionId: string,
+    expectedPeriodEnd: Date,
+  ): Promise<Subscription> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          plan: PrismaSubscriptionPlan.PRO,
+          autoRenew: false,
+          currentPeriodEnd: expectedPeriodEnd,
+        },
+        data: {
+          plan: PrismaSubscriptionPlan.FREE,
+          status: PrismaSubscriptionStatus.EXPIRED,
+          nextBillingAt: null,
+        },
+      });
+      return tx.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        select: subscriptionSelect,
+      });
+    });
+  }
+
   async activateByPayment(
     params: ActivateSubscriptionPaymentParams,
   ): Promise<Subscription> {
@@ -149,12 +188,24 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
   }
 
   async recordPaymentFailure(params: MarkPaymentFailedParams): Promise<void> {
-    await this.prisma.subscriptionPayment.upsert({
-      where: {
-        externalOrderId: params.externalOrderId,
-      },
-      update: this.toPaymentUpdateData(params),
-      create: this.toPaymentCreateData(params),
+    await this.prisma.$transaction(async (tx) => {
+      await tx.subscriptionPayment.upsert({
+        where: { externalOrderId: params.externalOrderId },
+        update: {},
+        create: this.toPaymentCreateData(params),
+      });
+      // 지연된 실패 응답이 이미 대사·반영된 성공 결제를 덮어쓰지 않는다.
+      await tx.subscriptionPayment.updateMany({
+        where: {
+          externalOrderId: params.externalOrderId,
+          subscriptionId: params.subscriptionId,
+          status: PrismaSubscriptionPaymentStatus.PENDING,
+        },
+        data: {
+          ...this.toPaymentUpdateData(params),
+          reconciliationNextAt: null,
+        },
+      });
     });
   }
 
@@ -170,6 +221,9 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
           externalOrderId: params.externalOrderId,
           amount: params.amount,
           currency: params.currency,
+          renewalDueAt: params.renewalDueAt,
+          renewalPeriodEnd: params.renewalPeriodEnd,
+          reconciliationNextAt: params.reconciliationNextAt,
           subscription: {
             connect: {
               id: params.subscriptionId,
@@ -200,6 +254,9 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
         plan: PrismaSubscriptionPlan.PRO,
         status: PrismaSubscriptionStatus.ACTIVE,
         autoRenew: true,
+        // 미확정 주문은 구독 상태와 별도의 대사 큐에서 처리한다.
+        // 기간이 변경돼도 결과 확인 전에 새 주문을 과금하지 않는다.
+        payments: { none: { status: PrismaSubscriptionPaymentStatus.PENDING } },
         externalBillingKey: {
           not: null,
         },
@@ -215,6 +272,126 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
       },
       take: limit,
       select: subscriptionSelect,
+    });
+  }
+
+  async findAutoRenewalPaymentsToReconcile(
+    now: Date,
+    limit: number,
+  ): Promise<AutoRenewalPayment[]> {
+    return this.prisma.subscriptionPayment.findMany({
+      where: {
+        provider: PrismaPaymentProvider.TOSS_PAYMENTS,
+        status: PrismaSubscriptionPaymentStatus.PENDING,
+        reconciliationNextAt: { lte: now },
+        manualReviewAt: null,
+      },
+      orderBy: [{ reconciliationNextAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: renewalPaymentSelect,
+    });
+  }
+
+  async claimAutoRenewalReconciliation(
+    paymentId: string,
+    now: Date,
+    leaseUntil: Date,
+  ): Promise<AutoRenewalPayment | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.subscriptionPayment.updateMany({
+        where: {
+          id: paymentId,
+          status: PrismaSubscriptionPaymentStatus.PENDING,
+          reconciliationNextAt: { lte: now },
+          manualReviewAt: null,
+        },
+        data: {
+          reconciliationNextAt: leaseUntil,
+          reconciliationAttempts: { increment: 1 },
+        },
+      });
+      return claimed.count === 1
+        ? tx.subscriptionPayment.findUniqueOrThrow({
+            where: { id: paymentId },
+            select: renewalPaymentSelect,
+          })
+        : null;
+    });
+  }
+
+  async deferAutoRenewalReconciliation(
+    params: DeferAutoRenewalReconciliationParams,
+  ): Promise<void> {
+    await this.prisma.subscriptionPayment.updateMany({
+      where: {
+        id: params.paymentId,
+        status: PrismaSubscriptionPaymentStatus.PENDING,
+        reconciliationAttempts: params.attempt,
+      },
+      data: {
+        reconciliationNextAt: params.nextAttemptAt,
+        reconciliationError: params.error,
+        manualReviewAt: params.manualReviewAt ?? null,
+      },
+    });
+  }
+
+  async completeAutoRenewalPayment(
+    params: CompleteAutoRenewalPaymentParams,
+  ): Promise<Subscription | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.subscriptionPayment.findUniqueOrThrow({
+        where: { externalOrderId: params.externalOrderId },
+        select: renewalPaymentSelect,
+      });
+      const completed = await tx.subscriptionPayment.updateMany({
+        where: {
+          id: payment.id,
+          status: PrismaSubscriptionPaymentStatus.PENDING,
+          provider: PrismaPaymentProvider.TOSS_PAYMENTS,
+          renewalDueAt: { not: null },
+          amount: params.amount,
+          currency: params.currency,
+        },
+        data: {
+          status: PrismaSubscriptionPaymentStatus.DONE,
+          externalPaymentKey: params.externalPaymentKey,
+          approvedAt: params.approvedAt,
+          rawData: params.rawData as Prisma.InputJsonValue,
+          reconciliationNextAt: null,
+          reconciliationError: null,
+          manualReviewAt: null,
+          failedAt: null,
+          failureCode: null,
+          failureMessage: null,
+        },
+      });
+      if (completed.count === 0) return null;
+
+      // 서로 다른 주문의 반영도 기간을 되돌리지 않도록 최신 구독을 잠근다.
+      // 외부 조회·과금은 이 트랜잭션 밖에서 완료된다.
+      await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${payment.subscriptionId} FOR UPDATE`;
+      const subscription = await tx.subscription.findUniqueOrThrow({
+        where: { id: payment.subscriptionId },
+        select: subscriptionSelect,
+      });
+      const periodEnd =
+        subscription.currentPeriodEnd &&
+        subscription.currentPeriodEnd > params.currentPeriodEnd
+          ? subscription.currentPeriodEnd
+          : params.currentPeriodEnd;
+      return tx.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          plan: PrismaSubscriptionPlan.PRO,
+          status: subscription.autoRenew
+            ? PrismaSubscriptionStatus.ACTIVE
+            : PrismaSubscriptionStatus.CANCELED,
+          currentPeriodEnd: periodEnd,
+          nextBillingAt: subscription.autoRenew ? periodEnd : null,
+        },
+        select: subscriptionSelect,
+      });
     });
   }
 
@@ -293,7 +470,7 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
 
   private toPaymentUpdateData(
     params: MarkPaymentFailedParams,
-  ): Prisma.SubscriptionPaymentUpdateInput {
+  ): Prisma.SubscriptionPaymentUpdateManyMutationInput {
     return {
       provider: params.provider as PrismaPaymentProvider,
       status: params.status as PrismaSubscriptionPaymentStatus,
@@ -308,11 +485,6 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
       ...(params.rawData !== undefined
         ? { rawData: params.rawData as Prisma.InputJsonValue }
         : {}),
-      subscription: {
-        connect: {
-          id: params.subscriptionId,
-        },
-      },
     };
   }
 }

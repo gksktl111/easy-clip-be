@@ -32,6 +32,7 @@ const createSubscription = (
 const createGateway = (): jest.Mocked<BillingPaymentGateway> => ({
   issueBillingKey: jest.fn(),
   chargeBilling: jest.fn(),
+  findPaymentByOrderId: jest.fn(),
 });
 
 const createMailer = (): jest.Mocked<SubscriptionPaymentMailPort> => ({
