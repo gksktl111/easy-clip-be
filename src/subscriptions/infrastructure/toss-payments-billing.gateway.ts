@@ -7,6 +7,7 @@ import {
   ChargeBillingResult,
   IssueBillingKeyParams,
   IssueBillingKeyResult,
+  LookupBillingPaymentResult,
 } from '../application/ports/billing-payment.gateway';
 
 type TossBillingKeyResponse = {
@@ -80,10 +81,50 @@ export class TossPaymentsBillingGateway implements BillingPaymentGateway {
     };
   }
 
-  private async request<TResponse>(
-    path: string,
-    body: Record<string, unknown>,
-  ): Promise<TResponse> {
+  async findPaymentByOrderId(
+    orderId: string,
+  ): Promise<LookupBillingPaymentResult | null> {
+    const response = await fetch(
+      `${this.baseUrl}/v1/payments/orders/${encodeURIComponent(orderId)}`,
+      {
+        method: 'GET',
+        headers: this.getRequestHeaders(),
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    const data = (await response.json()) as TossPaymentResponse & {
+      code?: string;
+      message?: string;
+    };
+
+    if (response.status === 404 && data.code === 'NOT_FOUND_PAYMENT') {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new SubscriptionsError(
+        'CONFLICT',
+        data.message ?? '토스페이먼츠 요청에 실패했습니다.',
+      );
+    }
+
+    const approvedAt = data.approvedAt ? new Date(data.approvedAt) : null;
+
+    return {
+      paymentKey: data.paymentKey,
+      orderId: data.orderId,
+      status: data.status,
+      totalAmount: data.totalAmount,
+      currency: data.currency,
+      approvedAt:
+        approvedAt && Number.isFinite(approvedAt.getTime()) ? approvedAt : null,
+      failureCode: data.failure?.code ?? null,
+      failureMessage: data.failure?.message ?? null,
+      rawData: data,
+    };
+  }
+
+  private getRequestHeaders(): Record<string, string> {
     const secretKey = this.configService.get<string>(
       'TOSS_PAYMENTS_SECRET_KEY',
     );
@@ -95,14 +136,19 @@ export class TossPaymentsBillingGateway implements BillingPaymentGateway {
       );
     }
 
+    return {
+      Authorization: `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  private async request<TResponse>(
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<TResponse> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${secretKey}:`).toString(
-          'base64',
-        )}`,
-        'Content-Type': 'application/json',
-      },
+      headers: this.getRequestHeaders(),
       body: JSON.stringify(body),
     });
 

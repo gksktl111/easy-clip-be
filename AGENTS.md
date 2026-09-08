@@ -1,27 +1,86 @@
-# Easy Clip 에이전트 지침
+## Tool-call and verification efficiency
 
-## 공통 언어 규칙
+- Batch independent searches and reads with parallel tools; inspect each result.
+  Keep combined output focused; if it truncates, narrow or split the read,
+  preserving decisive evidence and expanding only for a specific gap.
+  Keep dependent edits/checks sequential. Review the completed diff once unless
+  complexity or a concrete failure calls for an earlier check.
+- For reversible, low-impact copy/style/docs/config edits, do not add tests by
+  default. Avoid assertions that merely mirror tunable style values. Use diff
+  review and only a useful existing or visual check. Honor explicit user requests
+  and required repository/release gates.
+- Add regression coverage for a concrete behavior bug, meaningful new behavior,
+  or material data/security/concurrency risk. Prefer existing suites; verify the
+  actual trigger and outcome, not copied formulas or incidental implementation.
+  Do not create test infrastructure merely to validate a small edit.
+- Select the smallest checks that answer remaining questions. Omit checks already
+  included in a planned build/aggregate unless needed for an earlier decision.
+  Reuse passes across agents and follow-ups when relevant inputs are unchanged;
+  stop when selected checks and required gates pass.
+- After a failure, diagnose/fix it and rerun the affected case/file first; broaden
+  only if integration coverage is needed. For repeated failures of one pattern,
+  inspect the affected file and batch confirmed fixes before another full run.
+- Do not change unrelated product code or weaken assertions to fix an environment
+  or fixture failure. Establish the behavior contract or environment difference.
 
-- 입력 언어와 관계없이 항상 한국어로 응답한다.
-- 커밋 메시지, PR 제목과 본문, 이슈 제목과 본문도 한국어로 작성한다.
+## Subagent routing
 
-## 필수 스킬 라우팅
+Delegate bounded independent work when it saves time, removes substantial noise,
+or adds a useful independent check. Include startup, handoff, and review cost.
+Keep quick lookups and short edits/checks local, including follow-ups to an existing
+agent. Keep tightly coupled work local when delegation would delay the next decision.
 
-작업을 시작하기 전에 요청 유형에 맞는 저장소 로컬 스킬의 `SKILL.md`를 끝까지 읽고 적용한다.
+### Roles and models
 
-- 코드 추가, 수정, 리팩터링, 리뷰, 테스트, Prisma 스키마 또는 설정 변경:
-  - `.codex/skills/architecture-guidelines/SKILL.md`
-- Git 상태 확인, 이슈, 브랜치, 커밋, push, PR, 병합, 브랜치 정리 또는 이력 재작성:
-  - `.codex/skills/git-workflow/SKILL.md`
-- 코드 변경과 Git 작업을 함께 요청받은 경우:
-  1. `architecture-guidelines`를 먼저 적용해 코드 변경을 검증한다.
-  2. `git-workflow`를 적용해 Git 및 GitHub 작업을 진행한다.
+- Default to `agent_type = "astra_worker"` for bounded implementation, code
+  investigation, and reviews requiring judgment. Its config supplies Astra medium;
+  omit model/effort overrides.
+- Use Luna only through `agent_type = "luna_runner"` for supplied commands/scripts
+  whose runtime or output warrants handoff, with known inputs, outputs and completion
+  criteria. Its config supplies Luna xhigh; omit model/effort overrides.
+- Keep investigation, validation design, and interpretation with the parent or Astra.
+  Delegate to Luna only when the executable handoff is already simple; do not create
+  extra planning or scripts just to use Luna.
+- Choose by remaining decisions and impact at handoff. Keep difficult diagnosis,
+  architecture, security, and data-loss decisions with the parent or specialist.
+  When substantial independent work or review justifies another agent at that level,
+  use an appropriate role inheriting the parent's model and effort.
+- Respect role scope. Never use `luna_runner` for implementation or persistently
+  override built-in roles or existing specialists. If a configured role is unavailable,
+  keep the work local rather than silently substituting a model.
 
-각 스킬의 한국어 개요는 같은 폴더의 `DESCRIPTION.ko.md`에서 확인한다. 구체적인 실행 규칙은 `SKILL.md`를 기준으로 한다.
+### Handoff and completion
 
-## 공통 안전 규칙
+- Assign one outcome per agent, using the fewest needed. Add independent lanes
+  while the parent has useful work; avoid automatic agent chains and nested
+  delegation unless explicitly assigned. Do not duplicate exploration or jobs.
+- Give exact cwd, owned files/commands, objective, constraints, acceptance evidence,
+  and stop condition. For implementation, include before/after behavior and the
+  smallest useful verification; do not automatically request new tests.
+- Prefer `fork_turns = "none"` for self-contained work with needed context.
+  Use history only when needed; explicit model/effort overrides require `"none"`
+  or a supported recent-turn fork. Reuse agents for substantive follow-ups while
+  context helps. Finish the old job before starting a fresh handoff for a new
+  phase with excessive history.
+- Tell editors they share the codebase and must preserve others' changes.
+  Give shared result files one writer and an agreed format. Serialize overlapping
+  edits and work sharing mutable outputs/ports/services. Settle validation inputs
+  first; later edits invalidate only affected evidence.
+- Assign one monitor per job with an accessible handle/log, whole-job completion
+  criteria, exit evidence, deadline, cadence and cancellation ownership. Others
+  use its reports; transfer ownership before taking over monitoring. Phase success
+  or 100% progress alone is insufficient. Failed or unfinished prerequisites block
+  dependent checks; safe independent checks may continue.
+- A worker needing broader scope, a new policy, weaker assertions, or new error
+  exceptions returns a precise blocker. The parent resolves it before that change.
+  Keep destructive/external mutations and fresh-approval decisions with the parent.
+- Do useful work instead of polling; otherwise use completion notifications or
+  30-60 second waits within tool limits. Return concise evidence once; use interim
+  messages only for actionable findings, not duplicate app-task completion reports.
+- The parent reviews the diff and decisive results without redoing successful work.
+  Retry only for a named fix or explicit bounded transient-retry policy.
 
-- 사용자의 기존 변경을 보존하고 요청 범위와 무관한 변경을 수정하거나 stage하지 않는다.
-- 비밀값과 환경 파일을 코드, 로그, 커밋 또는 GitHub 메타데이터에 포함하지 않는다.
-- 사용자가 커밋, push, PR 생성 또는 병합을 요청하지 않으면 해당 작업을 수행하지 않는다.
-- 파괴적 명령과 공개 이력 재작성은 대상, 영향, 복구 방법을 확인하고 명시적인 승인을 받은 뒤 수행한다.
+### Repository workflows
+
+- For Git/GitHub operations, apply the repository-specific workflow in `.codex/skills/git-workflow/SKILL.md`.
+- When creating an issue, follow the repository's issue template if one exists.
