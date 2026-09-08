@@ -9,16 +9,18 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   ActivateSubscriptionPaymentParams,
+  AutoRenewalPayment,
   BillingMailRecipient,
+  CancelAutoRenewalResult,
   ClaimAutoRenewalPaymentParams,
+  CompleteAutoRenewalPaymentParams,
+  DeferAutoRenewalReconciliationParams,
   MarkPaymentFailedParams,
   SubscriptionsRepository,
   UpdateSubscriptionParams,
 } from '../domain/subscriptions.repository';
-import {
-  Subscription,
-  SubscriptionPaymentStatus,
-} from '../domain/subscription.types';
+import { Subscription } from '../domain/subscription.types';
+import { createAutoRenewalSubscriptionOrderId } from '../application/helpers/customer-key.helper';
 
 const subscriptionSelect = {
   id: true,
@@ -33,6 +35,17 @@ const subscriptionSelect = {
   externalBillingKey: true,
   externalCustomerKey: true,
 } satisfies Prisma.SubscriptionSelect;
+
+const renewalPaymentSelect = {
+  id: true,
+  subscriptionId: true,
+  externalOrderId: true,
+  amount: true,
+  currency: true,
+  renewalDueAt: true,
+  renewalPeriodEnd: true,
+  reconciliationAttempts: true,
+} satisfies Prisma.SubscriptionPaymentSelect;
 
 @Injectable()
 export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
@@ -116,6 +129,109 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
     });
   }
 
+  async cancelAutoRenewal(
+    subscriptionId: string,
+  ): Promise<CancelAutoRenewalResult | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${subscriptionId} FOR UPDATE`;
+      const current = await tx.subscription.findUnique({
+        where: { id: subscriptionId },
+        select: subscriptionSelect,
+      });
+      if (
+        !current ||
+        current.plan !== PrismaSubscriptionPlan.PRO ||
+        (current.status !== PrismaSubscriptionStatus.ACTIVE &&
+          current.status !== PrismaSubscriptionStatus.CANCELED)
+      )
+        return null;
+      const pending = await tx.subscriptionPayment.findFirst({
+        where: {
+          subscriptionId,
+          status: PrismaSubscriptionPaymentStatus.PENDING,
+        },
+        select: { id: true },
+      });
+      const subscription = await tx.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          status: PrismaSubscriptionStatus.CANCELED,
+          autoRenew: false,
+          nextBillingAt: null,
+        },
+        select: subscriptionSelect,
+      });
+      return { subscription, pendingRenewalPayment: pending !== null };
+    });
+  }
+
+  async resumeAutoRenewal(
+    subscriptionId: string,
+  ): Promise<Subscription | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${subscriptionId} FOR UPDATE`;
+      const current = await tx.subscription.findUnique({
+        where: { id: subscriptionId },
+        select: subscriptionSelect,
+      });
+      if (
+        !current ||
+        current.plan !== PrismaSubscriptionPlan.PRO ||
+        current.status !== PrismaSubscriptionStatus.CANCELED ||
+        !current.externalBillingKey ||
+        !current.externalCustomerKey ||
+        !current.currentPeriodEnd ||
+        current.currentPeriodEnd <= new Date()
+      )
+        return null;
+      return tx.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          status: PrismaSubscriptionStatus.ACTIVE,
+          autoRenew: true,
+          nextBillingAt: current.currentPeriodEnd,
+        },
+        select: subscriptionSelect,
+      });
+    });
+  }
+
+  async hasPendingAutoRenewalPayment(subscriptionId: string): Promise<boolean> {
+    const pending = await this.prisma.subscriptionPayment.findFirst({
+      where: {
+        subscriptionId,
+        status: PrismaSubscriptionPaymentStatus.PENDING,
+      },
+      select: { id: true },
+    });
+    return pending !== null;
+  }
+
+  async expireSubscriptionIfUnchanged(
+    subscriptionId: string,
+    expectedPeriodEnd: Date,
+  ): Promise<Subscription> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          plan: PrismaSubscriptionPlan.PRO,
+          autoRenew: false,
+          currentPeriodEnd: expectedPeriodEnd,
+        },
+        data: {
+          plan: PrismaSubscriptionPlan.FREE,
+          status: PrismaSubscriptionStatus.EXPIRED,
+          nextBillingAt: null,
+        },
+      });
+      return tx.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        select: subscriptionSelect,
+      });
+    });
+  }
+
   async activateByPayment(
     params: ActivateSubscriptionPaymentParams,
   ): Promise<Subscription> {
@@ -149,12 +265,24 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
   }
 
   async recordPaymentFailure(params: MarkPaymentFailedParams): Promise<void> {
-    await this.prisma.subscriptionPayment.upsert({
-      where: {
-        externalOrderId: params.externalOrderId,
-      },
-      update: this.toPaymentUpdateData(params),
-      create: this.toPaymentCreateData(params),
+    await this.prisma.$transaction(async (tx) => {
+      await tx.subscriptionPayment.upsert({
+        where: { externalOrderId: params.externalOrderId },
+        update: {},
+        create: this.toPaymentCreateData(params),
+      });
+      // 지연된 실패 응답이 이미 대사·반영된 성공 결제를 덮어쓰지 않는다.
+      await tx.subscriptionPayment.updateMany({
+        where: {
+          externalOrderId: params.externalOrderId,
+          subscriptionId: params.subscriptionId,
+          status: PrismaSubscriptionPaymentStatus.PENDING,
+        },
+        data: {
+          ...this.toPaymentUpdateData(params),
+          reconciliationNextAt: null,
+        },
+      });
     });
   }
 
@@ -162,23 +290,51 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
     params: ClaimAutoRenewalPaymentParams,
   ): Promise<boolean> {
     try {
-      await this.prisma.subscriptionPayment.create({
-        data: {
-          provider: params.provider as PrismaPaymentProvider,
-          status:
-            SubscriptionPaymentStatus.PENDING as PrismaSubscriptionPaymentStatus,
-          externalOrderId: params.externalOrderId,
-          amount: params.amount,
-          currency: params.currency,
-          subscription: {
-            connect: {
-              id: params.subscriptionId,
-            },
+      return await this.prisma.$transaction(async (tx) => {
+        // 해지와 같은 구독 잠금에서 최신 상태를 검증하고 청구 시작을 확정한다.
+        await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${params.subscriptionId} FOR UPDATE`;
+        const current = await tx.subscription.findUnique({
+          where: { id: params.subscriptionId },
+          select: subscriptionSelect,
+        });
+        if (
+          !current ||
+          current.plan !== PrismaSubscriptionPlan.PRO ||
+          current.status !== PrismaSubscriptionStatus.ACTIVE ||
+          !current.autoRenew ||
+          current.provider !== params.provider ||
+          current.externalBillingKey !== params.expectedBillingKey ||
+          current.externalCustomerKey !== params.expectedCustomerKey ||
+          !current.nextBillingAt ||
+          current.nextBillingAt > params.now ||
+          current.nextBillingAt.getTime() !== params.renewalDueAt.getTime() ||
+          current.currentPeriodEnd?.getTime() !==
+            params.renewalPeriodEnd?.getTime()
+        )
+          return false;
+        const pending = await tx.subscriptionPayment.findFirst({
+          where: {
+            subscriptionId: params.subscriptionId,
+            status: PrismaSubscriptionPaymentStatus.PENDING,
           },
-        },
+          select: { id: true },
+        });
+        if (pending) return false;
+        await tx.subscriptionPayment.create({
+          data: {
+            provider: params.provider as PrismaPaymentProvider,
+            status: PrismaSubscriptionPaymentStatus.PENDING,
+            externalOrderId: params.externalOrderId,
+            amount: params.amount,
+            currency: params.currency,
+            renewalDueAt: current.nextBillingAt,
+            renewalPeriodEnd: current.currentPeriodEnd,
+            reconciliationNextAt: params.reconciliationNextAt,
+            subscriptionId: current.id,
+          },
+        });
+        return true;
       });
-
-      return true;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -195,26 +351,188 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
     now: Date,
     limit: number,
   ): Promise<Subscription[]> {
-    return this.prisma.subscription.findMany({
+    const subscriptions: Subscription[] = [];
+    const pageSize = Math.min(limit, 100);
+    let cursor: { nextBillingAt: Date; id: string } | undefined;
+
+    while (subscriptions.length < limit) {
+      const page = await this.prisma.subscription.findMany({
+        where: {
+          plan: PrismaSubscriptionPlan.PRO,
+          status: PrismaSubscriptionStatus.ACTIVE,
+          autoRenew: true,
+          provider: PrismaPaymentProvider.TOSS_PAYMENTS,
+          // 미확정 주문은 구독 상태와 별도의 대사 큐에서 처리한다.
+          // 기간이 변경돼도 결과 확인 전에 새 주문을 과금하지 않는다.
+          payments: {
+            none: { status: PrismaSubscriptionPaymentStatus.PENDING },
+          },
+          externalBillingKey: { not: null, notIn: [''] },
+          externalCustomerKey: { not: null, notIn: [''] },
+          nextBillingAt: { lte: now },
+          ...(cursor
+            ? {
+                OR: [
+                  { nextBillingAt: { gt: cursor.nextBillingAt } },
+                  {
+                    nextBillingAt: cursor.nextBillingAt,
+                    id: { gt: cursor.id },
+                  },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ nextBillingAt: 'asc' }, { id: 'asc' }],
+        take: pageSize,
+        select: subscriptionSelect,
+      });
+      if (page.length === 0) break;
+
+      const orderIds = page.map((subscription) =>
+        createAutoRenewalSubscriptionOrderId(
+          subscription.id,
+          subscription.nextBillingAt!,
+        ),
+      );
+      const existingPayments = await this.prisma.subscriptionPayment.findMany({
+        where: { externalOrderId: { in: orderIds } },
+        select: { externalOrderId: true },
+      });
+      const existingOrderIds = new Set(
+        existingPayments.map((payment) => payment.externalOrderId),
+      );
+      for (let index = 0; index < page.length; index += 1) {
+        if (!existingOrderIds.has(orderIds[index])) {
+          subscriptions.push(page[index]);
+          if (subscriptions.length === limit) break;
+        }
+      }
+
+      // 충돌로 제외한 행도 커서를 전진시켜 오래된 실패 주문을 다시 읽지 않는다.
+      const last = page[page.length - 1];
+      cursor = { nextBillingAt: last.nextBillingAt!, id: last.id };
+      if (page.length < pageSize) break;
+    }
+
+    return subscriptions;
+  }
+
+  async findAutoRenewalPaymentsToReconcile(
+    now: Date,
+    limit: number,
+  ): Promise<AutoRenewalPayment[]> {
+    return this.prisma.subscriptionPayment.findMany({
       where: {
-        plan: PrismaSubscriptionPlan.PRO,
-        status: PrismaSubscriptionStatus.ACTIVE,
-        autoRenew: true,
-        externalBillingKey: {
-          not: null,
-        },
-        externalCustomerKey: {
-          not: null,
-        },
-        nextBillingAt: {
-          lte: now,
-        },
+        provider: PrismaPaymentProvider.TOSS_PAYMENTS,
+        status: PrismaSubscriptionPaymentStatus.PENDING,
+        reconciliationNextAt: { lte: now },
+        manualReviewAt: null,
       },
-      orderBy: {
-        nextBillingAt: 'asc',
-      },
+      orderBy: [{ reconciliationNextAt: 'asc' }, { id: 'asc' }],
       take: limit,
-      select: subscriptionSelect,
+      select: renewalPaymentSelect,
+    });
+  }
+
+  async claimAutoRenewalReconciliation(
+    paymentId: string,
+    now: Date,
+    leaseUntil: Date,
+  ): Promise<AutoRenewalPayment | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.subscriptionPayment.updateMany({
+        where: {
+          id: paymentId,
+          status: PrismaSubscriptionPaymentStatus.PENDING,
+          reconciliationNextAt: { lte: now },
+          manualReviewAt: null,
+        },
+        data: {
+          reconciliationNextAt: leaseUntil,
+          reconciliationAttempts: { increment: 1 },
+        },
+      });
+      return claimed.count === 1
+        ? tx.subscriptionPayment.findUniqueOrThrow({
+            where: { id: paymentId },
+            select: renewalPaymentSelect,
+          })
+        : null;
+    });
+  }
+
+  async deferAutoRenewalReconciliation(
+    params: DeferAutoRenewalReconciliationParams,
+  ): Promise<void> {
+    await this.prisma.subscriptionPayment.updateMany({
+      where: {
+        id: params.paymentId,
+        status: PrismaSubscriptionPaymentStatus.PENDING,
+        reconciliationAttempts: params.attempt,
+      },
+      data: {
+        reconciliationNextAt: params.nextAttemptAt,
+        reconciliationError: params.error,
+        manualReviewAt: params.manualReviewAt ?? null,
+      },
+    });
+  }
+
+  async completeAutoRenewalPayment(
+    params: CompleteAutoRenewalPaymentParams,
+  ): Promise<Subscription | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.subscriptionPayment.findUniqueOrThrow({
+        where: { externalOrderId: params.externalOrderId },
+        select: renewalPaymentSelect,
+      });
+      // 청구 선점·해지와 동일하게 구독 → 결제 순서로 잠근다.
+      await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${payment.subscriptionId} FOR UPDATE`;
+      const completed = await tx.subscriptionPayment.updateMany({
+        where: {
+          id: payment.id,
+          status: PrismaSubscriptionPaymentStatus.PENDING,
+          provider: PrismaPaymentProvider.TOSS_PAYMENTS,
+          renewalDueAt: { not: null },
+          amount: params.amount,
+          currency: params.currency,
+        },
+        data: {
+          status: PrismaSubscriptionPaymentStatus.DONE,
+          externalPaymentKey: params.externalPaymentKey,
+          approvedAt: params.approvedAt,
+          rawData: params.rawData as Prisma.InputJsonValue,
+          reconciliationNextAt: null,
+          reconciliationError: null,
+          manualReviewAt: null,
+          failedAt: null,
+          failureCode: null,
+          failureMessage: null,
+        },
+      });
+      if (completed.count === 0) return null;
+
+      const subscription = await tx.subscription.findUniqueOrThrow({
+        where: { id: payment.subscriptionId },
+        select: subscriptionSelect,
+      });
+      const periodEnd =
+        subscription.currentPeriodEnd &&
+        subscription.currentPeriodEnd > params.currentPeriodEnd
+          ? subscription.currentPeriodEnd
+          : params.currentPeriodEnd;
+      return tx.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          plan: PrismaSubscriptionPlan.PRO,
+          status: subscription.autoRenew
+            ? PrismaSubscriptionStatus.ACTIVE
+            : PrismaSubscriptionStatus.CANCELED,
+          currentPeriodEnd: periodEnd,
+          nextBillingAt: subscription.autoRenew ? periodEnd : null,
+        },
+        select: subscriptionSelect,
+      });
     });
   }
 
@@ -293,7 +611,7 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
 
   private toPaymentUpdateData(
     params: MarkPaymentFailedParams,
-  ): Prisma.SubscriptionPaymentUpdateInput {
+  ): Prisma.SubscriptionPaymentUpdateManyMutationInput {
     return {
       provider: params.provider as PrismaPaymentProvider,
       status: params.status as PrismaSubscriptionPaymentStatus,
@@ -308,11 +626,6 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
       ...(params.rawData !== undefined
         ? { rawData: params.rawData as Prisma.InputJsonValue }
         : {}),
-      subscription: {
-        connect: {
-          id: params.subscriptionId,
-        },
-      },
     };
   }
 }

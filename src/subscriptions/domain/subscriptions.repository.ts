@@ -52,6 +52,46 @@ export type ClaimAutoRenewalPaymentParams = {
   externalOrderId: string;
   amount: number;
   currency: string;
+  renewalDueAt: Date;
+  renewalPeriodEnd: Date | null;
+  reconciliationNextAt: Date;
+  expectedBillingKey: string;
+  expectedCustomerKey: string;
+  now: Date;
+};
+
+export type CancelAutoRenewalResult = {
+  subscription: Subscription;
+  pendingRenewalPayment: boolean;
+};
+
+export type AutoRenewalPayment = {
+  id: string;
+  subscriptionId: string;
+  externalOrderId: string;
+  amount: number;
+  currency: string;
+  renewalDueAt: Date | null;
+  renewalPeriodEnd: Date | null;
+  reconciliationAttempts: number;
+};
+
+export type CompleteAutoRenewalPaymentParams = {
+  externalOrderId: string;
+  externalPaymentKey: string;
+  amount: number;
+  currency: string;
+  approvedAt: Date;
+  currentPeriodEnd: Date;
+  rawData: unknown;
+};
+
+export type DeferAutoRenewalReconciliationParams = {
+  paymentId: string;
+  attempt: number;
+  nextAttemptAt: Date | null;
+  error: string;
+  manualReviewAt?: Date;
 };
 
 export type BillingMailRecipient = {
@@ -74,6 +114,19 @@ export interface SubscriptionsRepository {
     params: UpdateSubscriptionParams,
   ): Promise<Subscription>;
 
+  cancelAutoRenewal(
+    subscriptionId: string,
+  ): Promise<CancelAutoRenewalResult | null>;
+
+  resumeAutoRenewal(subscriptionId: string): Promise<Subscription | null>;
+
+  hasPendingAutoRenewalPayment(subscriptionId: string): Promise<boolean>;
+
+  expireSubscriptionIfUnchanged(
+    subscriptionId: string,
+    expectedPeriodEnd: Date,
+  ): Promise<Subscription>;
+
   activateByPayment(
     params: ActivateSubscriptionPaymentParams,
   ): Promise<Subscription>;
@@ -88,4 +141,23 @@ export interface SubscriptionsRepository {
     now: Date,
     limit: number,
   ): Promise<Subscription[]>;
+
+  findAutoRenewalPaymentsToReconcile(
+    now: Date,
+    limit: number,
+  ): Promise<AutoRenewalPayment[]>;
+
+  claimAutoRenewalReconciliation(
+    paymentId: string,
+    now: Date,
+    leaseUntil: Date,
+  ): Promise<AutoRenewalPayment | null>;
+
+  deferAutoRenewalReconciliation(
+    params: DeferAutoRenewalReconciliationParams,
+  ): Promise<void>;
+
+  completeAutoRenewalPayment(
+    params: CompleteAutoRenewalPaymentParams,
+  ): Promise<Subscription | null>;
 }

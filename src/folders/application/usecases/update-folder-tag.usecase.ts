@@ -4,6 +4,7 @@ import type { FoldersRepository } from '../../domain/folders.repository';
 import type { FolderTagOutput } from '../dtos/folder-tag-output.dto';
 import { UpdateFolderTagInput } from '../dtos/update-folder-tag-input.dto';
 import { FoldersError } from '../errors/folders.error';
+import { resolveFolderTagBackgroundColor } from '../helpers/folder-tag-background-color.helper';
 import { normalizeFolderTagName } from '../helpers/folder-name.helper';
 
 @Injectable()
@@ -17,7 +18,20 @@ export class UpdateFolderTagUseCase {
     userId: string,
     input: UpdateFolderTagInput,
   ): Promise<FolderTagOutput> {
-    const name = normalizeFolderTagName(input.name);
+    const name =
+      input.name === undefined ? undefined : normalizeFolderTagName(input.name);
+    const backgroundColor =
+      input.backgroundColor === undefined
+        ? undefined
+        : resolveFolderTagBackgroundColor(input.backgroundColor);
+
+    if (name === undefined && backgroundColor === undefined) {
+      throw new FoldersError(
+        'BAD_REQUEST',
+        '수정할 태그 이름 또는 배경색을 입력해야 합니다.',
+      );
+    }
+
     const folder = await this.foldersRepository.findPersonalFolderById(
       userId,
       input.folderId,
@@ -36,19 +50,28 @@ export class UpdateFolderTagUseCase {
       throw new FoldersError('NOT_FOUND', '태그를 찾을 수 없습니다.');
     }
 
-    const duplicatedTag = await this.foldersRepository.findTagByNameInFolder(
-      folder.id,
-      name,
-    );
+    const nameChanged = name !== undefined && name !== tag.name;
+    const backgroundColorChanged =
+      backgroundColor !== undefined && backgroundColor !== tag.backgroundColor;
 
-    if (duplicatedTag && duplicatedTag.id !== tag.id) {
-      throw new FoldersError('CONFLICT', '이미 존재하는 태그 이름입니다.');
+    if (nameChanged) {
+      const duplicatedTag = await this.foldersRepository.findTagByNameInFolder(
+        folder.id,
+        name,
+      );
+
+      if (duplicatedTag && duplicatedTag.id !== tag.id) {
+        throw new FoldersError('CONFLICT', '이미 존재하는 태그 이름입니다.');
+      }
     }
 
-    if (tag.name === name) {
+    if (!nameChanged && !backgroundColorChanged) {
       return tag;
     }
 
-    return this.foldersRepository.updateFolderTagName(tag.id, name);
+    return this.foldersRepository.updateFolderTag(tag.id, {
+      ...(nameChanged ? { name } : {}),
+      ...(backgroundColorChanged ? { backgroundColor } : {}),
+    });
   }
 }

@@ -2,7 +2,6 @@ import { SubscriptionsRepository } from '../../domain/subscriptions.repository';
 import {
   Subscription,
   SubscriptionPlan,
-  SubscriptionStatus,
 } from '../../domain/subscription.types';
 
 export async function normalizeExpiredSubscription(
@@ -13,12 +12,10 @@ export async function normalizeExpiredSubscription(
     return subscription;
   }
 
-  return subscriptionsRepository.updateSubscription(subscription.id, {
-    plan: SubscriptionPlan.FREE,
-    status: SubscriptionStatus.EXPIRED,
-    autoRenew: false,
-    nextBillingAt: null,
-  });
+  return subscriptionsRepository.expireSubscriptionIfUnchanged(
+    subscription.id,
+    subscription.currentPeriodEnd!,
+  );
 }
 
 export function isSubscriptionExpired(subscription: Subscription): boolean {

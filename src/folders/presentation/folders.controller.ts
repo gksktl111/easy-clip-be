@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiBody,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -42,6 +43,10 @@ import { DeleteFolderTagUseCase } from '../application/usecases/delete-folder-ta
 import { CreateFolderTagDto } from './dtos/create-folder-tag.dto';
 import { UpdateFolderTagDto } from './dtos/update-folder-tag.dto';
 
+@ApiForbiddenResponse({
+  description: 'Free 접근 폴더 이외의 콘텐츠 접근 또는 제한된 폴더 작업입니다.',
+  type: ErrorResponseDto,
+})
 @Controller('folders')
 @UseFilters(ApplicationExceptionFilter)
 @ApiTags('Folders')
@@ -148,6 +153,7 @@ export class FoldersController {
     return this.createFolderTagUseCase.execute(req.user.userId, {
       folderId,
       name: dto.name,
+      backgroundColor: dto.backgroundColor,
     });
   }
 
@@ -218,6 +224,7 @@ export class FoldersController {
       folderId,
       tagId,
       name: dto.name,
+      backgroundColor: dto.backgroundColor,
     });
   }
 

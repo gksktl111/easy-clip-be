@@ -1,14 +1,11 @@
 /* eslint-disable @typescript-eslint/unbound-method */
+import { ClipsError } from '../errors/clips.error';
 import { DeleteClipsUseCase } from './delete-clips.usecase';
 import { createClipsRepositoryMock as createRepository } from '../../test-support/create-clips-repository-mock';
 
 describe('DeleteClipsUseCase', () => {
   it('여러 클립을 소프트 삭제한다', async () => {
     const repo = createRepository();
-    repo.findClipsByIdsForUser.mockResolvedValue([
-      { id: 'clip-1' },
-      { id: 'clip-2' },
-    ] as never);
     repo.softDeleteClips.mockResolvedValue(2);
 
     const usecase = new DeleteClipsUseCase(repo);
@@ -16,11 +13,10 @@ describe('DeleteClipsUseCase', () => {
       clipIds: ['clip-1', 'clip-2'],
     });
 
-    expect(repo.findClipsByIdsForUser).toHaveBeenCalledWith('user-id', [
+    expect(repo.softDeleteClips).toHaveBeenCalledWith('user-id', [
       'clip-1',
       'clip-2',
     ]);
-    expect(repo.softDeleteClips).toHaveBeenCalledWith(['clip-1', 'clip-2']);
     expect(result).toEqual({ deletedCount: 2 });
   });
 
@@ -65,7 +61,9 @@ describe('DeleteClipsUseCase', () => {
 
   it('존재하지 않거나 사용자 소유가 아닌 클립이 포함되면 전체 삭제를 실패시킨다', async () => {
     const repo = createRepository();
-    repo.findClipsByIdsForUser.mockResolvedValue([{ id: 'clip-1' }] as never);
+    repo.softDeleteClips.mockRejectedValue(
+      new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.'),
+    );
 
     const usecase = new DeleteClipsUseCase(repo);
 
@@ -73,12 +71,17 @@ describe('DeleteClipsUseCase', () => {
       usecase.execute('user-id', { clipIds: ['clip-1', 'missing-clip'] }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
-    expect(repo.softDeleteClips).not.toHaveBeenCalled();
+    expect(repo.softDeleteClips).toHaveBeenCalledWith(
+      'user-id',
+      expect.any(Array),
+    );
   });
 
   it('이미 삭제된 클립이 포함되면 전체 삭제를 실패시킨다', async () => {
     const repo = createRepository();
-    repo.findClipsByIdsForUser.mockResolvedValue([{ id: 'clip-1' }] as never);
+    repo.softDeleteClips.mockRejectedValue(
+      new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.'),
+    );
 
     const usecase = new DeleteClipsUseCase(repo);
 
@@ -86,6 +89,9 @@ describe('DeleteClipsUseCase', () => {
       usecase.execute('user-id', { clipIds: ['clip-1', 'deleted-clip'] }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
-    expect(repo.softDeleteClips).not.toHaveBeenCalled();
+    expect(repo.softDeleteClips).toHaveBeenCalledWith(
+      'user-id',
+      expect.any(Array),
+    );
   });
 });

@@ -32,6 +32,7 @@ const createSubscription = (
 const createGateway = (): jest.Mocked<BillingPaymentGateway> => ({
   issueBillingKey: jest.fn(),
   chargeBilling: jest.fn(),
+  findPaymentByOrderId: jest.fn(),
 });
 
 const createMailer = (): jest.Mocked<SubscriptionPaymentMailPort> => ({
@@ -214,7 +215,7 @@ describe('ConfirmBillingAuthUseCase', () => {
         externalCustomerKey: 'customer-key',
       }),
     );
-    repo.updateSubscription.mockResolvedValue(
+    repo.resumeAutoRenewal.mockResolvedValue(
       createSubscription({
         plan: SubscriptionPlan.PRO,
         status: SubscriptionStatus.ACTIVE,
@@ -252,11 +253,7 @@ describe('ConfirmBillingAuthUseCase', () => {
       currentPeriodEnd,
       nextBillingAt: currentPeriodEnd,
     });
-    expect(repo.updateSubscription).toHaveBeenCalledWith('subscription-id', {
-      status: SubscriptionStatus.ACTIVE,
-      autoRenew: true,
-      nextBillingAt: currentPeriodEnd,
-    });
+    expect(repo.resumeAutoRenewal).toHaveBeenCalledWith('subscription-id');
     expect(result).toMatchObject({
       plan: SubscriptionPlan.PRO,
       status: SubscriptionStatus.ACTIVE,
@@ -394,7 +391,7 @@ describe('ConfirmBillingAuthUseCase', () => {
         externalCustomerKey: 'customer-key',
       }),
     );
-    repo.updateSubscription.mockResolvedValue(
+    repo.resumeAutoRenewal.mockResolvedValue(
       createSubscription({
         plan: SubscriptionPlan.PRO,
         status: SubscriptionStatus.ACTIVE,
@@ -430,5 +427,33 @@ describe('ConfirmBillingAuthUseCase', () => {
       status: SubscriptionStatus.ACTIVE,
       autoRenew: true,
     });
+  });
+  it('즉시 결제 없는 재개의 조건이 바뀌면 신규 과금으로 전환하지 않는다', async () => {
+    const repo = createRepository();
+    const gateway = createGateway();
+    const mailer = createMailer();
+    repo.getOrCreatePersonalSubscription.mockResolvedValue(
+      createSubscription({
+        plan: SubscriptionPlan.PRO,
+        status: SubscriptionStatus.CANCELED,
+        currentPeriodEnd: new Date('2099-03-01'),
+        externalBillingKey: 'billing-key',
+      }),
+    );
+    repo.resumeAutoRenewal.mockResolvedValue(null);
+    await expect(
+      new ConfirmBillingAuthUseCase(
+        repo,
+        gateway,
+        mailer,
+        createConfig(),
+      ).execute('user-id', {
+        authKey: 'auth-key',
+        customerKey: 'customer-key',
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(gateway.issueBillingKey).not.toHaveBeenCalled();
+    expect(gateway.chargeBilling).not.toHaveBeenCalled();
+    expect(mailer.sendSubscriptionResumed).not.toHaveBeenCalled();
   });
 });

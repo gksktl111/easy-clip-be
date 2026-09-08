@@ -19,6 +19,8 @@ export type ChargeBillingParams = {
   orderName: string;
   amount: number;
   currency: string;
+  // 결과 유실을 대사할 수 있는 호출에서만 명시한다.
+  timeoutMs?: number;
 };
 
 export type ChargeBillingResult = {
@@ -33,10 +35,18 @@ export type ChargeBillingResult = {
   rawData: unknown;
 };
 
+export type LookupBillingPaymentResult = Omit<ChargeBillingResult, 'status'> & {
+  status: string;
+};
+
 export interface BillingPaymentGateway {
   issueBillingKey(
     params: IssueBillingKeyParams,
   ): Promise<IssueBillingKeyResult>;
 
   chargeBilling(params: ChargeBillingParams): Promise<ChargeBillingResult>;
+
+  findPaymentByOrderId(
+    orderId: string,
+  ): Promise<LookupBillingPaymentResult | null>;
 }

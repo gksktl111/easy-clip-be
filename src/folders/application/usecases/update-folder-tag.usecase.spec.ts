@@ -40,6 +40,7 @@ describe('UpdateFolderTagUseCase', () => {
     repo.findTagByIdInFolder.mockResolvedValue({
       id: 'tag-id',
       name: 'backend',
+      backgroundColor: 'GRAY',
     } as never);
     repo.findTagByNameInFolder.mockResolvedValue({
       id: 'other-tag-id',
@@ -57,12 +58,13 @@ describe('UpdateFolderTagUseCase', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
-  it('정규화된 태그명 기준으로 중복을 검사한다', async () => {
+  it('공백을 보존한 태그명 기준으로 중복을 검사한다', async () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
     repo.findTagByIdInFolder.mockResolvedValue({
       id: 'tag-id',
       name: 'backend',
+      backgroundColor: 'GRAY',
     } as never);
     repo.findTagByNameInFolder.mockResolvedValue({
       id: 'other-tag-id',
@@ -81,7 +83,7 @@ describe('UpdateFolderTagUseCase', () => {
 
     expect(repo.findTagByNameInFolder).toHaveBeenCalledWith(
       'folder-id',
-      'frontend',
+      ' frontend ',
     );
   });
 
@@ -101,7 +103,7 @@ describe('UpdateFolderTagUseCase', () => {
     expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
   });
 
-  it('태그명이 10자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
+  it('공백을 포함해 태그명이 10자를 초과하면 BAD_REQUEST 에러를 던진다', async () => {
     const repo = createRepository();
 
     const usecase = new UpdateFolderTagUseCase(repo);
@@ -110,7 +112,7 @@ describe('UpdateFolderTagUseCase', () => {
       usecase.execute('user-id', {
         folderId: 'folder-id',
         tagId: 'tag-id',
-        name: 'a'.repeat(11),
+        name: `${'a'.repeat(10)} `,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
@@ -119,7 +121,12 @@ describe('UpdateFolderTagUseCase', () => {
 
   it('이름이 같으면 기존 태그를 반환한다', async () => {
     const repo = createRepository();
-    const tag = { id: 'tag-id', name: 'backend', folderId: 'folder-id' };
+    const tag = {
+      id: 'tag-id',
+      name: 'backend',
+      backgroundColor: 'GRAY',
+      folderId: 'folder-id',
+    };
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
     repo.findTagByIdInFolder.mockResolvedValue(tag as never);
     repo.findTagByNameInFolder.mockResolvedValue(tag as never);
@@ -131,7 +138,7 @@ describe('UpdateFolderTagUseCase', () => {
       name: 'backend',
     });
 
-    expect(repo.updateFolderTagName).not.toHaveBeenCalled();
+    expect(repo.updateFolderTag).not.toHaveBeenCalled();
     expect(result).toBe(tag);
   });
 
@@ -141,12 +148,14 @@ describe('UpdateFolderTagUseCase', () => {
     repo.findTagByIdInFolder.mockResolvedValue({
       id: 'tag-id',
       name: 'backend',
+      backgroundColor: 'GRAY',
       folderId: 'folder-id',
     } as never);
     repo.findTagByNameInFolder.mockResolvedValue(null);
-    repo.updateFolderTagName.mockResolvedValue({
+    repo.updateFolderTag.mockResolvedValue({
       id: 'tag-id',
-      name: 'frontend',
+      name: ' frontend ',
+      backgroundColor: 'GRAY',
       folderId: 'folder-id',
     } as never);
 
@@ -157,6 +166,66 @@ describe('UpdateFolderTagUseCase', () => {
       name: ' frontend ',
     });
 
-    expect(repo.updateFolderTagName).toHaveBeenCalledWith('tag-id', 'frontend');
+    expect(repo.updateFolderTag).toHaveBeenCalledWith('tag-id', {
+      name: ' frontend ',
+    });
+  });
+
+  it('태그 배경색만 수정한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.findTagByIdInFolder.mockResolvedValue({
+      id: 'tag-id',
+      name: 'backend',
+      backgroundColor: 'GRAY',
+      folderId: 'folder-id',
+    } as never);
+    repo.updateFolderTag.mockResolvedValue({
+      id: 'tag-id',
+      name: 'backend',
+      backgroundColor: 'PURPLE',
+      folderId: 'folder-id',
+    } as never);
+
+    const usecase = new UpdateFolderTagUseCase(repo);
+    await usecase.execute('user-id', {
+      folderId: 'folder-id',
+      tagId: 'tag-id',
+      backgroundColor: 'PURPLE',
+    });
+
+    expect(repo.findTagByNameInFolder).not.toHaveBeenCalled();
+    expect(repo.updateFolderTag).toHaveBeenCalledWith('tag-id', {
+      backgroundColor: 'PURPLE',
+    });
+  });
+
+  it('수정할 값이 없으면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+    const usecase = new UpdateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        folderId: 'folder-id',
+        tagId: 'tag-id',
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
+  });
+
+  it('지원하지 않는 배경색이면 BAD_REQUEST 에러를 던진다', async () => {
+    const repo = createRepository();
+    const usecase = new UpdateFolderTagUseCase(repo);
+
+    await expect(
+      usecase.execute('user-id', {
+        folderId: 'folder-id',
+        tagId: 'tag-id',
+        backgroundColor: 'BLACK' as never,
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
   });
 });

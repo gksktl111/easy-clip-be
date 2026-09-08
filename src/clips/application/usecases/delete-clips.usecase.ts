@@ -38,16 +38,10 @@ export class DeleteClipsUseCase {
       );
     }
 
-    const clips = await this.clipsRepository.findClipsByIdsForUser(
+    const deletedCount = await this.clipsRepository.softDeleteClips(
       userId,
       clipIds,
     );
-
-    if (clips.length !== clipIds.length) {
-      throw new ClipsError('NOT_FOUND', '클립을 찾을 수 없습니다.');
-    }
-
-    const deletedCount = await this.clipsRepository.softDeleteClips(clipIds);
 
     return { deletedCount };
   }

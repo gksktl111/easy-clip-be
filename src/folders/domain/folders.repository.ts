@@ -1,5 +1,6 @@
 import { Folder } from './folder.types';
 import { FolderTag } from './folder-tag.types';
+import type { TagBackgroundColor } from 'src/shared/application/tag-background-color.helper';
 
 export const FOLDERS_REPOSITORY = Symbol('FOLDERS_REPOSITORY');
 
@@ -18,6 +19,12 @@ export type CreateFolderParams = {
 export type CreateFolderTagParams = {
   folderId: string;
   name: string;
+  backgroundColor: TagBackgroundColor;
+};
+
+export type UpdateFolderTagParams = {
+  name?: string;
+  backgroundColor?: TagBackgroundColor;
 };
 
 export interface FoldersRepository {
@@ -27,6 +34,7 @@ export interface FoldersRepository {
   findPersonalFolderById(
     userId: string,
     folderId: string,
+    options?: { allowLocked?: boolean },
   ): Promise<Folder | null>;
   findFolderById(folderId: string): Promise<Folder | null>;
   findFolderByIdInWorkspace(
@@ -46,7 +54,10 @@ export interface FoldersRepository {
   createFolder(params: CreateFolderParams): Promise<Folder>;
   createFolderTag(params: CreateFolderTagParams): Promise<FolderTag>;
   updateFolderName(folderId: string, name: string): Promise<Folder>;
-  updateFolderTagName(tagId: string, name: string): Promise<FolderTag>;
+  updateFolderTag(
+    tagId: string,
+    params: UpdateFolderTagParams,
+  ): Promise<FolderTag>;
   updateFolderOrder(folderId: string, order: number): Promise<Folder>;
   deleteFolderTag(tagId: string): Promise<void>;
   softDeleteFolder(folderId: string): Promise<Folder>;

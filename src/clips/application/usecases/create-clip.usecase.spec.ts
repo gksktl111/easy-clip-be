@@ -41,7 +41,7 @@ describe('CreateClipUseCase', () => {
       'user-id',
       'folder-id',
     );
-    expect(repo.createClip).toHaveBeenCalledWith({
+    expect(repo.createClip).toHaveBeenCalledWith('user-id', {
       type: 'TEXT',
       title: 'hello',
       folderId: 'folder-id',
@@ -95,7 +95,7 @@ describe('CreateClipUseCase', () => {
       text: '#fff',
     });
 
-    expect(repo.createClip).toHaveBeenCalledWith({
+    expect(repo.createClip).toHaveBeenCalledWith('user-id', {
       type: 'COLOR',
       title: '#FFFFFF',
       folderId: 'folder-id',
@@ -148,7 +148,7 @@ describe('CreateClipUseCase', () => {
       file,
     );
 
-    expect(repo.createClip).toHaveBeenCalledWith({
+    expect(repo.createClip).toHaveBeenCalledWith('user-id', {
       type: 'IMAGE',
       title: 'image.png',
       folderId: 'folder-id',
@@ -205,7 +205,7 @@ describe('CreateClipUseCase', () => {
       file,
     );
 
-    expect(repo.createClip).toHaveBeenCalledWith({
+    expect(repo.createClip).toHaveBeenCalledWith('user-id', {
       type: 'IMAGE',
       title: '다운로드.png',
       folderId: 'folder-id',
@@ -287,4 +287,42 @@ describe('CreateClipUseCase', () => {
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
+  it.each([false, true])(
+    '생성 실패 후 DB 이미지 참조=%s에 따라 업로드를 정리한다',
+    async (referenced) => {
+      const repo = createRepository();
+      repo.findPersonalFolderById.mockResolvedValue({
+        id: 'folder-id',
+        workspaceId: 'workspace-id',
+      });
+      const error = new Error('create failed or response lost');
+      repo.createClip.mockRejectedValue(error);
+      repo.isCreatedImageReferenced.mockResolvedValue(referenced);
+      const storage = createImageStorage();
+      storage.uploadImage.mockResolvedValue({
+        key: 'new.png',
+        url: 'https://test.invalid/new.png',
+      });
+      await expect(
+        new CreateClipUseCase(repo, storage).execute(
+          'user-id',
+          { folderId: 'folder-id' },
+          {
+            mimetype: 'image/png',
+            originalname: 'new.png',
+            size: 1,
+          } as MulterFile,
+        ),
+      ).rejects.toBe(error);
+      expect(repo.isCreatedImageReferenced).toHaveBeenCalledWith(
+        'user-id',
+        'https://test.invalid/new.png',
+      );
+      if (referenced) expect(storage.deleteImage).not.toHaveBeenCalled();
+      else
+        expect(storage.deleteImage).toHaveBeenCalledWith(
+          'https://test.invalid/new.png',
+        );
+    },
+  );
 });

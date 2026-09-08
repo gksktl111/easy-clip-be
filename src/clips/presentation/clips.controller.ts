@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Request,
   UploadedFile,
@@ -17,6 +18,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiBody,
   ApiConsumes,
   ApiNoContentResponse,
@@ -34,6 +38,7 @@ import { ApplicationExceptionFilter } from 'src/shared/presentation/filters/appl
 import { CreateClipDto } from './dtos/create-clip.dto';
 import { DeleteClipsDto } from './dtos/delete-clips.dto';
 import { ListClipsQueryDto } from './dtos/list-clips-query.dto';
+import { ReplaceClipTagsDto } from './dtos/replace-clip-tags.dto';
 import { UpdateClipDto } from './dtos/update-clip.dto';
 import type { MulterFile } from 'src/shared/types/multer-file.type';
 import {
@@ -42,6 +47,7 @@ import {
   DeleteClipsResponseDto,
   LikeClipResponseDto,
   RecentViewedClipListResponseDto,
+  ReplaceClipTagsResponseDto,
 } from './dtos/clip-response.dto';
 import { DeleteClipUseCase } from '../application/usecases/delete-clip.usecase';
 import { DeleteAllClipsUseCase } from '../application/usecases/delete-all-clips.usecase';
@@ -55,9 +61,14 @@ import { LikeClipUseCase } from '../application/usecases/like-clip.usecase';
 import { UnlikeClipUseCase } from '../application/usecases/unlike-clip.usecase';
 import { RecordClipViewUseCase } from '../application/usecases/record-clip-view.usecase';
 import { ListRecentViewedClipsUseCase } from '../application/usecases/list-recent-viewed-clips.usecase';
+import { ReplaceClipTagsUseCase } from '../application/usecases/replace-clip-tags.usecase';
 import { ClipsError } from '../application/errors/clips.error';
 import { ErrorResponseDto } from 'src/shared/presentation/dtos/error-response.dto';
 
+@ApiForbiddenResponse({
+  description: 'Free 접근 폴더 이외의 콘텐츠 접근 또는 제한된 폴더 작업입니다.',
+  type: ErrorResponseDto,
+})
 @Controller('clips')
 @UseFilters(ApplicationExceptionFilter)
 @ApiTags('Clips')
@@ -80,6 +91,7 @@ export class ClipsController {
     private readonly unlikeClipUseCase: UnlikeClipUseCase,
     private readonly recordClipViewUseCase: RecordClipViewUseCase,
     private readonly listRecentViewedClipsUseCase: ListRecentViewedClipsUseCase,
+    private readonly replaceClipTagsUseCase: ReplaceClipTagsUseCase,
   ) {}
 
   @Get()
@@ -87,8 +99,19 @@ export class ClipsController {
   @ApiOperation({ summary: '클립 목록 조회' })
   @ApiQuery({ name: 'folderId', required: false })
   @ApiQuery({ name: 'cursor', required: false })
-  @ApiQuery({ name: 'favorite', required: false, enum: ['true'] })
-  @ApiQuery({ name: 'recent', required: false, enum: ['true'] })
+  @ApiQuery({
+    name: 'favorite',
+    required: false,
+    enum: ['true'],
+    description: '명시한 경우에만 좋아요 목록을 조회합니다.',
+  })
+  @ApiQuery({
+    name: 'recent',
+    required: false,
+    enum: ['true'],
+    description:
+      '좋아요 목록을 명시하지 않은 기본 조회는 최근 클립 목록을 반환합니다.',
+  })
   @ApiQuery({
     name: 'type',
     required: true,
@@ -97,7 +120,7 @@ export class ClipsController {
   @ApiQuery({ name: 'q', required: false })
   @ApiOkResponse({
     description:
-      '폴더, 좋아요, 최근 기준의 커서 페이지네이션 결과를 반환합니다.',
+      '폴더, 좋아요, 최근 기준의 커서 페이지네이션 결과를 반환합니다. 기본 조회는 최근 클립 목록입니다.',
     type: ClipCursorPageResponseDto,
   })
   getClips(
@@ -124,7 +147,7 @@ export class ClipsController {
       });
     }
 
-    if (favorite === recent) {
+    if (favorite && recent) {
       throw new ClipsError('BAD_REQUEST', '잘못된 요청입니다.');
     }
 
@@ -154,10 +177,42 @@ export class ClipsController {
     return this.listRecentViewedClipsUseCase.execute(req.user.userId);
   }
 
+  @Put(':clipId/tags')
+  @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '클립 태그 전체 교체' })
+  @ApiParam({ name: 'clipId', description: '클립 ID' })
+  @ApiBody({ type: ReplaceClipTagsDto })
+  @ApiOkResponse({
+    description: '교체 후 클립 태그 목록을 반환합니다.',
+    type: ReplaceClipTagsResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: '태그명이 유효하지 않습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: '클립을 찾을 수 없습니다.',
+    type: ErrorResponseDto,
+  })
+  replaceClipTags(
+    @Request() req: { user: AuthContext },
+    @Param('clipId') clipId: string,
+    @Body() dto: ReplaceClipTagsDto,
+  ) {
+    return this.replaceClipTagsUseCase.execute(req.user.userId, {
+      clipId,
+      tags: dto.tags,
+    });
+  }
+
   @Post()
   @UseGuards(JwtAccessGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: '클립 생성' })
+  @ApiConflictResponse({
+    description: '유효 플랜의 폴더별 클립 한도를 초과했습니다.',
+    type: ErrorResponseDto,
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateClipDto })
   @ApiOkResponse({
@@ -186,8 +241,13 @@ export class ClipsController {
   @UseGuards(JwtAccessGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: '클립 수정' })
+  @ApiBadRequestResponse({
+    description:
+      '소속 변경 필드가 있거나 수정할 이름·콘텐츠가 없으면 거부합니다.',
+    type: ErrorResponseDto,
+  })
   @ApiParam({ name: 'id', description: '클립 ID' })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('application/json', 'multipart/form-data')
   @ApiBody({ type: UpdateClipDto })
   @ApiOkResponse({
     description: '수정된 클립 정보를 반환합니다.',

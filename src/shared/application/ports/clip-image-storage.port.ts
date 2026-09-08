@@ -13,6 +13,7 @@ export type UploadedClipImage = {
 };
 
 export interface ClipImageStoragePort {
+  // 각 업로드는 새 객체와 고유 URL을 생성하며 기존 객체 URL을 재사용하지 않는다.
   uploadImage(input: UploadClipImageInput): Promise<UploadedClipImage>;
   deleteImage(imageUrl: string): Promise<void>;
 }

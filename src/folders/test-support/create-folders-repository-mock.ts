@@ -15,7 +15,7 @@ export const createFoldersRepositoryMock =
     createFolder: jest.fn(),
     createFolderTag: jest.fn(),
     updateFolderName: jest.fn(),
-    updateFolderTagName: jest.fn(),
+    updateFolderTag: jest.fn(),
     updateFolderOrder: jest.fn(),
     deleteFolderTag: jest.fn(),
     softDeleteFolder: jest.fn(),

@@ -1,4 +1,5 @@
 export type FolderOutput = {
+  isLocked?: boolean;
   id: string;
   name: string;
   order: number;

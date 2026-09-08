@@ -4,6 +4,7 @@ import type { FoldersRepository } from '../../domain/folders.repository';
 import type { FolderTagOutput } from '../dtos/folder-tag-output.dto';
 import { CreateFolderTagInput } from '../dtos/create-folder-tag-input.dto';
 import { FoldersError } from '../errors/folders.error';
+import { resolveFolderTagBackgroundColor } from '../helpers/folder-tag-background-color.helper';
 import { normalizeFolderTagName } from '../helpers/folder-name.helper';
 
 @Injectable()
@@ -18,6 +19,9 @@ export class CreateFolderTagUseCase {
     input: CreateFolderTagInput,
   ): Promise<FolderTagOutput> {
     const name = normalizeFolderTagName(input.name);
+    const backgroundColor = resolveFolderTagBackgroundColor(
+      input.backgroundColor,
+    );
     const folder = await this.foldersRepository.findPersonalFolderById(
       userId,
       input.folderId,
@@ -39,6 +43,7 @@ export class CreateFolderTagUseCase {
     return this.foldersRepository.createFolderTag({
       folderId: folder.id,
       name,
+      backgroundColor,
     });
   }
 }

@@ -249,10 +249,10 @@ GITHUB_CLIENT_SECRET=...
 GITHUB_REDIRECT_URI=...
 ```
 
-OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠키로 저장한 뒤 프론트엔드의 `/{userId}/favorites` 경로로 리다이렉트합니다.
+OAuth 로그인 성공 후 백엔드는 access/refresh token을 `httpOnly` 쿠키로 저장한 뒤 프론트엔드의 `/favorites` 경로로 리다이렉트합니다.
 
 - `OAUTH_STATE_SECRET`: OAuth state 변조 방지를 위한 HMAC secret. 미설정 시 `JWT_ACCESS_SECRET`을 사용합니다.
-- `OAUTH_SUCCESS_REDIRECT_BASE_URL`: 로그인 완료 후 조합할 프론트 base URL. 최종 이동 주소는 `<base-url>/<userId>/favorites` 형태입니다.
+- `OAUTH_SUCCESS_REDIRECT_BASE_URL`: 로그인 완료 후 조합할 프론트 base URL. 최종 이동 주소는 `<base-url>/favorites` 형태입니다.
 - `AUTH_COOKIE_DOMAIN`: 운영에서 쿠키를 공유할 도메인이 필요할 때만 설정
 - `AUTH_COOKIE_SECURE`: `true`면 `Secure` 쿠키로 발급, 미설정 시 `NODE_ENV=production`에서 자동 활성화
 - `AUTH_ACCESS_TOKEN_COOKIE_NAME`, `AUTH_REFRESH_TOKEN_COOKIE_NAME`: 쿠키 이름 커스터마이징

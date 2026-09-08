@@ -4,6 +4,7 @@ import {
   ClipType,
   PersonalFolder,
   RecentClipItem,
+  Tag,
 } from './clip.types';
 
 export const CLIPS_REPOSITORY = Symbol('CLIPS_REPOSITORY');
@@ -21,7 +22,20 @@ export type CreateClipParams = {
   imageUrl: string | null;
 };
 
-export type UpdateClipParams = CreateClipParams;
+export type UpdateClipParams =
+  | Omit<CreateClipParams, 'folderId' | 'workspaceId'>
+  | { title: string };
+
+export type UpdatedClip = {
+  clip: Clip;
+  previousImageUrl: string | null;
+};
+
+export type ReplaceClipTagsParams = {
+  userId: string;
+  clipId: string;
+  tagNames: string[];
+};
 
 export type FindClipsParams = {
   userId: string;
@@ -32,7 +46,7 @@ export type FindClipsParams = {
   type?: ClipType;
   q?: string;
   searchTarget?: ClipSearchTarget;
-  likedOnly?: boolean;
+  likedOnly?: true;
 };
 
 export type FindRecentClipsParams = {
@@ -42,7 +56,6 @@ export type FindRecentClipsParams = {
   type?: ClipType;
   q?: string;
   searchTarget?: ClipSearchTarget;
-  likedOnly?: boolean;
 };
 
 export interface ClipsRepository {
@@ -77,14 +90,21 @@ export interface ClipsRepository {
       viewId: string;
       searchTarget: ClipSearchTarget;
     },
-  ): Promise<{ liked: boolean } | null>;
+  ): Promise<boolean>;
   createClipView(userId: string, clipId: string): Promise<void>;
   isClipLikedByUser(userId: string, clipId: string): Promise<boolean>;
   createClipLike(userId: string, clipId: string): Promise<void>;
   deleteClipLike(userId: string, clipId: string): Promise<void>;
-  createClip(params: CreateClipParams): Promise<Clip>;
-  updateClip(clipId: string, params: UpdateClipParams): Promise<Clip>;
-  softDeleteClip(clipId: string): Promise<Clip>;
-  softDeleteClips(clipIds: string[]): Promise<number>;
+  createClip(userId: string, params: CreateClipParams): Promise<Clip>;
+  updateClip(
+    userId: string,
+    clipId: string,
+    params: UpdateClipParams,
+  ): Promise<UpdatedClip | null>;
+  isCreatedImageReferenced(userId: string, imageUrl: string): Promise<boolean>;
+  isClipImageReferenced(clipId: string, imageUrl: string): Promise<boolean>;
+  replaceClipTags(params: ReplaceClipTagsParams): Promise<Tag[]>;
+  softDeleteClip(userId: string, clipId: string): Promise<Clip>;
+  softDeleteClips(userId: string, clipIds: string[]): Promise<number>;
   softDeleteAllClipsInFolder(userId: string, folderId: string): Promise<number>;
 }

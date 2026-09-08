@@ -116,6 +116,11 @@ model Workspace {
   name String
   ownerUserId String @unique
 
+  // Free 접근 선택은 구독 기간별로 고정한다. 삭제 후에도 선택 이력을 보존한다.
+  freeAccessibleFolderId String?
+  freeAccessInitialized Boolean @default(false)
+  freeAccessPeriodEnd DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -152,6 +157,8 @@ model Subscription {
   workspaceId String @unique
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   payments    SubscriptionPayment[]
+
+  @@index([plan, status, autoRenew, nextBillingAt, id], map: "Subscription_auto_renewal_due_idx")
 }
 
 model SubscriptionPayment {
@@ -174,6 +181,14 @@ model SubscriptionPayment {
   failureMessage String?
   rawData        Json?
 
+  // 자동갱신 과금 전 고정한 주기와 복구 일정. 과금 결과 미확정은 PENDING을 유지한다.
+  renewalDueAt          DateTime?
+  renewalPeriodEnd      DateTime?
+  reconciliationNextAt  DateTime?
+  reconciliationAttempts Int @default(0)
+  reconciliationError   String?
+  manualReviewAt        DateTime?
+
   subscriptionId String
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
@@ -182,6 +197,7 @@ model SubscriptionPayment {
 
   @@index([subscriptionId, status])
   @@index([provider])
+  @@index([status, reconciliationNextAt])
 }
 
 
@@ -190,6 +206,18 @@ enum ClipType {
   TEXT
   COLOR
   IMAGE
+}
+
+enum TagBackgroundColor {
+  GRAY
+  BROWN
+  ORANGE
+  YELLOW
+  GREEN
+  BLUE
+  PURPLE
+  PINK
+  RED
 }
 
 model Folder {
@@ -244,8 +272,9 @@ model Clip {
 
 // 노션 데이터베이스 같은 태그 모델 (하나의 태그 생성이 이를 같은 폴더내의 다른 클립에도 적용이 가능)
 model Tag {
-  id   String @id @default(cuid()) // 태그 고유 ID
-  name String                      // 태그 이름
+  id              String             @id @default(cuid()) // 태그 고유 ID
+  name            String                             // 태그 이름
+  backgroundColor TagBackgroundColor @default(GRAY)  // 태그 배경색
 
   folderId String
   folder   Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)

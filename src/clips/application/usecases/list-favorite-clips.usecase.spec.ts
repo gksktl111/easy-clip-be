@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
+import { ApplicationError } from 'src/shared/application/application.error';
 import { ListFavoriteClipsUseCase } from './list-favorite-clips.usecase';
 import { createClipsRepositoryMock as createRepository } from '../../test-support/create-clips-repository-mock';
 
@@ -44,5 +45,18 @@ describe('ListFavoriteClipsUseCase', () => {
         type: 'ALL',
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+  it('잠긴 폴더의 이전 커서는 접근 범위 밖의 NOT_FOUND로 처리한다', async () => {
+    const repo = createRepository();
+    repo.findClipByIdForUser.mockRejectedValue(
+      new ApplicationError('FORBIDDEN', '잠긴 폴더입니다.'),
+    );
+    await expect(
+      new ListFavoriteClipsUseCase(repo).execute('user-id', {
+        cursor: 'locked-clip',
+        type: 'ALL',
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(repo.findClips).not.toHaveBeenCalled();
   });
 });

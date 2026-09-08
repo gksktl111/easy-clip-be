@@ -1,6 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { assertClipIncrease } from 'src/shared/application/clip-limit';
+import { lockClipQuota } from 'src/shared/infrastructure/prisma-clip-limit';
+import {
+  assertFolderAccess,
+  lockWorkspaceAccess,
+  prepareFolderRestore,
+  resolveFolderAccess,
+  type FolderAccess,
+} from 'src/shared/infrastructure/prisma-folder-access';
+import { TrashError } from '../application/errors/trash.error';
 import {
   HardDeleteAllTrashItemsResult,
   HardDeleteSelectedTrashItemsResult,
@@ -22,67 +32,54 @@ export class PrismaTrashRepository implements TrashRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findDeletedItems(params: FindTrashItemsParams): Promise<TrashItem[]> {
-    const cursor = await this.findTrashItemCursor(params);
-
-    if (params.cursor && !cursor) {
-      return [];
-    }
-
-    const [clips, folders] = await Promise.all([
-      this.prisma.clip.findMany({
-        where: {
-          deletedAt: {
-            not: null,
+    return this.prisma.$transaction(async (tx) => {
+      const workspace = await tx.workspace.findUnique({
+        where: { ownerUserId: params.userId },
+        select: { id: true },
+      });
+      if (!workspace) return [];
+      const access = await lockWorkspaceAccess(tx, workspace.id);
+      const cursor = await this.findTrashItemCursor(tx, params, access);
+      if (params.cursor && !cursor) return [];
+      const [clips, folders] = await Promise.all([
+        tx.clip.findMany({
+          where: {
+            workspaceId: workspace.id,
+            deletedAt: { not: null },
+            folder: { deletedAt: null },
+            ...this.clipAccessWhere(access),
+            ...(cursor ? { OR: buildClipTrashCursorWhere(cursor) } : {}),
           },
-          folder: {
-            deletedAt: null,
+          orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
+          take: params.limit,
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            folderId: true,
+            deletedAt: true,
           },
-          ...(cursor ? { OR: buildClipTrashCursorWhere(cursor) } : {}),
-          workspace: {
-            ownerUserId: params.userId,
+        }) as Promise<TrashClipItem[]>,
+        tx.folder.findMany({
+          where: {
+            workspaceId: workspace.id,
+            deletedAt: { not: null },
+            ...(cursor ? { OR: buildFolderTrashCursorWhere(cursor) } : {}),
           },
-        },
-        orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
-        take: params.limit,
-        select: {
-          id: true,
-          title: true,
-          type: true,
-          folderId: true,
-          deletedAt: true,
-        },
-      }) as Promise<TrashClipItem[]>,
-      this.prisma.folder.findMany({
-        where: {
-          deletedAt: {
-            not: null,
-          },
-          ...(cursor ? { OR: buildFolderTrashCursorWhere(cursor) } : {}),
-          workspace: {
-            ownerUserId: params.userId,
-          },
-        },
-        orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
-        take: params.limit,
-        select: {
-          id: true,
-          name: true,
-          deletedAt: true,
-        },
-      }) as Promise<TrashFolderItem[]>,
-    ]);
-
-    return [
-      ...clips.map((clip): TrashItem => ({ ...clip, itemType: 'CLIP' })),
-      ...folders.map(
-        (folder): TrashItem => ({
-          ...folder,
-          itemType: 'FOLDER',
-        }),
-      ),
-    ]
-      .sort(compareTrashItems)
-      .slice(0, params.limit);
+          orderBy: [{ deletedAt: 'desc' }, { id: 'desc' }],
+          take: params.limit,
+          select: { id: true, name: true, deletedAt: true },
+        }) as Promise<TrashFolderItem[]>,
+      ]);
+      return [
+        ...clips.map((clip): TrashItem => ({ ...clip, itemType: 'CLIP' })),
+        ...folders.map(
+          (folder): TrashItem => ({ ...folder, itemType: 'FOLDER' }),
+        ),
+      ]
+        .sort(compareTrashItems)
+        .slice(0, params.limit);
+    });
   }
 
   async findDeletedClipsByIds(
@@ -175,44 +172,101 @@ export class PrismaTrashRepository implements TrashRepository {
 
   async restoreItems(params: RestoreTrashItemsParams): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      if (params.folderIds.length > 0) {
+      const workspaceId = await lockClipQuota(tx, params.userId);
+      const folderIds = [...new Set(params.folderIds)];
+      const clipIds = [...new Set(params.clipIds)];
+      const candidates = await tx.clip.findMany({
+        where: { id: { in: clipIds }, workspaceId },
+        select: { id: true, folderId: true },
+      });
+      const parentIds = [
+        ...new Set([...folderIds, ...candidates.map((clip) => clip.folderId)]),
+      ];
+      const ownedFolders = await tx.folder.findMany({
+        where: { id: { in: parentIds }, workspaceId },
+        select: { id: true },
+      });
+      await this.lockFolders(
+        tx,
+        ownedFolders.map((folder) => folder.id),
+      );
+      await this.lockClips(
+        tx,
+        candidates.map((clip) => clip.id),
+      );
+      const folders = await tx.folder.findMany({
+        where: { id: { in: parentIds }, workspaceId },
+        select: { id: true, deletedAt: true },
+      });
+      const clips = await tx.clip.findMany({
+        where: { id: { in: clipIds }, workspaceId, deletedAt: { not: null } },
+        select: { id: true, folderId: true },
+      });
+      if (clips.length !== clipIds.length) {
+        throw new TrashError('NOT_FOUND', '휴지통 클립을 찾을 수 없습니다.');
+      }
+      const restoringFolders = new Set(folderIds);
+      if (
+        folders.filter(
+          (folder) =>
+            restoringFolders.has(folder.id) && folder.deletedAt !== null,
+        ).length !== folderIds.length
+      ) {
+        throw new TrashError('NOT_FOUND', '휴지통 폴더를 찾을 수 없습니다.');
+      }
+      const foldersById = new Map(folders.map((folder) => [folder.id, folder]));
+      const increases = new Map<string, number>();
+      for (const clip of clips) {
+        const folder = foldersById.get(clip.folderId);
+        if (!folder)
+          throw new TrashError('NOT_FOUND', '클립의 폴더를 찾을 수 없습니다.');
+        if (folder.deletedAt && !restoringFolders.has(folder.id)) {
+          throw new TrashError(
+            'CONFLICT',
+            '삭제된 폴더에 속한 클립은 단독으로 복구할 수 없습니다.',
+          );
+        }
+        increases.set(folder.id, (increases.get(folder.id) ?? 0) + 1);
+      }
+      const access = await prepareFolderRestore(
+        tx,
+        await resolveFolderAccess(tx, workspaceId),
+        folderIds,
+      );
+      for (const folderId of increases.keys()) {
+        assertFolderAccess(access, folderId);
+      }
+      const projectedCounts: Array<{
+        folderId: string;
+        currentCount: number;
+        increase: number;
+      }> = [];
+      for (const [folderId, increase] of increases) {
+        // 폴더 자체 복구는 기존 클립을 다시 노출할 뿐 추가 복구량이 아니다.
+        const currentCount = await tx.clip.count({
+          where: { folderId, deletedAt: null },
+        });
+        projectedCounts.push({ folderId, currentCount, increase });
+      }
+      // 전체 요청에 300개 초과 폴더가 있으면 업그레이드로 해결된다고 안내하지 않는다.
+      projectedCounts.sort(
+        (a, b) =>
+          b.currentCount + b.increase - a.currentCount - a.increase ||
+          a.folderId.localeCompare(b.folderId),
+      );
+      for (const { folderId, currentCount, increase } of projectedCounts) {
+        assertClipIncrease(access, folderId, currentCount, increase);
+      }
+      if (folderIds.length > 0) {
         await tx.folder.updateMany({
-          where: {
-            id: {
-              in: params.folderIds,
-            },
-            deletedAt: {
-              not: null,
-            },
-            workspace: {
-              ownerUserId: params.userId,
-            },
-          },
-          data: {
-            deletedAt: null,
-          },
+          where: { id: { in: folderIds }, workspaceId },
+          data: { deletedAt: null },
         });
       }
-
-      if (params.clipIds.length > 0) {
+      if (clipIds.length > 0) {
         await tx.clip.updateMany({
-          where: {
-            id: {
-              in: params.clipIds,
-            },
-            deletedAt: {
-              not: null,
-            },
-            workspace: {
-              ownerUserId: params.userId,
-            },
-            folder: {
-              deletedAt: null,
-            },
-          },
-          data: {
-            deletedAt: null,
-          },
+          where: { id: { in: clipIds }, workspaceId },
+          data: { deletedAt: null },
         });
       }
     });
@@ -222,107 +276,13 @@ export class PrismaTrashRepository implements TrashRepository {
     params: DeleteTrashItemsParams,
   ): Promise<HardDeleteSelectedTrashItemsResult> {
     return this.prisma.$transaction(async (tx) => {
-      const folderImageClips =
-        params.folderIds.length > 0
-          ? await tx.clip.findMany({
-              where: {
-                folderId: {
-                  in: params.folderIds,
-                },
-                imageUrl: {
-                  not: null,
-                },
-                workspace: {
-                  ownerUserId: params.userId,
-                },
-              },
-              select: {
-                imageUrl: true,
-              },
-            })
-          : [];
-
-      const folderClipDeletion =
-        params.folderIds.length > 0
-          ? await tx.clip.deleteMany({
-              where: {
-                folderId: {
-                  in: params.folderIds,
-                },
-                workspace: {
-                  ownerUserId: params.userId,
-                },
-              },
-            })
-          : { count: 0 };
-
-      const folderDeletion =
-        params.folderIds.length > 0
-          ? await tx.folder.deleteMany({
-              where: {
-                id: {
-                  in: params.folderIds,
-                },
-                deletedAt: {
-                  not: null,
-                },
-                workspace: {
-                  ownerUserId: params.userId,
-                },
-              },
-            })
-          : { count: 0 };
-
-      const clips =
-        params.clipIds.length > 0
-          ? await tx.clip.findMany({
-              where: {
-                id: {
-                  in: params.clipIds,
-                },
-                deletedAt: {
-                  not: null,
-                },
-                workspace: {
-                  ownerUserId: params.userId,
-                },
-              },
-              select: {
-                id: true,
-                imageUrl: true,
-              },
-            })
-          : [];
-
-      const clipDeletion =
-        clips.length > 0
-          ? await tx.clip.deleteMany({
-              where: {
-                id: {
-                  in: clips.map((clip) => clip.id),
-                },
-                deletedAt: {
-                  not: null,
-                },
-                workspace: {
-                  ownerUserId: params.userId,
-                },
-              },
-            })
-          : { count: 0 };
-
-      const clipsDeleted = folderClipDeletion.count + clipDeletion.count;
-      const foldersDeleted = folderDeletion.count;
-
-      return {
-        clipsDeleted,
-        foldersDeleted,
-        totalDeleted: clipsDeleted + foldersDeleted,
-        imageUrls: this.compactImageUrls([
-          ...folderImageClips.map((clip) => clip.imageUrl),
-          ...clips.map((clip) => clip.imageUrl),
-        ]),
-      };
+      const workspaceId = await lockClipQuota(tx, params.userId);
+      return this.deleteOwnedItems(
+        tx,
+        workspaceId,
+        params.folderIds,
+        params.clipIds,
+      );
     });
   }
 
@@ -380,215 +340,216 @@ export class PrismaTrashRepository implements TrashRepository {
     expiresBefore: Date,
     limit: number,
   ): Promise<HardDeleteTrashItemsResult> {
-    const folders = await this.prisma.folder.findMany({
-      where: {
-        deletedAt: {
-          lte: expiresBefore,
+    return this.prisma.$transaction(async (tx) => {
+      const candidates = await tx.folder.findMany({
+        where: { deletedAt: { lte: expiresBefore } },
+        orderBy: [{ deletedAt: 'asc' }, { id: 'asc' }],
+        take: limit,
+        select: { id: true },
+      });
+      if (candidates.length === 0) return this.emptyHardDeleteResult();
+      await this.lockFolders(
+        tx,
+        candidates.map((folder) => folder.id),
+      );
+      const folders = await tx.folder.findMany({
+        where: {
+          id: { in: candidates.map((folder) => folder.id) },
+          deletedAt: { lte: expiresBefore },
         },
-      },
-      orderBy: [{ deletedAt: 'asc' }, { id: 'asc' }],
-      take: limit,
-      select: {
-        id: true,
-      },
+        select: { id: true },
+      });
+      const folderIds = folders.map((folder) => folder.id);
+      const children = await tx.clip.findMany({
+        where: { folderId: { in: folderIds } },
+        select: { id: true },
+      });
+      await this.lockClips(
+        tx,
+        children.map((clip) => clip.id),
+      );
+      const imageClips = await tx.clip.findMany({
+        where: { folderId: { in: folderIds }, imageUrl: { not: null } },
+        select: { imageUrl: true },
+      });
+      const result = await tx.folder.deleteMany({
+        where: { id: { in: folderIds } },
+      });
+      return {
+        deletedCount: result.count,
+        imageUrls: this.compactImageUrls(
+          imageClips.map((clip) => clip.imageUrl),
+        ),
+      };
     });
-
-    if (folders.length === 0) {
-      return this.emptyHardDeleteResult();
-    }
-
-    const folderIds = folders.map((folder) => folder.id);
-    const imageClips = await this.prisma.clip.findMany({
-      where: {
-        folderId: {
-          in: folderIds,
-        },
-        imageUrl: {
-          not: null,
-        },
-      },
-      select: {
-        imageUrl: true,
-      },
-    });
-
-    const result = await this.prisma.folder.deleteMany({
-      where: {
-        id: {
-          in: folderIds,
-        },
-        deletedAt: {
-          lte: expiresBefore,
-        },
-      },
-    });
-
-    return {
-      deletedCount: result.count,
-      imageUrls: this.compactImageUrls(imageClips.map((clip) => clip.imageUrl)),
-    };
   }
 
   async hardDeleteExpiredClips(
     expiresBefore: Date,
     limit: number,
   ): Promise<HardDeleteTrashItemsResult> {
-    const clips = await this.prisma.clip.findMany({
-      where: {
-        deletedAt: {
-          lte: expiresBefore,
+    return this.prisma.$transaction(async (tx) => {
+      const candidates = await tx.clip.findMany({
+        where: {
+          deletedAt: { lte: expiresBefore },
+          folder: { deletedAt: null },
         },
-        folder: {
-          deletedAt: null,
+        orderBy: [{ deletedAt: 'asc' }, { id: 'asc' }],
+        take: limit,
+        select: { id: true, folderId: true },
+      });
+      if (candidates.length === 0) return this.emptyHardDeleteResult();
+      await this.lockFolders(
+        tx,
+        candidates.map((clip) => clip.folderId),
+      );
+      await this.lockClips(
+        tx,
+        candidates.map((clip) => clip.id),
+      );
+      const clips = await tx.clip.findMany({
+        where: {
+          id: { in: candidates.map((clip) => clip.id) },
+          deletedAt: { lte: expiresBefore },
+          folder: { deletedAt: null },
         },
-      },
-      orderBy: [{ deletedAt: 'asc' }, { id: 'asc' }],
-      take: limit,
-      select: {
-        id: true,
-        imageUrl: true,
-      },
+        select: { id: true, imageUrl: true },
+      });
+      const result = await tx.clip.deleteMany({
+        where: { id: { in: clips.map((clip) => clip.id) } },
+      });
+      return {
+        deletedCount: result.count,
+        imageUrls: this.compactImageUrls(clips.map((clip) => clip.imageUrl)),
+      };
     });
-
-    if (clips.length === 0) {
-      return this.emptyHardDeleteResult();
-    }
-
-    const result = await this.prisma.clip.deleteMany({
-      where: {
-        id: {
-          in: clips.map((clip) => clip.id),
-        },
-        deletedAt: {
-          lte: expiresBefore,
-        },
-        folder: {
-          deletedAt: null,
-        },
-      },
-    });
-
-    return {
-      deletedCount: result.count,
-      imageUrls: this.compactImageUrls(clips.map((clip) => clip.imageUrl)),
-    };
   }
 
   async hardDeleteAllTrashItemsForUser(
     userId: string,
   ): Promise<HardDeleteAllTrashItemsResult> {
     return this.prisma.$transaction(async (tx) => {
-      const folders = await tx.folder.findMany({
-        where: {
-          deletedAt: {
-            not: null,
-          },
-          workspace: {
-            ownerUserId: userId,
-          },
-        },
-        select: {
-          id: true,
-        },
+      const workspace = await tx.workspace.findUnique({
+        where: { ownerUserId: userId },
+        select: { id: true },
       });
-
-      const folderIds = folders.map((folder) => folder.id);
-      const folderImageClips =
-        folderIds.length > 0
-          ? await tx.clip.findMany({
-              where: {
-                folderId: {
-                  in: folderIds,
-                },
-                imageUrl: {
-                  not: null,
-                },
-              },
-              select: {
-                imageUrl: true,
-              },
-            })
-          : [];
-
-      const folderClipDeletion =
-        folderIds.length > 0
-          ? await tx.clip.deleteMany({
-              where: {
-                folderId: {
-                  in: folderIds,
-                },
-              },
-            })
-          : { count: 0 };
-
-      const folderDeletion =
-        folderIds.length > 0
-          ? await tx.folder.deleteMany({
-              where: {
-                id: {
-                  in: folderIds,
-                },
-                deletedAt: {
-                  not: null,
-                },
-                workspace: {
-                  ownerUserId: userId,
-                },
-              },
-            })
-          : { count: 0 };
-
+      if (!workspace) {
+        return {
+          clipsDeleted: 0,
+          foldersDeleted: 0,
+          totalDeleted: 0,
+          imageUrls: [],
+        };
+      }
+      const workspaceId = await lockClipQuota(tx, userId);
+      const folders = await tx.folder.findMany({
+        where: { workspaceId, deletedAt: { not: null } },
+        select: { id: true },
+      });
       const clips = await tx.clip.findMany({
         where: {
-          deletedAt: {
-            not: null,
-          },
-          workspace: {
-            ownerUserId: userId,
-          },
-          folder: {
-            deletedAt: null,
-          },
+          workspaceId,
+          deletedAt: { not: null },
+          folder: { deletedAt: null },
         },
-        select: {
-          id: true,
-          imageUrl: true,
-        },
+        select: { id: true },
       });
-
-      const clipDeletion =
-        clips.length > 0
-          ? await tx.clip.deleteMany({
-              where: {
-                id: {
-                  in: clips.map((clip) => clip.id),
-                },
-                deletedAt: {
-                  not: null,
-                },
-                workspace: {
-                  ownerUserId: userId,
-                },
-                folder: {
-                  deletedAt: null,
-                },
-              },
-            })
-          : { count: 0 };
-
-      const clipsDeleted = folderClipDeletion.count + clipDeletion.count;
-      const foldersDeleted = folderDeletion.count;
-
-      return {
-        clipsDeleted,
-        foldersDeleted,
-        totalDeleted: clipsDeleted + foldersDeleted,
-        imageUrls: this.compactImageUrls([
-          ...folderImageClips.map((clip) => clip.imageUrl),
-          ...clips.map((clip) => clip.imageUrl),
-        ]),
-      };
+      return this.deleteOwnedItems(
+        tx,
+        workspaceId,
+        folders.map((folder) => folder.id),
+        clips.map((clip) => clip.id),
+        true,
+      );
     });
+  }
+
+  private async deleteOwnedItems(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    requestedFolderIds: string[],
+    requestedClipIds: string[],
+    requireActiveParent = false,
+  ): Promise<HardDeleteSelectedTrashItemsResult> {
+    const explicitClips = await tx.clip.findMany({
+      where: { id: { in: requestedClipIds }, workspaceId },
+      select: { id: true, folderId: true },
+    });
+    const parentIds = [
+      ...new Set([
+        ...requestedFolderIds,
+        ...explicitClips.map((clip) => clip.folderId),
+      ]),
+    ];
+    const ownedFolders = await tx.folder.findMany({
+      where: { id: { in: parentIds }, workspaceId },
+      select: { id: true },
+    });
+    await this.lockFolders(
+      tx,
+      ownedFolders.map((folder) => folder.id),
+    );
+    // 복구가 먼저 완료됐다면 자식 조회·삭제와 이미지 정리 대상 모두에서 제외한다.
+    const folders = await tx.folder.findMany({
+      where: {
+        id: { in: requestedFolderIds },
+        workspaceId,
+        deletedAt: { not: null },
+      },
+      select: { id: true },
+    });
+    const folderIds = folders.map((folder) => folder.id);
+    const clipWhere: Prisma.ClipWhereInput = {
+      workspaceId,
+      OR: [
+        { folderId: { in: folderIds } },
+        {
+          id: { in: requestedClipIds },
+          deletedAt: { not: null },
+          ...(requireActiveParent ? { folder: { deletedAt: null } } : {}),
+        },
+      ],
+    };
+    const candidates = await tx.clip.findMany({
+      where: clipWhere,
+      select: { id: true },
+    });
+    await this.lockClips(
+      tx,
+      candidates.map((clip) => clip.id),
+    );
+    const clips = await tx.clip.findMany({
+      where: { ...clipWhere, id: { in: candidates.map((clip) => clip.id) } },
+      select: { id: true, imageUrl: true },
+    });
+    const clipDeletion = await tx.clip.deleteMany({
+      where: { id: { in: clips.map((clip) => clip.id) } },
+    });
+    const folderDeletion = await tx.folder.deleteMany({
+      where: { id: { in: folderIds } },
+    });
+    return {
+      clipsDeleted: clipDeletion.count,
+      foldersDeleted: folderDeletion.count,
+      totalDeleted: clipDeletion.count + folderDeletion.count,
+      imageUrls: this.compactImageUrls(clips.map((clip) => clip.imageUrl)),
+    };
+  }
+
+  private async lockFolders(
+    tx: Prisma.TransactionClient,
+    ids: string[],
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await tx.$queryRaw`SELECT "id" FROM "Folder" WHERE "id" IN (${Prisma.join([...new Set(ids)])}) ORDER BY "id" FOR UPDATE`;
+  }
+
+  private async lockClips(
+    tx: Prisma.TransactionClient,
+    ids: string[],
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await tx.$queryRaw`SELECT "id" FROM "Clip" WHERE "id" IN (${Prisma.join([...new Set(ids)])}) ORDER BY "id" FOR UPDATE`;
   }
 
   private compactImageUrls(imageUrls: Array<string | null | undefined>) {
@@ -604,58 +565,45 @@ export class PrismaTrashRepository implements TrashRepository {
     };
   }
 
+  private clipAccessWhere(access: FolderAccess): Prisma.ClipWhereInput {
+    return access.effectivePlan === 'FREE'
+      ? {
+          folderId: {
+            in: access.accessibleFolderId ? [access.accessibleFolderId] : [],
+          },
+        }
+      : {};
+  }
+
   private async findTrashItemCursor(
+    tx: Prisma.TransactionClient,
     params: FindTrashItemsParams,
+    access: FolderAccess,
   ): Promise<TrashItemCursor | null> {
-    if (!params.cursor) {
-      return null;
-    }
-
+    if (!params.cursor) return null;
     const parsedCursor = parseTrashItemCursor(params.cursor);
-
-    if (!parsedCursor) {
-      return null;
-    }
-
+    if (!parsedCursor) return null;
     if (parsedCursor.itemType === 'CLIP') {
-      const clip = await this.prisma.clip.findFirst({
+      const clip = await tx.clip.findFirst({
         where: {
           id: parsedCursor.id,
-          deletedAt: {
-            not: null,
-          },
-          folder: {
-            deletedAt: null,
-          },
-          workspace: {
-            ownerUserId: params.userId,
-          },
+          workspaceId: access.workspaceId,
+          deletedAt: { not: null },
+          folder: { deletedAt: null },
+          ...this.clipAccessWhere(access),
         },
-        select: {
-          id: true,
-          deletedAt: true,
-        },
+        select: { id: true, deletedAt: true },
       });
-
       return clip ? { ...clip, itemType: 'CLIP' } : null;
     }
-
-    const folder = await this.prisma.folder.findFirst({
+    const folder = await tx.folder.findFirst({
       where: {
         id: parsedCursor.id,
-        deletedAt: {
-          not: null,
-        },
-        workspace: {
-          ownerUserId: params.userId,
-        },
+        workspaceId: access.workspaceId,
+        deletedAt: { not: null },
       },
-      select: {
-        id: true,
-        deletedAt: true,
-      },
+      select: { id: true, deletedAt: true },
     });
-
     return folder ? { ...folder, itemType: 'FOLDER' } : null;
   }
 }

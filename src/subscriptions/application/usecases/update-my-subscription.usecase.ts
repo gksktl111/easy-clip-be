@@ -9,7 +9,7 @@ import {
 } from '../../domain/subscription.types';
 import { SUBSCRIPTION_PAYMENT_MAIL_PORT } from '../ports/subscription-payment-mail.port';
 import type { SubscriptionPaymentMailPort } from '../ports/subscription-payment-mail.port';
-import { MySubscriptionOutput } from '../dtos/my-subscription-output.dto';
+import { UpdateMySubscriptionOutput } from '../dtos/my-subscription-output.dto';
 import { UpdateMySubscriptionInput } from '../dtos/update-my-subscription-input.dto';
 import { SubscriptionsError } from '../errors/subscriptions.error';
 import { normalizeExpiredSubscription } from '../helpers/subscription-expiration.helper';
@@ -29,7 +29,7 @@ export class UpdateMySubscriptionUseCase {
   async execute(
     userId: string,
     input: UpdateMySubscriptionInput,
-  ): Promise<MySubscriptionOutput> {
+  ): Promise<UpdateMySubscriptionOutput> {
     const currentSubscription =
       await this.subscriptionsRepository.getOrCreatePersonalSubscription(
         userId,
@@ -40,7 +40,23 @@ export class UpdateMySubscriptionUseCase {
     );
 
     if (input.type === SubscriptionAction.CANCEL) {
-      return toMySubscriptionResponse(await this.cancel(subscription));
+      const canceled = await this.subscriptionsRepository.cancelAutoRenewal(
+        subscription.id,
+      );
+      if (!canceled)
+        throw new SubscriptionsError(
+          'CONFLICT',
+          '현재 구독 상태에서는 자동갱신을 해지할 수 없습니다.',
+        );
+      return {
+        ...toMySubscriptionResponse(canceled.subscription),
+        cancellation: {
+          pendingRenewalPayment: canceled.pendingRenewalPayment,
+          message: canceled.pendingRenewalPayment
+            ? '자동갱신이 해지되었습니다. 이미 시작된 결제는 완료될 수 있으며, 결제된 이용 기간은 보장됩니다.'
+            : '자동갱신이 해지되었습니다. 이미 결제한 기간까지 이용할 수 있습니다.',
+        },
+      };
     }
 
     if (input.type === SubscriptionAction.RESUME) {
@@ -56,24 +72,6 @@ export class UpdateMySubscriptionUseCase {
     );
   }
 
-  private async cancel(subscription: Subscription) {
-    if (
-      subscription.plan !== SubscriptionPlan.PRO ||
-      subscription.status !== SubscriptionStatus.ACTIVE
-    ) {
-      throw new SubscriptionsError(
-        'CONFLICT',
-        '구독 해지는 PRO ACTIVE 상태에서만 가능합니다.',
-      );
-    }
-
-    return this.subscriptionsRepository.updateSubscription(subscription.id, {
-      status: SubscriptionStatus.CANCELED,
-      autoRenew: false,
-      nextBillingAt: null,
-    });
-  }
-
   private async resume(subscription: Subscription) {
     if (
       subscription.plan !== SubscriptionPlan.PRO ||
@@ -87,11 +85,15 @@ export class UpdateMySubscriptionUseCase {
       );
     }
 
-    return this.subscriptionsRepository.updateSubscription(subscription.id, {
-      status: SubscriptionStatus.ACTIVE,
-      autoRenew: true,
-      nextBillingAt: subscription.currentPeriodEnd,
-    });
+    const resumed = await this.subscriptionsRepository.resumeAutoRenewal(
+      subscription.id,
+    );
+    if (!resumed)
+      throw new SubscriptionsError(
+        'CONFLICT',
+        '구독 상태가 변경되어 자동갱신을 재개할 수 없습니다.',
+      );
+    return resumed;
   }
 
   private async sendSubscriptionResumedMail(

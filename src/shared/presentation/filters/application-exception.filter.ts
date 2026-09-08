@@ -12,6 +12,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { FolderAccessError } from '../../application/folder-access';
+import { ClipLimitError } from '../../application/clip-limit';
 import { ApplicationError } from '../../application/application.error';
 
 @Catch()
@@ -46,6 +48,29 @@ export class ApplicationExceptionFilter implements ExceptionFilter {
 
     if (!(error instanceof ApplicationError)) {
       return new InternalServerErrorException('Internal server error');
+    }
+
+    if (error instanceof FolderAccessError) {
+      const statusCode = error.code === 'CONFLICT' ? 409 : 403;
+      return new HttpException(
+        {
+          statusCode,
+          message: error.message,
+          error: statusCode === 409 ? 'Conflict' : 'Forbidden',
+          code: error.policyCode,
+        },
+        statusCode,
+      );
+    }
+
+    if (error instanceof ClipLimitError) {
+      return new ConflictException({
+        statusCode: 409,
+        message: error.message,
+        error: 'Conflict',
+        code: error.policyCode,
+        details: error.details,
+      });
     }
 
     switch (error.code) {

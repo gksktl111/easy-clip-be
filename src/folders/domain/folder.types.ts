@@ -1,6 +1,7 @@
 export type ClipType = 'TEXT' | 'COLOR' | 'IMAGE';
 
 export type Folder = {
+  isLocked?: boolean;
   id: string;
   name: string;
   order: number;

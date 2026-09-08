@@ -1,4 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  TAG_BACKGROUND_COLORS,
+  type TagBackgroundColor,
+} from 'src/shared/application/tag-background-color.helper';
 
 export class ClipTagResponseDto {
   @ApiProperty({ example: 'cmtag123' })
@@ -6,6 +10,14 @@ export class ClipTagResponseDto {
 
   @ApiProperty({ example: 'backend' })
   name: string;
+
+  @ApiProperty({ enum: TAG_BACKGROUND_COLORS, example: 'GRAY' })
+  backgroundColor: TagBackgroundColor;
+}
+
+export class ReplaceClipTagsResponseDto {
+  @ApiProperty({ type: [ClipTagResponseDto] })
+  tags: ClipTagResponseDto[];
 }
 
 export class ClipResponseDto {
