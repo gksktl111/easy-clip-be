@@ -442,6 +442,188 @@ describe('Per-folder clip quotas (PostgreSQL integration)', () => {
     );
   });
 
+  it.each(['repository', 'HTTP'] as const)(
+    'returns full deleted clip content and explicit null fields through %s',
+    async (transport) => {
+      await subscribe('PRO');
+      const deletedAt = new Date('2026-01-10T12:00:00Z');
+      const textContent = `  First line\n\n${'long body with spaces '.repeat(300)}\n\tLast line  `;
+      const imageUrl = 'https://test.invalid/stored/original.png?version=2';
+      const fixtures = [
+        {
+          id: randomUUID(),
+          type: 'TEXT' as const,
+          title: 'A short title different from the body',
+          textContent,
+          imageUrl: null,
+          colorHex: null,
+        },
+        {
+          id: randomUUID(),
+          type: 'IMAGE' as const,
+          title: 'Stored image',
+          textContent: null,
+          imageUrl,
+          colorHex: null,
+        },
+        {
+          id: randomUUID(),
+          type: 'COLOR' as const,
+          title: 'Saved color',
+          textContent: null,
+          imageUrl: null,
+          colorHex: '#12AbEf',
+        },
+      ];
+      await prisma.clip.createMany({
+        data: fixtures.map((fixture) => ({
+          ...fixture,
+          workspaceId,
+          folderId,
+          deletedAt,
+        })),
+      });
+
+      const expected = fixtures
+        .map((fixture) => ({
+          ...fixture,
+          itemType: 'CLIP',
+          folderId,
+          deletedAt: transport === 'HTTP' ? deletedAt.toISOString() : deletedAt,
+        }))
+        .sort((a, b) => (a.id < b.id ? 1 : -1));
+      if (transport === 'repository') {
+        expect(await trash.findDeletedItems({ userId, limit: 10 })).toEqual(
+          expected,
+        );
+      } else {
+        const response = await request(app.getHttpServer())
+          .get('/trash')
+          .expect(200);
+        expect(response.body).toEqual({
+          items: expected,
+          hasNextPage: false,
+          nextCursor: null,
+        });
+      }
+    },
+  );
+
+  it('paginates mixed trash without exposing other workspaces or deleted-folder children', async () => {
+    await subscribe('PRO');
+    const deletedAt = new Date('2026-01-10T12:00:00Z');
+    const visibleClip = await prisma.clip.create({
+      data: { ...content, workspaceId, folderId, deletedAt },
+    });
+    await prisma.folder.update({
+      where: { id: otherFolderId },
+      data: { deletedAt },
+    });
+    await seed(1, otherFolderId, true);
+    await seed(1, otherFolderId);
+    const olderClip = await prisma.clip.create({
+      data: {
+        ...content,
+        workspaceId,
+        folderId,
+        deletedAt: new Date('2026-01-09T12:00:00Z'),
+      },
+    });
+    const foreignUserId = randomUUID();
+    const foreignWorkspaceId = randomUUID();
+    const foreignFolderId = randomUUID();
+    await prisma.user.create({
+      data: {
+        id: foreignUserId,
+        ownedWorkspace: {
+          create: {
+            id: foreignWorkspaceId,
+            name: 'Other workspace',
+            folders: {
+              create: [
+                { id: foreignFolderId, name: 'Other active folder' },
+                { name: 'Other deleted folder', deletedAt },
+              ],
+            },
+          },
+        },
+      },
+    });
+    try {
+      const foreignClip = await prisma.clip.create({
+        data: {
+          ...content,
+          workspaceId: foreignWorkspaceId,
+          folderId: foreignFolderId,
+          deletedAt,
+        },
+      });
+      const expectedItems = [
+        {
+          id: visibleClip.id,
+          itemType: 'CLIP',
+          title: content.title,
+          type: content.type,
+          folderId,
+          textContent: content.textContent,
+          imageUrl: null,
+          colorHex: null,
+          deletedAt: deletedAt.toISOString(),
+        },
+        {
+          id: otherFolderId,
+          itemType: 'FOLDER',
+          name: 'Second',
+          deletedAt: deletedAt.toISOString(),
+        },
+        {
+          id: olderClip.id,
+          itemType: 'CLIP',
+          title: content.title,
+          type: content.type,
+          folderId,
+          textContent: content.textContent,
+          imageUrl: null,
+          colorHex: null,
+          deletedAt: olderClip.deletedAt!.toISOString(),
+        },
+      ];
+      // Equal deletion timestamps exercise the CLIP -> FOLDER cursor boundary.
+      let cursor: string | undefined;
+      for (const [index, expectedItem] of expectedItems.entries()) {
+        expect(
+          await trash.findDeletedItems({ userId, limit: 1, cursor }),
+        ).toEqual([
+          { ...expectedItem, deletedAt: new Date(expectedItem.deletedAt) },
+        ]);
+        const response = await request(app.getHttpServer())
+          .get('/trash')
+          .query({ limit: 1, ...(cursor ? { cursor } : {}) })
+          .expect(200);
+        const hasNextPage = index < expectedItems.length - 1;
+        expect(response.body).toEqual({
+          items: [expectedItem],
+          hasNextPage,
+          nextCursor: hasNextPage
+            ? `${expectedItem.itemType}:${expectedItem.id}`
+            : null,
+        });
+        cursor = `${expectedItem.itemType}:${expectedItem.id}`;
+      }
+      const response = await request(app.getHttpServer())
+        .get('/trash')
+        .query({ cursor: `CLIP:${foreignClip.id}` })
+        .expect(200);
+      expect(response.body).toEqual({
+        items: [],
+        hasNextPage: false,
+        nextCursor: null,
+      });
+    } finally {
+      await prisma.user.delete({ where: { id: foreignUserId } });
+    }
+  });
+
   it('returns an actionable HTTP quota error without mutating the full folder', async () => {
     await subscribe('FREE');
     await seed(50);

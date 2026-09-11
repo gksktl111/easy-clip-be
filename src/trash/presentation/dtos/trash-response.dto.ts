@@ -13,6 +13,32 @@ export class TrashClipResponseDto {
   @ApiProperty({ example: 'cmfolder123' })
   folderId: string;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'TEXT 클립의 전체 원문 (공백·줄바꿈 보존). 해당하지 않는 값은 null.',
+    example: '첫째 줄\n둘째 줄',
+  })
+  textContent: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'IMAGE 클립의 이미지 URL (기존 클립 응답과 동일). 해당하지 않는 값은 null.',
+    example: 'https://cdn.easy-clip.app/clips/example.png',
+  })
+  imageUrl: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'COLOR 클립의 저장된 색상 코드. 해당하지 않는 값은 null.',
+    example: '#12ABEF',
+  })
+  colorHex: string | null;
+
   @ApiProperty({ example: '2026-06-05T09:00:00.000Z', nullable: true })
   deletedAt: Date | null;
 }
@@ -46,6 +72,33 @@ export class TrashItemResponseDto {
 
   @ApiPropertyOptional({ example: 'cmfolder123' })
   folderId?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'TEXT 클립의 전체 원문 (공백·줄바꿈 보존). 해당하지 않는 값은 null이며 CLIP 항목에만 필수로 존재하고 FOLDER 항목에서는 생략.',
+    example: '첫째 줄\n둘째 줄',
+  })
+  textContent?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'IMAGE 클립의 이미지 URL (기존 클립 응답과 동일). 해당하지 않는 값은 null이며 CLIP 항목에만 필수로 존재하고 FOLDER 항목에서는 생략.',
+    example: 'https://cdn.easy-clip.app/clips/example.png',
+  })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'COLOR 클립의 저장된 색상 코드. 해당하지 않는 값은 null이며 CLIP 항목에만 필수로 존재하고 FOLDER 항목에서는 생략.',
+    example: '#12ABEF',
+  })
+  colorHex?: string | null;
 
   @ApiPropertyOptional({ example: '삭제된 폴더' })
   name?: string;
