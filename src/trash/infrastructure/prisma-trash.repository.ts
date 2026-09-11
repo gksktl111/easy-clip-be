@@ -55,6 +55,9 @@ export class PrismaTrashRepository implements TrashRepository {
           select: {
             id: true,
             title: true,
+            textContent: true,
+            imageUrl: true,
+            colorHex: true,
             type: true,
             folderId: true,
             deletedAt: true,
@@ -72,7 +75,15 @@ export class PrismaTrashRepository implements TrashRepository {
         }) as Promise<TrashFolderItem[]>,
       ]);
       return [
-        ...clips.map((clip): TrashItem => ({ ...clip, itemType: 'CLIP' })),
+        ...clips.map(
+          (clip): TrashItem => ({
+            ...clip,
+            itemType: 'CLIP',
+            textContent: clip.type === 'TEXT' ? clip.textContent : null,
+            imageUrl: clip.type === 'IMAGE' ? clip.imageUrl : null,
+            colorHex: clip.type === 'COLOR' ? clip.colorHex : null,
+          }),
+        ),
         ...folders.map(
           (folder): TrashItem => ({ ...folder, itemType: 'FOLDER' }),
         ),
@@ -105,6 +116,9 @@ export class PrismaTrashRepository implements TrashRepository {
       select: {
         id: true,
         title: true,
+        textContent: true,
+        imageUrl: true,
+        colorHex: true,
         type: true,
         folderId: true,
         deletedAt: true,
@@ -120,6 +134,9 @@ export class PrismaTrashRepository implements TrashRepository {
       (clip): TrashClipItem => ({
         id: clip.id,
         title: clip.title,
+        textContent: clip.textContent,
+        imageUrl: clip.imageUrl,
+        colorHex: clip.colorHex,
         type: clip.type,
         folderId: clip.folderId,
         deletedAt: clip.deletedAt,
@@ -145,6 +162,9 @@ export class PrismaTrashRepository implements TrashRepository {
       select: {
         id: true,
         title: true,
+        textContent: true,
+        imageUrl: true,
+        colorHex: true,
         type: true,
         folderId: true,
         deletedAt: true,
@@ -163,11 +183,14 @@ export class PrismaTrashRepository implements TrashRepository {
     return {
       id: clip.id,
       title: clip.title,
+      textContent: clip.textContent,
+      imageUrl: clip.imageUrl,
+      colorHex: clip.colorHex,
       type: clip.type,
       folderId: clip.folderId,
       deletedAt: clip.deletedAt,
       folderDeletedAt: clip.folder.deletedAt,
-    } as TrashClipItem;
+    };
   }
 
   async restoreItems(params: RestoreTrashItemsParams): Promise<void> {
