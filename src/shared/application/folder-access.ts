@@ -35,3 +35,17 @@ export function assertFolderAccess(
     );
   }
 }
+
+export function assertProFeature(
+  access: Pick<ClipEntitlements, 'effectivePlan'>,
+  feature: 'CLIP_SEARCH' | 'TAG_MANAGEMENT',
+): void {
+  if (access.effectivePlan !== 'PRO') {
+    throw new FolderAccessError(
+      'FEATURE_NOT_AVAILABLE',
+      feature === 'CLIP_SEARCH'
+        ? '클립 검색은 Pro에서 사용할 수 있습니다.'
+        : '태그 관리는 Pro에서 사용할 수 있습니다.',
+    );
+  }
+}

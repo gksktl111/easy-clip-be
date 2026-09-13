@@ -1,3 +1,4 @@
+import { resolveProMonthlyPrice } from '../helpers/pro-monthly-price.helper';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual } from 'crypto';
@@ -94,11 +95,7 @@ export class ProcessDueAutoRenewalsUseCase {
           continue;
         }
 
-        const amount = this.getProPlanAmount();
-        const currency = this.configService.get<string>(
-          'TOSS_PAYMENTS_CURRENCY',
-          'KRW',
-        );
+        const { amount, currency } = resolveProMonthlyPrice(this.configService);
         const orderId = createAutoRenewalSubscriptionOrderId(
           subscription.id,
           subscription.nextBillingAt ?? now,
@@ -330,12 +327,6 @@ export class ProcessDueAutoRenewalsUseCase {
       response.approvedAt instanceof Date &&
       Number.isFinite(response.approvedAt.getTime())
     );
-  }
-
-  private getProPlanAmount(): number {
-    const raw = this.configService.get<string>('PRO_MONTHLY_AMOUNT');
-    const amount = raw ? Number(raw) : 4900;
-    return Number.isInteger(amount) && amount > 0 ? amount : 4900;
   }
 
   private async sendPaymentSuccessMail(input: {

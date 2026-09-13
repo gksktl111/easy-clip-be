@@ -63,11 +63,6 @@ describe('auth-cookie helper', () => {
     setAuthCookies(response, config, {
       access_token: 'access-token',
       refresh_token: 'refresh-token',
-      user: {
-        id: 'user-id',
-        displayName: '사용자',
-        avatarUrl: null,
-      },
     });
 
     expect(cookie).toHaveBeenNthCalledWith(

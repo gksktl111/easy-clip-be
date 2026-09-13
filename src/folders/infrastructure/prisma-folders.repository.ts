@@ -2,7 +2,10 @@ import {
   lockWorkspaceAccess,
   withFolderAccess,
 } from 'src/shared/infrastructure/prisma-folder-access';
-import { FolderAccessError } from 'src/shared/application/folder-access';
+import {
+  assertProFeature,
+  FolderAccessError,
+} from 'src/shared/application/folder-access';
 import { Injectable } from '@nestjs/common';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -126,8 +129,16 @@ export class PrismaFoldersRepository implements FoldersRepository {
     });
   }
 
+  async assertTagManagementAvailable(folderId: string): Promise<void> {
+    return withFolderAccess(this.prisma, folderId, (_tx, access) => {
+      assertProFeature(access, 'TAG_MANAGEMENT');
+      return Promise.resolve();
+    });
+  }
+
   async findTagsByFolderId(folderId: string): Promise<FolderTag[]> {
-    return withFolderAccess(this.prisma, folderId, async (tx) => {
+    return withFolderAccess(this.prisma, folderId, async (tx, access) => {
+      assertProFeature(access, 'TAG_MANAGEMENT');
       return (
         tx.tag as unknown as {
           findMany(args: unknown): Promise<FolderTag[]>;
@@ -219,19 +230,24 @@ export class PrismaFoldersRepository implements FoldersRepository {
   }
 
   async createFolderTag(params: CreateFolderTagParams): Promise<FolderTag> {
-    return withFolderAccess(this.prisma, params.folderId, async (tx) => {
-      return (
-        tx.tag as unknown as {
-          create(args: unknown): Promise<FolderTag>;
-        }
-      ).create({
-        data: {
-          folderId: params.folderId,
-          name: params.name,
-          backgroundColor: params.backgroundColor,
-        },
-      });
-    });
+    return withFolderAccess(
+      this.prisma,
+      params.folderId,
+      async (tx, access) => {
+        assertProFeature(access, 'TAG_MANAGEMENT');
+        return (
+          tx.tag as unknown as {
+            create(args: unknown): Promise<FolderTag>;
+          }
+        ).create({
+          data: {
+            folderId: params.folderId,
+            name: params.name,
+            backgroundColor: params.backgroundColor,
+          },
+        });
+      },
+    );
   }
 
   async updateFolderName(folderId: string, name: string): Promise<Folder> {
@@ -251,7 +267,8 @@ export class PrismaFoldersRepository implements FoldersRepository {
       where: { id: tagId },
       select: { folderId: true },
     });
-    return withFolderAccess(this.prisma, tag.folderId, async (tx) => {
+    return withFolderAccess(this.prisma, tag.folderId, async (tx, access) => {
+      assertProFeature(access, 'TAG_MANAGEMENT');
       return (
         tx.tag as unknown as {
           update(args: unknown): Promise<FolderTag>;
@@ -282,7 +299,8 @@ export class PrismaFoldersRepository implements FoldersRepository {
       where: { id: tagId },
       select: { folderId: true },
     });
-    return withFolderAccess(this.prisma, tag.folderId, async (tx) => {
+    return withFolderAccess(this.prisma, tag.folderId, async (tx, access) => {
+      assertProFeature(access, 'TAG_MANAGEMENT');
       await tx.tag.delete({
         where: { id: tagId },
       });

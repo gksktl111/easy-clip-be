@@ -2,21 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { AuthProvider } from 'src/shared/types/auth-provider.type';
-import { Request } from 'express';
+import { BadRequestException } from '@nestjs/common';
+import { OAuthStateRequest } from '../guards/oauth-state.guard';
 import type { AuthenticateOptions } from 'passport';
 import { Profile, Strategy } from 'passport-github2';
 import { OAuthUser } from '../../domain/auth.types';
-import {
-  buildOAuthState,
-  parseOAuthState,
-  resolveOAuthStateSecret,
-} from '../helpers/oauth-state.helper';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
   private readonly logger = new Logger(GithubStrategy.name);
 
-  constructor(private readonly config: ConfigService) {
+  constructor(config: ConfigService) {
     super({
       clientID: config.getOrThrow<string>('GITHUB_CLIENT_ID'),
       clientSecret: config.getOrThrow<string>('GITHUB_CLIENT_SECRET'),
@@ -26,24 +22,21 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     });
   }
 
-  authenticate(req: Request, options?: AuthenticateOptions): void {
+  authenticate(req: OAuthStateRequest, options?: AuthenticateOptions): void {
     super.authenticate(req, {
       ...options,
-      state: buildOAuthState(req, {
-        secret: resolveOAuthStateSecret(this.config),
-      }),
+      state: req.oauthState,
     });
   }
 
   async validate(
-    req: Request,
+    req: OAuthStateRequest,
     accessToken: string,
     refreshToken: string,
     profile: Profile,
   ): Promise<OAuthUser> {
-    const state = parseOAuthState(req.query.state as string | undefined, {
-      secret: resolveOAuthStateSecret(this.config),
-    });
+    const state = req.verifiedOAuthState;
+    if (!state) throw new BadRequestException('OAuth state 검증이 필요합니다.');
     const email = await this.resolveEmail(accessToken, profile);
 
     return {

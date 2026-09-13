@@ -1,3 +1,8 @@
+# Deliberately omit the query string (OAuth code/state can appear on callbacks).
+log_format easyclip '$remote_addr - $remote_user [$time_local] '
+                    '"$request_method $uri $server_protocol" $status $body_bytes_sent';
+access_log /var/log/nginx/access.log easyclip;
+
 server {
     listen 80;
     server_name ${API_DOMAIN};
@@ -22,7 +27,9 @@ server {
     ssl_certificate /etc/nginx/certs/origin.pem;
     ssl_certificate_key /etc/nginx/certs/origin.key;
 
-    client_max_body_size 10m;
+    # 10 MiB image + two 1 MiB text fields + multipart framing.
+    # Keep this >= R2_MAX_IMAGE_BYTES + 3 MiB when changing the API limit.
+    client_max_body_size 13m;
 
     location = /metrics {
         return 404;

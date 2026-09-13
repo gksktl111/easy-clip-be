@@ -1,6 +1,7 @@
 import type { ClipsRepository } from '../domain/clips.repository';
 
 export const createClipsRepositoryMock = (): jest.Mocked<ClipsRepository> => ({
+  assertSearchAvailable: jest.fn().mockResolvedValue(undefined),
   findPersonalFolderById: jest.fn(),
   findClipByIdForUser: jest.fn(),
   findClips: jest.fn(),

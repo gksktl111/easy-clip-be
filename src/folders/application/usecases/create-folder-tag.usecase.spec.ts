@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
+import { FolderAccessError } from 'src/shared/application/folder-access';
 import { createFoldersRepositoryMock as createRepository } from '../../test-support/create-folders-repository-mock';
 import { CreateFolderTagUseCase } from './create-folder-tag.usecase';
 
@@ -118,5 +119,26 @@ describe('CreateFolderTagUseCase', () => {
       name: 'backend',
       backgroundColor: 'ORANGE',
     });
+  });
+
+  it('Free에서는 중복 이름 검사 전에 태그 생성을 거부한다', async () => {
+    const repo = createRepository();
+    repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
+    repo.findTagByNameInFolder.mockResolvedValue({ id: 'tag-id' } as never);
+    repo.assertTagManagementAvailable.mockRejectedValue(
+      new FolderAccessError('FEATURE_NOT_AVAILABLE', 'Pro 전용 기능입니다.'),
+    );
+
+    await expect(
+      new CreateFolderTagUseCase(repo).execute('user-id', {
+        folderId: 'folder-id',
+        name: 'backend',
+      }),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      policyCode: 'FEATURE_NOT_AVAILABLE',
+    });
+    expect(repo.findTagByNameInFolder).not.toHaveBeenCalled();
+    expect(repo.createFolderTag).not.toHaveBeenCalled();
   });
 });

@@ -18,6 +18,7 @@ export function createCorsOptions(env: CorsEnvironment): CorsOptions {
       callback(null, isAllowedCorsOrigin(origin, env));
     },
     credentials: true,
+    exposedHeaders: ['Retry-After'],
   };
 }
 

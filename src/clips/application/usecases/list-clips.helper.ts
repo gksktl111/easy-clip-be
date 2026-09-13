@@ -23,6 +23,8 @@ export const resolveClipSearchTarget = async (
     return undefined;
   }
 
+  await clipsRepository.assertSearchAvailable(params.userId);
+
   const hasTitleMatches = await clipsRepository.hasTitleMatches({
     userId: params.userId,
     folderId: params.folderId,
@@ -119,6 +121,8 @@ export const resolveRecentClipSearchTarget = async (
   if (!params.q) {
     return undefined;
   }
+
+  await clipsRepository.assertSearchAvailable(params.userId);
 
   const hasTitleMatches = await clipsRepository.hasRecentTitleMatches({
     userId: params.userId,

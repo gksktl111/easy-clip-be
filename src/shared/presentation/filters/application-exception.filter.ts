@@ -12,6 +12,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import {
+  sanitizeLogError,
+  sanitizeRequestUrl,
+} from '../../application/helpers/log-sanitization.helper';
 import { FolderAccessError } from '../../application/folder-access';
 import { ClipLimitError } from '../../application/clip-limit';
 import { ApplicationError } from '../../application/application.error';
@@ -30,10 +34,10 @@ export class ApplicationExceptionFilter implements ExceptionFilter {
     const payload = httpException.getResponse();
 
     this.logger.error({
-      err: exception instanceof Error ? exception : undefined,
+      err: sanitizeLogError(exception),
       method: request.method,
       msg: '요청 처리 중 예외가 발생했습니다.',
-      path: request.originalUrl || request.url,
+      path: sanitizeRequestUrl(request.originalUrl || request.url),
       statusCode: status,
       userId: this.extractUserId(request),
     });

@@ -1,5 +1,7 @@
 # 클립 태그 전체 교체 API 흐름
 
+2026-09-14 확정 정책: 아래 태그 전용 API의 성공 흐름은 유효 Pro에 적용한다. Free는 접근 폴더에서도 `403 FEATURE_NOT_AVAILABLE`이며 빈 배열·기존 이름 재사용도 차단한다. 일반 클립 응답의 기존 `tags`는 유지한다. 소유권·삭제 `404`와 잠금 `403 PROJECT_LOCKED`를 먼저 검사한다. 오류 예시와 배포 상태는 [Free 검색·태그 FE 계약](10-free-search-tags-be-handoff.md)를 따른다.
+
 `PUT /clips/:clipId/tags`는 클립에 연결된 태그를 이름 목록으로 전체 교체합니다. 클라이언트는 태그 ID를 보낼 필요가 없습니다.
 
 - `tags`: 클립에 연결할 태그 이름 전체 목록입니다.
@@ -54,6 +56,8 @@ flowchart TD
     end
 
     subgraph Database["PostgreSQL / Prisma 트랜잭션"]
+        CheckAccess["기존 구독·폴더·클립 잠금 후<br/>소유권·삭제 상태·폴더 잠금 재검사"]
+        ProFeature{"현재 유효 플랜이 Pro인가?"}
         UpsertTags["태그명 각각 upsert<br/>where: folderId + 정확한 name"]
         ReplaceRelations["DELETE ClipTag WHERE clipId<br/>INSERT ClipTag ...<br/>COMMIT"]
     end
@@ -76,7 +80,12 @@ flowchart TD
     ValidateNames -->|실패| TagBadRequest
     ValidateNames -->|성공| Normalize
     Normalize --> ReplaceRepo
-    ReplaceRepo --> UpsertTags
+    ReplaceRepo --> CheckAccess
+    CheckAccess -->|없음·미소유·삭제| NotFound
+    CheckAccess -->|잠긴 폴더| Locked["403 PROJECT_LOCKED"]
+    CheckAccess -->|접근 가능| ProFeature
+    ProFeature -->|Free| FeatureUnavailable["403 FEATURE_NOT_AVAILABLE"]
+    ProFeature -->|Pro| UpsertTags
     UpsertTags --> ReplaceRelations
     ReplaceRelations --> Success
 ```

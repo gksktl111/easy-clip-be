@@ -1,3 +1,6 @@
+import { OAuthStateGuard } from './presentation/guards/oauth-state.guard';
+import { OAUTH_STATE_STORE } from './application/ports/oauth-state-store.port';
+import { PrismaOAuthStateStore } from './infrastructure/prisma-oauth-state.store';
 import { Module } from '@nestjs/common';
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { AuthController } from './presentation/auth.controller';
@@ -30,6 +33,8 @@ import { TestAdminLoginUseCase } from './application/usecases/test-admin-login.u
   ],
   controllers: [AuthController],
   providers: [
+    OAuthStateGuard,
+    { provide: OAUTH_STATE_STORE, useClass: PrismaOAuthStateStore },
     { provide: AUTH_REPOSITORY, useClass: PrismaAuthRepository },
     { provide: AUTH_SESSION_PORT, useClass: JwtAuthSessionPort },
     SignInUseCase,

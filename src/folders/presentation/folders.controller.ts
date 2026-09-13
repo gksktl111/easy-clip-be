@@ -99,7 +99,11 @@ export class FoldersController {
 
   @Get(':folderId/tags')
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '폴더 태그 목록 조회' })
+  @ApiOperation({
+    summary: '폴더 태그 목록 조회',
+    description:
+      'Pro 전용 기능입니다. Free에서는 FEATURE_NOT_AVAILABLE(403)을 반환합니다.',
+  })
   @ApiParam({ name: 'folderId', description: '폴더 ID' })
   @ApiOkResponse({
     description: '폴더에 속한 태그 목록을 반환합니다.',
@@ -134,7 +138,11 @@ export class FoldersController {
 
   @Post(':folderId/tags')
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '폴더 태그 생성' })
+  @ApiOperation({
+    summary: '폴더 태그 생성',
+    description:
+      'Pro 전용 기능입니다. Free에서는 FEATURE_NOT_AVAILABLE(403)을 반환합니다.',
+  })
   @ApiParam({ name: 'folderId', description: '폴더 ID' })
   @ApiBody({ type: CreateFolderTagDto })
   @ApiOkResponse({
@@ -202,7 +210,11 @@ export class FoldersController {
 
   @Patch(':folderId/tags/:tagId')
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '폴더 태그 수정' })
+  @ApiOperation({
+    summary: '폴더 태그 수정',
+    description:
+      'Pro 전용 기능입니다. Free에서는 FEATURE_NOT_AVAILABLE(403)을 반환합니다.',
+  })
   @ApiParam({ name: 'folderId', description: '폴더 ID' })
   @ApiParam({ name: 'tagId', description: '태그 ID' })
   @ApiBody({ type: UpdateFolderTagDto })
@@ -246,7 +258,11 @@ export class FoldersController {
 
   @Delete(':folderId/tags/:tagId')
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '폴더 태그 삭제' })
+  @ApiOperation({
+    summary: '폴더 태그 삭제',
+    description:
+      'Pro 전용 기능입니다. Free에서는 FEATURE_NOT_AVAILABLE(403)을 반환합니다.',
+  })
   @ApiParam({ name: 'folderId', description: '폴더 ID' })
   @ApiParam({ name: 'tagId', description: '태그 ID' })
   @ApiOkResponse({

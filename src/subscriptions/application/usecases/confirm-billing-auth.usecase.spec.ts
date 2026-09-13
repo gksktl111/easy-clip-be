@@ -1,459 +1,291 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { ConfigService } from '@nestjs/config';
 import { ConfirmBillingAuthUseCase } from './confirm-billing-auth.usecase';
+import { ReconcileInitialPaymentsUseCase } from './reconcile-initial-payments.usecase';
+import { GetInitialPaymentUseCase } from './get-initial-payment.usecase';
 import { BillingPaymentGateway } from '../ports/billing-payment.gateway';
-import { SubscriptionPaymentMailPort } from '../ports/subscription-payment-mail.port';
-import { createSubscriptionsRepositoryMock as createRepository } from '../../test-support/create-subscriptions-repository-mock';
-import {
-  PaymentProvider,
-  Subscription,
-  SubscriptionPaymentStatus,
-  SubscriptionPlan,
-  SubscriptionStatus,
-} from '../../domain/subscription.types';
+import { createSubscriptionsRepositoryMock } from '../../test-support/create-subscriptions-repository-mock';
+import { resolveProMonthlyPrice } from '../helpers/pro-monthly-price.helper';
+import { InitialPaymentAttempt } from '../../domain/subscriptions.repository';
+import { Subscription } from '../../domain/subscription.types';
 
-const createSubscription = (
-  overrides: Partial<Subscription> = {},
-): Subscription => ({
-  id: 'subscription-id',
-  workspaceId: 'workspace-id',
-  plan: SubscriptionPlan.FREE,
-  status: SubscriptionStatus.ACTIVE,
+const config = new ConfigService({ PRO_MONTHLY_AMOUNT: '4900' });
+const subscription: Subscription = {
+  id: 'sub',
+  workspaceId: 'workspace',
+  plan: 'FREE',
+  status: 'ACTIVE',
   autoRenew: false,
-  startedAt: new Date('2026-01-01T00:00:00.000Z'),
+  startedAt: new Date(),
   currentPeriodEnd: null,
   nextBillingAt: null,
-  provider: PaymentProvider.TOSS_PAYMENTS,
+  provider: null,
   externalBillingKey: null,
-  externalCustomerKey: 'customer-key',
-  ...overrides,
-});
+  externalCustomerKey: 'customer',
+};
+const input = {
+  authKey: 'auth',
+  customerKey: 'customer',
+  idempotencyKey: '55555555-5555-4555-8555-555555555555',
+  priceVersion: resolveProMonthlyPrice(config).priceVersion,
+};
 
-const createGateway = (): jest.Mocked<BillingPaymentGateway> => ({
-  issueBillingKey: jest.fn(),
-  chargeBilling: jest.fn(),
-  findPaymentByOrderId: jest.fn(),
-});
+function fixture() {
+  const repo = createSubscriptionsRepositoryMock();
+  const gateway: jest.Mocked<BillingPaymentGateway> = {
+    issueBillingKey: jest.fn(),
+    chargeBilling: jest.fn(),
+    findPaymentByOrderId: jest.fn(),
+  };
+  const mailer = {
+    sendPaymentSuccess: jest.fn(),
+    sendSubscriptionResumed: jest.fn(),
+  };
+  const attempt: InitialPaymentAttempt = {
+    id: 'attempt',
+    subscriptionId: 'sub',
+    idempotencyKey: input.idempotencyKey,
+    externalOrderId: 'order',
+    status: 'PENDING',
+    amount: 4900,
+    currency: 'KRW',
+    priceVersion: input.priceVersion,
+    customerKey: 'customer',
+    billingKey: null,
+    createdAt: new Date(),
+  };
+  const payment = {
+    paymentKey: 'payment',
+    orderId: 'order',
+    status: 'DONE',
+    totalAmount: 4900,
+    currency: 'KRW',
+    approvedAt: new Date(),
+    failureCode: null,
+    failureMessage: null,
+    rawData: {},
+  };
+  repo.getOrCreatePersonalSubscription.mockResolvedValue({ ...subscription });
+  repo.claimInitialPayment.mockResolvedValue({ attempt, claimed: true });
+  repo.completeInitialPayment.mockResolvedValue({
+    ...subscription,
+    plan: 'PRO',
+    autoRenew: true,
+  });
+  gateway.issueBillingKey.mockResolvedValue({
+    billingKey: 'billing',
+    authenticatedAt: new Date(),
+    method: 'CARD',
+    rawData: {},
+  });
+  gateway.chargeBilling.mockResolvedValue(payment);
+  const usecase = new ConfirmBillingAuthUseCase(
+    repo,
+    gateway,
+    mailer,
+    config,
+    new ReconcileInitialPaymentsUseCase(repo, gateway, mailer),
+  );
+  const reconcile = new ReconcileInitialPaymentsUseCase(repo, gateway, mailer);
+  return { repo, gateway, mailer, attempt, payment, usecase, reconcile };
+}
 
-const createMailer = (): jest.Mocked<SubscriptionPaymentMailPort> => ({
-  sendPaymentSuccess: jest.fn(),
-  sendSubscriptionResumed: jest.fn(),
-});
-
-const createConfig = () =>
-  ({
-    get: jest.fn((key: string, defaultValue?: string) => {
-      const values: Record<string, string> = {
-        PRO_MONTHLY_AMOUNT: '4900',
-        TOSS_PAYMENTS_CURRENCY: 'KRW',
-        TOSS_PAYMENTS_PRO_ORDER_NAME: 'Easy Clip PRO 월간 구독',
-      };
-      return values[key] ?? defaultValue;
-    }),
-  }) as unknown as ConfigService;
-
-describe('ConfirmBillingAuthUseCase', () => {
-  it('최초 결제 성공 시 PRO 구독을 생성하고 자동갱신을 활성화한다', async () => {
-    const repo = createRepository();
-    const gateway = createGateway();
-    const mailer = createMailer();
-    const approvedAt = new Date('2026-02-01T00:00:00.000Z');
-    const periodEnd = new Date('2026-03-01T00:00:00.000Z');
-
-    repo.getOrCreatePersonalSubscription.mockResolvedValue(
-      createSubscription(),
-    );
-    gateway.issueBillingKey.mockResolvedValue({
-      billingKey: 'billing-key',
-      authenticatedAt: approvedAt,
-      method: '카드',
-      rawData: {},
+describe('Initial payment durability', () => {
+  it('persists the claim and billing key before charging, then commits PRO', async () => {
+    const f = fixture();
+    f.gateway.issueBillingKey.mockImplementation(() => {
+      expect(f.repo.claimInitialPayment).toHaveBeenCalledTimes(1);
+      return Promise.resolve({
+        billingKey: 'billing',
+        authenticatedAt: new Date(),
+        method: 'CARD',
+        rawData: {},
+      });
     });
-    gateway.chargeBilling.mockResolvedValue({
-      paymentKey: 'payment-key',
-      orderId: 'order-id',
-      status: SubscriptionPaymentStatus.DONE,
-      totalAmount: 4900,
-      currency: 'KRW',
-      approvedAt,
-      failureCode: null,
-      failureMessage: null,
-      rawData: {},
+    f.gateway.chargeBilling.mockImplementation(() => {
+      expect(f.repo.saveInitialBillingKey).toHaveBeenCalledWith(
+        'attempt',
+        'billing',
+      );
+      return Promise.resolve(f.payment);
     });
-    repo.activateByPayment.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.ACTIVE,
-        autoRenew: true,
-        externalBillingKey: 'billing-key',
-        currentPeriodEnd: periodEnd,
-        nextBillingAt: periodEnd,
-      }),
-    );
-    repo.findBillingMailRecipientByUserId.mockResolvedValue({
-      email: 'user@example.com',
+    await expect(f.usecase.execute('user', input)).resolves.toMatchObject({
+      status: 'DONE',
+      subscription: { plan: 'PRO' },
     });
-
-    const usecase = new ConfirmBillingAuthUseCase(
-      repo,
-      gateway,
-      mailer,
-      createConfig(),
-    );
-    const result = await usecase.execute('user-id', {
-      authKey: 'auth-key',
-      customerKey: 'customer-key',
-    });
-
-    expect(repo.activateByPayment).toHaveBeenCalledWith(
+    expect(f.gateway.chargeBilling).toHaveBeenCalledWith(
       expect.objectContaining({
-        subscriptionId: 'subscription-id',
-        provider: PaymentProvider.TOSS_PAYMENTS,
-        status: SubscriptionPaymentStatus.DONE,
-        externalBillingKey: 'billing-key',
-        externalCustomerKey: 'customer-key',
-        externalPaymentKey: 'payment-key',
+        orderId: 'order',
         amount: 4900,
-        currency: 'KRW',
-      }),
-    );
-    expect(result).toMatchObject({
-      plan: SubscriptionPlan.PRO,
-      status: SubscriptionStatus.ACTIVE,
-      autoRenew: true,
-      nextBillingAt: periodEnd,
-    });
-    expect(mailer.sendPaymentSuccess).toHaveBeenCalledWith({
-      recipientEmail: 'user@example.com',
-      amount: 4900,
-      currency: 'KRW',
-      approvedAt,
-      plan: SubscriptionPlan.PRO,
-      currentPeriodEnd: periodEnd,
-      nextBillingAt: periodEnd,
-      paymentKind: 'INITIAL',
-    });
-  });
-
-  it('활성 PRO 구독은 기존 만료일 뒤로 1개월 연장한다', async () => {
-    const repo = createRepository();
-    const gateway = createGateway();
-    const mailer = createMailer();
-    const currentPeriodEnd = new Date('2026-04-01T00:00:00.000Z');
-
-    repo.getOrCreatePersonalSubscription.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.ACTIVE,
-        autoRenew: true,
-        startedAt: new Date('2026-02-01T00:00:00.000Z'),
-        currentPeriodEnd,
-      }),
-    );
-    gateway.issueBillingKey.mockResolvedValue({
-      billingKey: 'billing-key',
-      authenticatedAt: new Date('2026-02-01T00:00:00.000Z'),
-      method: '카드',
-      rawData: {},
-    });
-    gateway.chargeBilling.mockResolvedValue({
-      paymentKey: 'payment-key',
-      orderId: 'order-id',
-      status: SubscriptionPaymentStatus.DONE,
-      totalAmount: 4900,
-      currency: 'KRW',
-      approvedAt: new Date('2026-03-01T00:00:00.000Z'),
-      failureCode: null,
-      failureMessage: null,
-      rawData: {},
-    });
-    repo.activateByPayment.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.ACTIVE,
-        autoRenew: true,
-      }),
-    );
-    repo.findBillingMailRecipientByUserId.mockResolvedValue({
-      email: 'user@example.com',
-    });
-
-    const usecase = new ConfirmBillingAuthUseCase(
-      repo,
-      gateway,
-      mailer,
-      createConfig(),
-    );
-    await usecase.execute('user-id', {
-      authKey: 'auth-key',
-      customerKey: 'customer-key',
-    });
-
-    expect(repo.activateByPayment).toHaveBeenCalledWith(
-      expect.objectContaining({
-        currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
-        nextBillingAt: new Date('2026-05-01T00:00:00.000Z'),
+        idempotencyKey: 'attempt:charge',
       }),
     );
   });
 
-  it('남은 기간이 있는 해지 구독은 즉시 결제 없이 자동갱신만 재개한다', async () => {
-    const repo = createRepository();
-    const gateway = createGateway();
-    const mailer = createMailer();
-    const currentPeriodEnd = new Date('2099-04-01T00:00:00.000Z');
+  it.each([
+    'cm123456789012345678901234',
+    '55555555-5555-4555-8555-555555555555',
+  ])(
+    'sends a provider-compatible order ID for subscription %s',
+    async (subscriptionId) => {
+      const f = fixture();
+      f.repo.getOrCreatePersonalSubscription.mockResolvedValue({
+        ...subscription,
+        id: subscriptionId,
+      });
+      f.repo.claimInitialPayment.mockImplementation((params) => {
+        f.attempt.externalOrderId = params.externalOrderId;
+        f.payment.orderId = params.externalOrderId;
+        return Promise.resolve({ attempt: f.attempt, claimed: true });
+      });
+      await expect(f.usecase.execute('user', input)).resolves.toMatchObject({
+        status: 'DONE',
+      });
+      const charged = f.gateway.chargeBilling.mock.calls[0][0];
+      expect(charged.orderId).toMatch(/^[A-Za-z0-9_-]{6,64}$/);
+      expect(charged.orderId).toBe(
+        f.repo.claimInitialPayment.mock.calls[0][0].externalOrderId,
+      );
+    },
+  );
 
-    repo.getOrCreatePersonalSubscription.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.CANCELED,
-        autoRenew: false,
-        startedAt: new Date('2026-02-01T00:00:00.000Z'),
-        currentPeriodEnd,
-        nextBillingAt: null,
-        externalBillingKey: 'billing-key',
-        externalCustomerKey: 'customer-key',
-      }),
-    );
-    repo.resumeAutoRenewal.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.ACTIVE,
-        autoRenew: true,
-        startedAt: new Date('2026-02-01T00:00:00.000Z'),
-        currentPeriodEnd,
-        nextBillingAt: currentPeriodEnd,
-        externalBillingKey: 'billing-key',
-        externalCustomerKey: 'customer-key',
-      }),
-    );
-    repo.findBillingMailRecipientByUserId.mockResolvedValue({
-      email: 'user@example.com',
+  it('replays a completed key with its saved quote despite a changed price', async () => {
+    const f = fixture();
+    f.repo.findInitialPayment.mockResolvedValue({
+      ...f.attempt,
+      status: 'DONE',
     });
-
-    const usecase = new ConfirmBillingAuthUseCase(
-      repo,
-      gateway,
-      mailer,
-      createConfig(),
-    );
-    const result = await usecase.execute('user-id', {
-      authKey: 'auth-key',
-      customerKey: 'customer-key',
-    });
-
-    expect(gateway.issueBillingKey).not.toHaveBeenCalled();
-    expect(gateway.chargeBilling).not.toHaveBeenCalled();
-    expect(repo.activateByPayment).not.toHaveBeenCalled();
-    expect(repo.recordPaymentFailure).not.toHaveBeenCalled();
-    expect(mailer.sendPaymentSuccess).not.toHaveBeenCalled();
-    expect(mailer.sendSubscriptionResumed).toHaveBeenCalledWith({
-      recipientEmail: 'user@example.com',
-      plan: SubscriptionPlan.PRO,
-      currentPeriodEnd,
-      nextBillingAt: currentPeriodEnd,
-    });
-    expect(repo.resumeAutoRenewal).toHaveBeenCalledWith('subscription-id');
-    expect(result).toMatchObject({
-      plan: SubscriptionPlan.PRO,
-      status: SubscriptionStatus.ACTIVE,
-      autoRenew: true,
-      currentPeriodEnd,
-      nextBillingAt: currentPeriodEnd,
-    });
-  });
-
-  it('결제 실패 시 구독을 변경하지 않고 실패 이력만 저장한다', async () => {
-    const repo = createRepository();
-    const gateway = createGateway();
-    const mailer = createMailer();
-
-    repo.getOrCreatePersonalSubscription.mockResolvedValue(
-      createSubscription(),
-    );
-    gateway.issueBillingKey.mockResolvedValue({
-      billingKey: 'billing-key',
-      authenticatedAt: new Date('2026-02-01T00:00:00.000Z'),
-      method: '카드',
-      rawData: {},
-    });
-    gateway.chargeBilling.mockResolvedValue({
-      paymentKey: 'payment-key',
-      orderId: 'order-id',
-      status: SubscriptionPaymentStatus.FAILED,
-      totalAmount: 4900,
-      currency: 'KRW',
-      approvedAt: null,
-      failureCode: 'REJECT_CARD',
-      failureMessage: '카드 승인 실패',
-      rawData: {},
-    });
-
-    const usecase = new ConfirmBillingAuthUseCase(
-      repo,
-      gateway,
-      mailer,
-      createConfig(),
-    );
-
     await expect(
-      usecase.execute('user-id', {
-        authKey: 'auth-key',
-        customerKey: 'customer-key',
-      }),
+      f.usecase.execute('user', { ...input, priceVersion: 'old-price' }),
+    ).resolves.toMatchObject({ status: 'DONE', amount: 4900 });
+    expect(f.repo.claimInitialPayment).not.toHaveBeenCalled();
+    expect(f.gateway.issueBillingKey).not.toHaveBeenCalled();
+    expect(f.gateway.chargeBilling).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale price before claiming or calling the provider', async () => {
+    const f = fixture();
+    await expect(
+      f.usecase.execute('user', { ...input, priceVersion: 'stale' }),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
-
-    expect(repo.recordPaymentFailure).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: SubscriptionPaymentStatus.FAILED,
-        failureCode: 'REJECT_CARD',
-      }),
-    );
-    expect(repo.activateByPayment).not.toHaveBeenCalled();
-    expect(mailer.sendPaymentSuccess).not.toHaveBeenCalled();
+    expect(f.repo.claimInitialPayment).not.toHaveBeenCalled();
+    expect(f.gateway.issueBillingKey).not.toHaveBeenCalled();
   });
 
-  it('결제 성공 메일 발송 실패가 결제 성공 응답을 막지 않는다', async () => {
-    const repo = createRepository();
-    const gateway = createGateway();
-    const mailer = createMailer();
-    const approvedAt = new Date('2026-02-01T00:00:00.000Z');
-    const periodEnd = new Date('2026-03-01T00:00:00.000Z');
-
-    repo.getOrCreatePersonalSubscription.mockResolvedValue(
-      createSubscription(),
-    );
-    gateway.issueBillingKey.mockResolvedValue({
-      billingKey: 'billing-key',
-      authenticatedAt: approvedAt,
-      method: '카드',
-      rawData: {},
+  it('a competing key cannot charge when the durable claim is denied', async () => {
+    const f = fixture();
+    f.repo.claimInitialPayment.mockResolvedValue(null);
+    await expect(f.usecase.execute('user', input)).rejects.toMatchObject({
+      code: 'CONFLICT',
     });
-    gateway.chargeBilling.mockResolvedValue({
-      paymentKey: 'payment-key',
-      orderId: 'order-id',
-      status: SubscriptionPaymentStatus.DONE,
-      totalAmount: 4900,
-      currency: 'KRW',
-      approvedAt,
-      failureCode: null,
-      failureMessage: null,
-      rawData: {},
-    });
-    repo.activateByPayment.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.ACTIVE,
-        autoRenew: true,
-        externalBillingKey: 'billing-key',
-        currentPeriodEnd: periodEnd,
-        nextBillingAt: periodEnd,
-      }),
-    );
-    repo.findBillingMailRecipientByUserId.mockResolvedValue({
-      email: 'user@example.com',
-    });
-    mailer.sendPaymentSuccess.mockRejectedValue(new Error('resend failed'));
-
-    const usecase = new ConfirmBillingAuthUseCase(
-      repo,
-      gateway,
-      mailer,
-      createConfig(),
-    );
-
-    await expect(
-      usecase.execute('user-id', {
-        authKey: 'auth-key',
-        customerKey: 'customer-key',
-      }),
-    ).resolves.toMatchObject({
-      plan: SubscriptionPlan.PRO,
-      status: SubscriptionStatus.ACTIVE,
-    });
+    expect(f.gateway.issueBillingKey).not.toHaveBeenCalled();
   });
 
-  it('구독 재개 메일 발송 실패가 즉시 결제 없는 재개 응답을 막지 않는다', async () => {
-    const repo = createRepository();
-    const gateway = createGateway();
-    const mailer = createMailer();
-    const currentPeriodEnd = new Date('2099-04-01T00:00:00.000Z');
+  it.each(['issue', 'charge', 'commit'])(
+    'preserves pending after %s failure and never charges on retry',
+    async (failure) => {
+      const f = fixture();
+      if (failure === 'issue')
+        f.gateway.issueBillingKey.mockRejectedValue(new Error('timeout'));
+      if (failure === 'charge')
+        f.gateway.chargeBilling.mockRejectedValue(new Error('timeout'));
+      if (failure === 'commit')
+        f.repo.completeInitialPayment.mockRejectedValueOnce(
+          new Error('db unavailable'),
+        );
+      await expect(f.usecase.execute('user', input)).resolves.toMatchObject({
+        status: 'PENDING',
+      });
+      f.repo.findInitialPayment.mockResolvedValue(f.attempt);
+      f.gateway.findPaymentByOrderId.mockResolvedValue(
+        failure === 'issue' ? null : f.payment,
+      );
+      await expect(f.usecase.execute('user', input)).resolves.toMatchObject({
+        status: failure === 'issue' ? 'PENDING' : 'DONE',
+      });
+      expect(f.gateway.issueBillingKey).toHaveBeenCalledTimes(1);
+      expect(f.gateway.chargeBilling).toHaveBeenCalledTimes(
+        failure === 'issue' ? 0 : 1,
+      );
+      expect(f.repo.failInitialPayment).not.toHaveBeenCalled();
+    },
+  );
 
-    repo.getOrCreatePersonalSubscription.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.CANCELED,
-        autoRenew: false,
-        startedAt: new Date('2026-02-01T00:00:00.000Z'),
-        currentPeriodEnd,
-        nextBillingAt: null,
-        externalBillingKey: 'billing-key',
-        externalCustomerKey: 'customer-key',
-      }),
-    );
-    repo.resumeAutoRenewal.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.ACTIVE,
-        autoRenew: true,
-        startedAt: new Date('2026-02-01T00:00:00.000Z'),
-        currentPeriodEnd,
-        nextBillingAt: currentPeriodEnd,
-        externalBillingKey: 'billing-key',
-        externalCustomerKey: 'customer-key',
-      }),
-    );
-    repo.findBillingMailRecipientByUserId.mockResolvedValue({
-      email: 'user@example.com',
-    });
-    mailer.sendSubscriptionResumed.mockRejectedValue(
-      new Error('resend failed'),
-    );
+  it.each([
+    { orderId: 'other' },
+    { totalAmount: 1 },
+    { currency: 'USD' },
+    { paymentKey: '' },
+    { approvedAt: null },
+    { approvedAt: new Date('invalid') },
+    { approvedAt: new Date('2000-01-01') },
+    { status: 'IN_PROGRESS' },
+  ])(
+    'keeps mismatched or uncertain provider results pending: %p',
+    async (mismatch) => {
+      const f = fixture();
+      f.gateway.chargeBilling.mockResolvedValue({ ...f.payment, ...mismatch });
+      await expect(f.usecase.execute('user', input)).resolves.toMatchObject({
+        status: 'PENDING',
+      });
+      expect(f.repo.completeInitialPayment).not.toHaveBeenCalled();
+      expect(f.repo.failInitialPayment).not.toHaveBeenCalled();
+    },
+  );
 
-    const usecase = new ConfirmBillingAuthUseCase(
-      repo,
-      gateway,
-      mailer,
-      createConfig(),
-    );
-
+  it('owner lookup never exposes another subscription attempt or contacts provider', async () => {
+    const f = fixture();
     await expect(
-      usecase.execute('user-id', {
-        authKey: 'auth-key',
-        customerKey: 'customer-key',
-      }),
-    ).resolves.toMatchObject({
-      plan: SubscriptionPlan.PRO,
-      status: SubscriptionStatus.ACTIVE,
+      new GetInitialPaymentUseCase(f.repo).execute(
+        'other-user',
+        input.idempotencyKey,
+      ),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(f.repo.findInitialPayment).toHaveBeenCalledWith(
+      subscription.id,
+      input.idempotencyKey,
+    );
+    expect(f.gateway.findPaymentByOrderId).not.toHaveBeenCalled();
+  });
+
+  it('batch recovers a saved pending payment without frontend participation', async () => {
+    const f = fixture();
+    f.attempt.billingKey = 'billing';
+    f.repo.findPendingInitialPayments.mockResolvedValue([f.attempt]);
+    f.gateway.findPaymentByOrderId.mockResolvedValue(f.payment);
+    await expect(f.reconcile.executeBatch()).resolves.toEqual({
+      processed: 1,
+      pending: 0,
+    });
+    expect(f.gateway.chargeBilling).not.toHaveBeenCalled();
+  });
+
+  it('resumes a canceled paid period without charging and tolerates mail failure', async () => {
+    const f = fixture();
+    const canceled: Subscription = {
+      ...subscription,
+      plan: 'PRO',
+      status: 'CANCELED',
+      currentPeriodEnd: new Date('2099-01-01'),
+      externalBillingKey: 'billing',
+    };
+    f.repo.getOrCreatePersonalSubscription.mockResolvedValue(canceled);
+    f.repo.resumeAutoRenewal.mockResolvedValue({
+      ...canceled,
+      status: 'ACTIVE',
       autoRenew: true,
+      nextBillingAt: canceled.currentPeriodEnd,
     });
-  });
-  it('즉시 결제 없는 재개의 조건이 바뀌면 신규 과금으로 전환하지 않는다', async () => {
-    const repo = createRepository();
-    const gateway = createGateway();
-    const mailer = createMailer();
-    repo.getOrCreatePersonalSubscription.mockResolvedValue(
-      createSubscription({
-        plan: SubscriptionPlan.PRO,
-        status: SubscriptionStatus.CANCELED,
-        currentPeriodEnd: new Date('2099-03-01'),
-        externalBillingKey: 'billing-key',
-      }),
+    f.repo.findBillingMailRecipientByUserId.mockResolvedValue({
+      email: 'receipt@example.test',
+    });
+    f.mailer.sendSubscriptionResumed.mockRejectedValue(
+      new Error('mail unavailable'),
     );
-    repo.resumeAutoRenewal.mockResolvedValue(null);
-    await expect(
-      new ConfirmBillingAuthUseCase(
-        repo,
-        gateway,
-        mailer,
-        createConfig(),
-      ).execute('user-id', {
-        authKey: 'auth-key',
-        customerKey: 'customer-key',
-      }),
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
-    expect(gateway.issueBillingKey).not.toHaveBeenCalled();
-    expect(gateway.chargeBilling).not.toHaveBeenCalled();
-    expect(mailer.sendSubscriptionResumed).not.toHaveBeenCalled();
+    await expect(f.usecase.execute('user', input)).resolves.toMatchObject({
+      status: 'DONE',
+      subscription: { autoRenew: true },
+    });
+    expect(f.gateway.issueBillingKey).not.toHaveBeenCalled();
   });
 });

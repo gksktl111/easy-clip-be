@@ -56,7 +56,8 @@ describe('cors.helper', () => {
       throw new Error('origin callback이 필요합니다.');
     }
 
-    corsOptions.origin(undefined, callback);
+    // cors passes undefined at runtime when the request has no Origin header.
+    Reflect.apply(corsOptions.origin, undefined, [undefined, callback]);
 
     expect(callback).toHaveBeenCalledWith(null, true);
   });

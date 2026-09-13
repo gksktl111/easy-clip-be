@@ -1,3 +1,5 @@
+import { ClipUploadRateGuard } from './guards/clip-upload-rate.guard';
+import { ClipImageValidationPipe } from './pipes/clip-image-validation.pipe';
 import {
   Body,
   Controller,
@@ -31,6 +33,9 @@ import {
   ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
+  ApiPayloadTooLargeResponse,
+  ApiTooManyRequestsResponse,
+  ApiServiceUnavailableResponse,
 } from '@nestjs/swagger';
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { AuthContext } from 'src/shared/types/auth-context.type';
@@ -117,7 +122,17 @@ export class ClipsController {
     required: true,
     enum: ['TEXT', 'COLOR', 'IMAGE', 'ALL'],
   })
-  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({
+    name: 'q',
+    required: false,
+    description:
+      'Pro 전용 제목/태그 검색. 빈 문자열·공백은 일반 목록으로 처리합니다.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Free 검색은 FEATURE_NOT_AVAILABLE, 잠긴 폴더는 PROJECT_LOCKED.',
+    type: ErrorResponseDto,
+  })
   @ApiOkResponse({
     description:
       '폴더, 좋아요, 최근 기준의 커서 페이지네이션 결과를 반환합니다. 기본 조회는 최근 클립 목록입니다.',
@@ -179,7 +194,12 @@ export class ClipsController {
 
   @Put(':clipId/tags')
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '클립 태그 전체 교체' })
+  @ApiOperation({ summary: '클립 태그 전체 교체 (Pro 전용)' })
+  @ApiForbiddenResponse({
+    description:
+      'Free는 빈 배열을 포함한 모든 교체에 FEATURE_NOT_AVAILABLE. 잠긴 폴더는 PROJECT_LOCKED.',
+    type: ErrorResponseDto,
+  })
   @ApiParam({ name: 'clipId', description: '클립 ID' })
   @ApiBody({ type: ReplaceClipTagsDto })
   @ApiOkResponse({
@@ -206,8 +226,22 @@ export class ClipsController {
   }
 
   @Post()
-  @UseGuards(JwtAccessGuard)
+  @UseGuards(JwtAccessGuard, ClipUploadRateGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiPayloadTooLargeResponse({
+    description: '이미지 파일 크기가 수신 제한을 초과했습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'UPLOAD_RATE_LIMIT_EXCEEDED. Retry-After(초) 이후 재시도합니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      '업로드 제한 미설정(UPLOAD_RATE_LIMIT_NOT_CONFIGURED) 또는 업로드 혼잡.',
+    type: ErrorResponseDto,
+  })
   @ApiOperation({ summary: '클립 생성' })
   @ApiConflictResponse({
     description: '유효 플랜의 폴더별 클립 한도를 초과했습니다.',
@@ -226,7 +260,7 @@ export class ClipsController {
   createClip(
     @Request() req: { user: AuthContext },
     @Body() dto: CreateClipDto,
-    @UploadedFile() file?: MulterFile,
+    @UploadedFile(new ClipImageValidationPipe()) file?: MulterFile,
   ) {
     return this.createClipUseCase.execute(
       req.user.userId,
@@ -238,8 +272,22 @@ export class ClipsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAccessGuard)
+  @UseGuards(JwtAccessGuard, ClipUploadRateGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiPayloadTooLargeResponse({
+    description: '이미지 파일 크기가 수신 제한을 초과했습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'UPLOAD_RATE_LIMIT_EXCEEDED. Retry-After(초) 이후 재시도합니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      '업로드 제한 미설정(UPLOAD_RATE_LIMIT_NOT_CONFIGURED) 또는 업로드 혼잡.',
+    type: ErrorResponseDto,
+  })
   @ApiOperation({ summary: '클립 수정' })
   @ApiBadRequestResponse({
     description:
@@ -261,7 +309,7 @@ export class ClipsController {
     @Request() req: { user: AuthContext },
     @Param('id') id: string,
     @Body() dto: UpdateClipDto,
-    @UploadedFile() file?: MulterFile,
+    @UploadedFile(new ClipImageValidationPipe()) file?: MulterFile,
   ) {
     return this.updateClipUseCase.execute(
       req.user.userId,

@@ -2,6 +2,13 @@ import type { SubscriptionsRepository } from '../domain/subscriptions.repository
 
 export const createSubscriptionsRepositoryMock =
   (): jest.Mocked<SubscriptionsRepository> => ({
+    deferInitialReconciliation: jest.fn(),
+    findPendingInitialPayments: jest.fn().mockResolvedValue([]),
+    findInitialPayment: jest.fn().mockResolvedValue(null),
+    claimInitialPayment: jest.fn(),
+    saveInitialBillingKey: jest.fn(),
+    completeInitialPayment: jest.fn(),
+    failInitialPayment: jest.fn(),
     getOrCreatePersonalSubscription: jest.fn(),
     findBillingMailRecipientByUserId: jest.fn(),
     findBillingMailRecipientBySubscriptionId: jest.fn(),
