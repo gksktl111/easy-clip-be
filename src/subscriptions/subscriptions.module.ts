@@ -1,3 +1,7 @@
+import { GetInitialPaymentUseCase } from './application/usecases/get-initial-payment.usecase';
+import { ReconcileInitialPaymentsUseCase } from './application/usecases/reconcile-initial-payments.usecase';
+import { ProcessSubscriptionPaymentsUseCase } from './application/usecases/process-subscription-payments.usecase';
+import { GetSubscriptionPriceUseCase } from './application/usecases/get-subscription-price.usecase';
 import { Module } from '@nestjs/common';
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { SUBSCRIPTIONS_REPOSITORY } from './domain/subscriptions.repository';
@@ -28,6 +32,10 @@ import { SubscriptionsController } from './presentation/subscriptions.controller
       provide: SUBSCRIPTION_PAYMENT_MAIL_PORT,
       useClass: ResendSubscriptionPaymentMailService,
     },
+    GetInitialPaymentUseCase,
+    ReconcileInitialPaymentsUseCase,
+    ProcessSubscriptionPaymentsUseCase,
+    GetSubscriptionPriceUseCase,
     GetMySubscriptionUseCase,
     UpdateMySubscriptionUseCase,
     CreateBillingAuthRequestUseCase,

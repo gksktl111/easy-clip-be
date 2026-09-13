@@ -1,8 +1,15 @@
+import { GetInitialPaymentUseCase } from '../application/usecases/get-initial-payment.usecase';
+import { ReconcileInitialPaymentsUseCase } from '../application/usecases/reconcile-initial-payments.usecase';
+import { ProcessSubscriptionPaymentsUseCase } from '../application/usecases/process-subscription-payments.usecase';
+import { GetSubscriptionPriceUseCase } from '../application/usecases/get-subscription-price.usecase';
 import {
   Body,
   Controller,
   Get,
+  Header,
   Patch,
+  Param,
+  ParseUUIDPipe,
   Post,
   Request,
   UseFilters,
@@ -11,6 +18,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiBody,
   ApiExcludeEndpoint,
   ApiForbiddenResponse,
@@ -28,12 +36,13 @@ import { AuthContext } from 'src/shared/types/auth-context.type';
 import { ConfirmBillingAuthUseCase } from '../application/usecases/confirm-billing-auth.usecase';
 import { CreateBillingAuthRequestUseCase } from '../application/usecases/create-billing-auth-request.usecase';
 import { GetMySubscriptionUseCase } from '../application/usecases/get-my-subscription.usecase';
-import { ProcessDueAutoRenewalsUseCase } from '../application/usecases/process-due-auto-renewals.usecase';
 import { UpdateMySubscriptionUseCase } from '../application/usecases/update-my-subscription.usecase';
 import { ConfirmBillingAuthDto } from './dtos/confirm-billing-auth.dto';
 import {
   BillingAuthRequestResponseDto,
+  SubscriptionPriceResponseDto,
   MySubscriptionResponseDto,
+  InitialPaymentResponseDto,
   ProcessDueAutoRenewalsResponseDto,
   UpdateMySubscriptionResponseDto,
 } from './dtos/subscription-response.dto';
@@ -49,13 +58,24 @@ import { UpdateMySubscriptionDto } from './dtos/update-my-subscription.dto';
 })
 export class SubscriptionsController {
   constructor(
+    private readonly getSubscriptionPriceUseCase: GetSubscriptionPriceUseCase,
     private readonly configService: ConfigService,
     private readonly getMySubscriptionUseCase: GetMySubscriptionUseCase,
     private readonly updateMySubscriptionUseCase: UpdateMySubscriptionUseCase,
     private readonly createBillingAuthRequestUseCase: CreateBillingAuthRequestUseCase,
     private readonly confirmBillingAuthUseCase: ConfirmBillingAuthUseCase,
-    private readonly processDueAutoRenewalsUseCase: ProcessDueAutoRenewalsUseCase,
+    private readonly processSubscriptionPaymentsUseCase: ProcessSubscriptionPaymentsUseCase,
+    private readonly getInitialPaymentUseCase: GetInitialPaymentUseCase,
+    private readonly reconcileInitialPaymentsUseCase: ReconcileInitialPaymentsUseCase,
   ) {}
+
+  @Get('subscriptions/pricing')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: '공개 PRO 월간 가격 조회', security: [] })
+  @ApiOkResponse({ type: SubscriptionPriceResponseDto })
+  getSubscriptionPrice() {
+    return this.getSubscriptionPriceUseCase.execute();
+  }
 
   @Get('subscriptions/me')
   @UseGuards(JwtAccessGuard)
@@ -103,15 +123,39 @@ export class SubscriptionsController {
       '먼저 POST /subscriptions/me/billing-auth/request로 customerKey를 발급받고, 프론트에서 토스페이먼츠 requestBillingAuth를 완료한 뒤 성공 리다이렉트의 authKey/customerKey로 호출합니다. Swagger 예시값만으로는 성공할 수 없습니다.',
   })
   @ApiBody({ type: ConfirmBillingAuthDto })
-  @ApiOkResponse({
-    description: '최초 결제 후 갱신된 구독 상태를 반환합니다.',
-    type: MySubscriptionResponseDto,
+  @ApiCreatedResponse({
+    description:
+      '결제 시도 결과를 반환합니다. PENDING은 결과 확인 중이며 새 결제를 생성하지 않습니다.',
+    type: InitialPaymentResponseDto,
   })
   confirmBillingAuth(
     @Request() req: { user: AuthContext },
     @Body() dto: ConfirmBillingAuthDto,
   ) {
     return this.confirmBillingAuthUseCase.execute(req.user.userId, dto);
+  }
+
+  @Get('subscriptions/me/billing/payments/:idempotencyKey')
+  @UseGuards(JwtAccessGuard)
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: '본인의 최초 결제 시도 결과 조회' })
+  @ApiOkResponse({ type: InitialPaymentResponseDto })
+  getInitialPayment(
+    @Request() req: { user: AuthContext },
+    @Param('idempotencyKey', new ParseUUIDPipe({ version: '4' })) key: string,
+  ) {
+    return this.getInitialPaymentUseCase.execute(req.user.userId, key);
+  }
+
+  @Post('subscriptions/me/billing/payments/:idempotencyKey/reconcile')
+  @UseGuards(JwtAccessGuard)
+  @ApiOperation({ summary: '본인의 최초 결제 시도를 결제사 조회 결과와 대사' })
+  @ApiCreatedResponse({ type: InitialPaymentResponseDto })
+  reconcileInitialPayment(
+    @Request() req: { user: AuthContext },
+    @Param('idempotencyKey', new ParseUUIDPipe({ version: '4' })) key: string,
+  ) {
+    return this.reconcileInitialPaymentsUseCase.execute(req.user.userId, key);
   }
 
   @Post('subscriptions/auto-renewals/due')
@@ -136,7 +180,7 @@ export class SubscriptionsController {
     type: ErrorResponseDto,
   })
   processDueAutoRenewals(@Request() request: ExpressRequest) {
-    return this.processDueAutoRenewalsUseCase.execute({
+    return this.processSubscriptionPaymentsUseCase.execute({
       accessPolicy: {
         enabled:
           this.configService.get<string>('AUTO_RENEWALS_BATCH_ENABLED') ===

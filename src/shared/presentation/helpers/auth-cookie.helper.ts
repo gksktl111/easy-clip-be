@@ -76,7 +76,7 @@ export function resolveOAuthSuccessRedirectUrl(config: ConfigService): string {
   return `${trimTrailingSlash(baseUrl)}/favorites`;
 }
 
-function extractBearerToken(request: Request): string | undefined {
+export function extractBearerToken(request: Request): string | undefined {
   const [type, token] = request.headers.authorization?.split(' ') ?? [];
   return type === 'Bearer' ? token : undefined;
 }
@@ -91,7 +91,7 @@ function resolveClientIp(request: Request): string | undefined {
   return forwardedFor?.split(',')[0]?.trim() || request.ip;
 }
 
-function extractCookieToken(
+export function extractCookieToken(
   request: Request,
   tokenType: 'access' | 'refresh',
 ): string | undefined {
@@ -103,7 +103,9 @@ function extractCookieToken(
   return parseCookieHeader(request.headers.cookie)[cookieName];
 }
 
-function parseCookieHeader(rawCookieHeader?: string): Record<string, string> {
+export function parseCookieHeader(
+  rawCookieHeader?: string,
+): Record<string, string> {
   if (!rawCookieHeader) {
     return {};
   }
@@ -124,7 +126,11 @@ function parseCookieHeader(rawCookieHeader?: string): Record<string, string> {
         return cookies;
       }
 
-      cookies[key] = decodeURIComponent(value);
+      try {
+        cookies[key] = decodeURIComponent(value);
+      } catch {
+        // Invalid cookies cannot be authentication credentials.
+      }
       return cookies;
     }, {});
 }
@@ -146,7 +152,7 @@ function buildCookieOptions(
   };
 }
 
-function isSecureCookie(config: ConfigService): boolean {
+export function isSecureCookie(config: ConfigService): boolean {
   const override = config.get<string>('AUTH_COOKIE_SECURE');
 
   if (override === 'true') {

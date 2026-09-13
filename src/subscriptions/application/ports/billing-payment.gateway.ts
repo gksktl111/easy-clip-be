@@ -1,6 +1,7 @@
 export const BILLING_PAYMENT_GATEWAY = Symbol('BILLING_PAYMENT_GATEWAY');
 
 export type IssueBillingKeyParams = {
+  idempotencyKey?: string;
   authKey: string;
   customerKey: string;
 };
@@ -13,6 +14,7 @@ export type IssueBillingKeyResult = {
 };
 
 export type ChargeBillingParams = {
+  idempotencyKey?: string;
   billingKey: string;
   customerKey: string;
   orderId: string;
@@ -26,7 +28,7 @@ export type ChargeBillingParams = {
 export type ChargeBillingResult = {
   paymentKey: string;
   orderId: string;
-  status: 'DONE' | 'FAILED' | 'CANCELED';
+  status: string;
   totalAmount: number;
   currency: string;
   approvedAt: Date | null;

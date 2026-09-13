@@ -1,3 +1,5 @@
+import { ClipUploadRateGuard } from './guards/clip-upload-rate.guard';
+import { ClipImageValidationPipe } from './pipes/clip-image-validation.pipe';
 import {
   Body,
   Controller,
@@ -31,6 +33,9 @@ import {
   ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
+  ApiPayloadTooLargeResponse,
+  ApiTooManyRequestsResponse,
+  ApiServiceUnavailableResponse,
 } from '@nestjs/swagger';
 import { JwtAccessGuard } from 'src/shared/presentation/guards/jwt-access.guard';
 import { AuthContext } from 'src/shared/types/auth-context.type';
@@ -206,8 +211,22 @@ export class ClipsController {
   }
 
   @Post()
-  @UseGuards(JwtAccessGuard)
+  @UseGuards(JwtAccessGuard, ClipUploadRateGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiPayloadTooLargeResponse({
+    description: '이미지 파일 크기가 수신 제한을 초과했습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'UPLOAD_RATE_LIMIT_EXCEEDED. Retry-After(초) 이후 재시도합니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      '업로드 제한 미설정(UPLOAD_RATE_LIMIT_NOT_CONFIGURED) 또는 업로드 혼잡.',
+    type: ErrorResponseDto,
+  })
   @ApiOperation({ summary: '클립 생성' })
   @ApiConflictResponse({
     description: '유효 플랜의 폴더별 클립 한도를 초과했습니다.',
@@ -226,7 +245,7 @@ export class ClipsController {
   createClip(
     @Request() req: { user: AuthContext },
     @Body() dto: CreateClipDto,
-    @UploadedFile() file?: MulterFile,
+    @UploadedFile(new ClipImageValidationPipe()) file?: MulterFile,
   ) {
     return this.createClipUseCase.execute(
       req.user.userId,
@@ -238,8 +257,22 @@ export class ClipsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAccessGuard)
+  @UseGuards(JwtAccessGuard, ClipUploadRateGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiPayloadTooLargeResponse({
+    description: '이미지 파일 크기가 수신 제한을 초과했습니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'UPLOAD_RATE_LIMIT_EXCEEDED. Retry-After(초) 이후 재시도합니다.',
+    type: ErrorResponseDto,
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      '업로드 제한 미설정(UPLOAD_RATE_LIMIT_NOT_CONFIGURED) 또는 업로드 혼잡.',
+    type: ErrorResponseDto,
+  })
   @ApiOperation({ summary: '클립 수정' })
   @ApiBadRequestResponse({
     description:
@@ -261,7 +294,7 @@ export class ClipsController {
     @Request() req: { user: AuthContext },
     @Param('id') id: string,
     @Body() dto: UpdateClipDto,
-    @UploadedFile() file?: MulterFile,
+    @UploadedFile(new ClipImageValidationPipe()) file?: MulterFile,
   ) {
     return this.updateClipUseCase.execute(
       req.user.userId,

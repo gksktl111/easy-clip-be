@@ -5,7 +5,11 @@ import { AuthPlatform } from 'src/shared/types/auth-platform.type';
 import { OAuthMode } from '../../domain/auth.types';
 import { AuthError } from '../../application/errors/auth.error';
 
-type OAuthStatePayload = {
+export type OAuthStatePayload = {
+  nonce?: string;
+  browserHash?: string;
+  provider?: string;
+  sessionId?: string;
   platform: AuthPlatform;
   mode: OAuthMode;
   currentUserId?: string;
@@ -22,6 +26,10 @@ type OAuthStateOptions = {
   secret: string;
   now?: number;
   ttlMs?: number;
+  binding?: Pick<
+    OAuthStatePayload,
+    'nonce' | 'browserHash' | 'provider' | 'sessionId'
+  >;
 };
 
 export function buildOAuthState(
@@ -30,6 +38,7 @@ export function buildOAuthState(
 ): string {
   const now = options.now ?? Date.now();
   const payload: OAuthStatePayload = {
+    ...options.binding,
     platform: resolvePlatform(req),
     mode: resolveMode(req),
     currentUserId: resolveCurrentUserId(req),
@@ -84,6 +93,10 @@ export function parseOAuthState(
   }
 
   return {
+    ...(parsed.nonce ? { nonce: parsed.nonce } : {}),
+    ...(parsed.browserHash ? { browserHash: parsed.browserHash } : {}),
+    ...(parsed.provider ? { provider: parsed.provider } : {}),
+    ...(parsed.sessionId ? { sessionId: parsed.sessionId } : {}),
     platform,
     mode,
     currentUserId,
@@ -125,9 +138,12 @@ function encodeJson(value: OAuthStatePayload): string {
 
 function decodeJson(encoded: string): Partial<OAuthStatePayload> {
   try {
-    return JSON.parse(
+    const value: unknown = JSON.parse(
       Buffer.from(encoded, 'base64url').toString(),
-    ) as Partial<OAuthStatePayload>;
+    );
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error('Invalid payload');
+    return value as Partial<OAuthStatePayload>;
   } catch {
     throw invalidOAuthState();
   }

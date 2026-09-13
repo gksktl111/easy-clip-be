@@ -1,3 +1,5 @@
+import { ConfigService } from '@nestjs/config';
+import { ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, type ExecutionContext } from '@nestjs/common';
 import request from 'supertest';
@@ -61,6 +63,13 @@ describe('AppController (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
   });
 
@@ -72,6 +81,36 @@ describe('AppController (e2e)', () => {
     const instance = app.getHttpAdapter().getInstance() as unknown as App;
 
     return request(instance).get('/').expect(200).expect('Hello World!');
+  });
+
+  it('serves the configured public price without credentials or cached values', async () => {
+    const config = app.get(ConfigService);
+    const previous = config.get<string>('PRO_MONTHLY_AMOUNT');
+    config.set('PRO_MONTHLY_AMOUNT', '1000');
+    try {
+      const result = await request(app.getHttpServer())
+        .get('/subscriptions/pricing')
+        .expect(200)
+        .expect('Cache-Control', 'no-store');
+      expect(result.body).toMatchObject({
+        plan: 'PRO',
+        amount: 1000,
+        currency: 'KRW',
+        interval: 'MONTH',
+        intervalCount: 1,
+      });
+      const body = result.body as { priceVersion: unknown };
+      expect(body.priceVersion).toEqual(expect.any(String));
+    } finally {
+      config.set('PRO_MONTHLY_AMOUNT', previous);
+    }
+  });
+
+  it('rejects the old confirmation body before entering the payment use case', async () => {
+    await request(app.getHttpServer())
+      .post('/subscriptions/me/billing-auth/confirm')
+      .send({ authKey: 'test-auth', customerKey: 'test-customer' })
+      .expect(400);
   });
 
   it('/metrics (GET)', async () => {

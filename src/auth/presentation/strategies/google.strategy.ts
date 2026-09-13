@@ -1,20 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { AuthProvider } from 'src/shared/types/auth-provider.type';
-import { Request } from 'express';
+import { BadRequestException } from '@nestjs/common';
+import { OAuthStateRequest } from '../guards/oauth-state.guard';
 import type { AuthenticateOptions } from 'passport';
 import { Profile, Strategy } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
 import { OAuthUser } from '../../domain/auth.types';
-import {
-  buildOAuthState,
-  parseOAuthState,
-  resolveOAuthStateSecret,
-} from '../helpers/oauth-state.helper';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
-  constructor(private readonly config: ConfigService) {
+  constructor(config: ConfigService) {
     super({
       clientID: config.getOrThrow<string>('GOOGLE_CLIENT_ID'),
       clientSecret: config.getOrThrow<string>('GOOGLE_CLIENT_SECRET'),
@@ -24,24 +20,21 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     });
   }
 
-  authenticate(req: Request, options?: AuthenticateOptions): void {
+  authenticate(req: OAuthStateRequest, options?: AuthenticateOptions): void {
     super.authenticate(req, {
       ...options,
-      state: buildOAuthState(req, {
-        secret: resolveOAuthStateSecret(this.config),
-      }),
+      state: req.oauthState,
     });
   }
 
   validate(
-    req: Request,
+    req: OAuthStateRequest,
     accessToken: string,
     refreshToken: string,
     profile: Profile,
   ): OAuthUser {
-    const state = parseOAuthState(req.query.state as string | undefined, {
-      secret: resolveOAuthStateSecret(this.config),
-    });
+    const state = req.verifiedOAuthState;
+    if (!state) throw new BadRequestException('OAuth state 검증이 필요합니다.');
 
     return {
       provider: AuthProvider.GOOGLE,
