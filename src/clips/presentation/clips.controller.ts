@@ -122,7 +122,17 @@ export class ClipsController {
     required: true,
     enum: ['TEXT', 'COLOR', 'IMAGE', 'ALL'],
   })
-  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({
+    name: 'q',
+    required: false,
+    description:
+      'Pro 전용 제목/태그 검색. 빈 문자열·공백은 일반 목록으로 처리합니다.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Free 검색은 FEATURE_NOT_AVAILABLE, 잠긴 폴더는 PROJECT_LOCKED.',
+    type: ErrorResponseDto,
+  })
   @ApiOkResponse({
     description:
       '폴더, 좋아요, 최근 기준의 커서 페이지네이션 결과를 반환합니다. 기본 조회는 최근 클립 목록입니다.',
@@ -184,7 +194,12 @@ export class ClipsController {
 
   @Put(':clipId/tags')
   @UseGuards(JwtAccessGuard)
-  @ApiOperation({ summary: '클립 태그 전체 교체' })
+  @ApiOperation({ summary: '클립 태그 전체 교체 (Pro 전용)' })
+  @ApiForbiddenResponse({
+    description:
+      'Free는 빈 배열을 포함한 모든 교체에 FEATURE_NOT_AVAILABLE. 잠긴 폴더는 PROJECT_LOCKED.',
+    type: ErrorResponseDto,
+  })
   @ApiParam({ name: 'clipId', description: '클립 ID' })
   @ApiBody({ type: ReplaceClipTagsDto })
   @ApiOkResponse({

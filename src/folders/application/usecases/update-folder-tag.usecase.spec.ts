@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
+import { FolderAccessError } from 'src/shared/application/folder-access';
 import { createFoldersRepositoryMock as createRepository } from '../../test-support/create-folders-repository-mock';
 import { UpdateFolderTagUseCase } from './update-folder-tag.usecase';
 
@@ -22,6 +23,9 @@ describe('UpdateFolderTagUseCase', () => {
     const repo = createRepository();
     repo.findPersonalFolderById.mockResolvedValue({ id: 'folder-id' } as never);
     repo.findTagByIdInFolder.mockResolvedValue(null);
+    repo.assertTagManagementAvailable.mockRejectedValue(
+      new FolderAccessError('FEATURE_NOT_AVAILABLE', 'Pro 전용 기능입니다.'),
+    );
 
     const usecase = new UpdateFolderTagUseCase(repo);
 
@@ -228,4 +232,43 @@ describe('UpdateFolderTagUseCase', () => {
 
     expect(repo.findPersonalFolderById).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { name: 'backend' },
+    { backgroundColor: 'GRAY' as const },
+    { name: 'frontend' },
+    { backgroundColor: 'PURPLE' as const },
+  ])(
+    'Free에서는 변경 없는 요청과 실제 변경을 모두 거부한다: %j',
+    async (change) => {
+      const repo = createRepository();
+      repo.findPersonalFolderById.mockResolvedValue({
+        id: 'folder-id',
+      } as never);
+      repo.findTagByIdInFolder.mockResolvedValue({
+        id: 'tag-id',
+        name: 'backend',
+        backgroundColor: 'GRAY',
+      } as never);
+      repo.findTagByNameInFolder.mockResolvedValue({
+        id: 'other-tag-id',
+      } as never);
+      repo.assertTagManagementAvailable.mockRejectedValue(
+        new FolderAccessError('FEATURE_NOT_AVAILABLE', 'Pro 전용 기능입니다.'),
+      );
+
+      await expect(
+        new UpdateFolderTagUseCase(repo).execute('user-id', {
+          folderId: 'folder-id',
+          tagId: 'tag-id',
+          ...change,
+        }),
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        policyCode: 'FEATURE_NOT_AVAILABLE',
+      });
+      expect(repo.findTagByNameInFolder).not.toHaveBeenCalled();
+      expect(repo.updateFolderTag).not.toHaveBeenCalled();
+    },
+  );
 });

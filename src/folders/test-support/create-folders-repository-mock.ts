@@ -8,6 +8,7 @@ export const createFoldersRepositoryMock =
     findPersonalFolderById: jest.fn(),
     findFolderById: jest.fn(),
     findFolderByIdInWorkspace: jest.fn(),
+    assertTagManagementAvailable: jest.fn(),
     findTagsByFolderId: jest.fn(),
     findTagByIdInFolder: jest.fn(),
     findTagByNameInFolder: jest.fn(),
