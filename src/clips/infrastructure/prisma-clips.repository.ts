@@ -1,3 +1,4 @@
+import { assertProFeature } from 'src/shared/application/folder-access';
 import { assertClipIncrease } from 'src/shared/application/clip-limit';
 import { lockClipQuota } from 'src/shared/infrastructure/prisma-clip-limit';
 import {
@@ -32,6 +33,18 @@ import {
 @Injectable()
 export class PrismaClipsRepository implements ClipsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async assertSearchAvailable(userId: string): Promise<void> {
+    const available = await this.withReadAccess(
+      userId,
+      false,
+      (_tx, access) => {
+        assertProFeature(access, 'CLIP_SEARCH');
+        return Promise.resolve(true);
+      },
+    );
+    if (!available) assertProFeature({ effectivePlan: 'FREE' }, 'CLIP_SEARCH');
+  }
 
   async findPersonalFolderById(
     userId: string,
@@ -396,7 +409,8 @@ export class PrismaClipsRepository implements ClipsRepository {
     return withClipAccess(
       this.prisma,
       params.clipId,
-      async (tx, _access, clip) => {
+      async (tx, access, clip) => {
+        assertProFeature(access, 'TAG_MANAGEMENT');
         const tags: Tag[] = [];
         for (const name of params.tagNames) {
           tags.push(
@@ -533,7 +547,7 @@ export class PrismaClipsRepository implements ClipsRepository {
     params: Omit<FindClipsParams, 'cursor' | 'limit'>,
     recent = false,
   ): Promise<ClipSearchTarget | undefined> {
-    if (!params.q) return undefined;
+    if (!params.q?.trim()) return undefined;
     const where = this.buildWhere({ ...params, searchTarget: 'title' }, access);
     const match = recent
       ? await tx.clipView.findFirst({
@@ -548,8 +562,12 @@ export class PrismaClipsRepository implements ClipsRepository {
     params: Omit<FindClipsParams, 'cursor' | 'limit'>,
     access: FolderAccess,
   ): Prisma.ClipWhereInput {
-    const { userId, folderId, workspaceId, type, q, searchTarget, likedOnly } =
+    const { userId, folderId, workspaceId, type, searchTarget, likedOnly } =
       params;
+    const q = params.q?.trim();
+    // All search reads, including existence checks and cursor matching, run
+    // under the subscription lock and must check the current effective plan.
+    if (q) assertProFeature(access, 'CLIP_SEARCH');
 
     const where: Prisma.ClipWhereInput = {
       deletedAt: null,

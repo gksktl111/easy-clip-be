@@ -17,6 +17,7 @@ import { PrismaClipsRepository } from '../src/clips/infrastructure/prisma-clips.
 import { UpdateClipUseCase } from '../src/clips/application/usecases/update-clip.usecase';
 
 describe('Clip content updates (PostgreSQL integration)', () => {
+  const previousUploadRate = process.env.CLIP_UPLOAD_REQUESTS_PER_MINUTE;
   let prisma: PrismaService;
   let second: PrismaService;
   let repository: PrismaClipsRepository;
@@ -50,6 +51,7 @@ describe('Clip content updates (PostgreSQL integration)', () => {
   const row = () => prisma.clip.findUniqueOrThrow({ where: { id: clipId } });
 
   beforeAll(async () => {
+    process.env.CLIP_UPLOAD_REQUESTS_PER_MINUTE = '100';
     if (
       !process.env.DATABASE_URL ||
       new URL(process.env.DATABASE_URL).pathname !== '/test_db'
@@ -136,6 +138,9 @@ describe('Clip content updates (PostgreSQL integration)', () => {
     await prisma.user.deleteMany({ where: { id: userId } });
   });
   afterAll(async () => {
+    if (previousUploadRate === undefined)
+      delete process.env.CLIP_UPLOAD_REQUESTS_PER_MINUTE;
+    else process.env.CLIP_UPLOAD_REQUESTS_PER_MINUTE = previousUploadRate;
     await app?.close();
     await Promise.all([prisma?.$disconnect(), second?.$disconnect()]);
   });

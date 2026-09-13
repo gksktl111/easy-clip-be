@@ -1,3 +1,5 @@
+import { OAuthStateGuard } from './guards/oauth-state.guard';
+import { assertCookieCsrf } from 'src/shared/presentation/helpers/cookie-csrf.helper';
 import {
   Body,
   Controller,
@@ -73,7 +75,7 @@ export class AuthController {
    * ====================================================== */
 
   @Get('google')
-  @UseGuards(PassportAuthGuard('google'))
+  @UseGuards(OAuthStateGuard, PassportAuthGuard('google'))
   @ApiOperation({ summary: 'Google OAuth 로그인 시작' })
   @ApiOkResponse({
     description: 'OAuth 제공자 로그인 페이지로 리다이렉트됩니다.',
@@ -81,7 +83,7 @@ export class AuthController {
   googleLogin(): void {}
 
   @Get('google/link')
-  @UseGuards(JwtAccessGuard, PassportAuthGuard('google'))
+  @UseGuards(JwtAccessGuard, OAuthStateGuard, PassportAuthGuard('google'))
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Google OAuth 계정 연결 시작' })
   @ApiOkResponse({
@@ -94,7 +96,7 @@ export class AuthController {
   googleLink(): void {}
 
   @Get('google/callback')
-  @UseGuards(PassportAuthGuard('google'))
+  @UseGuards(OAuthStateGuard, PassportAuthGuard('google'))
   @ApiOperation({ summary: 'Google OAuth 콜백 처리' })
   @ApiFoundResponse({
     description:
@@ -116,7 +118,7 @@ export class AuthController {
    * ====================================================== */
 
   @Get('github')
-  @UseGuards(PassportAuthGuard('github'))
+  @UseGuards(OAuthStateGuard, PassportAuthGuard('github'))
   @ApiOperation({ summary: 'GitHub OAuth 로그인 시작' })
   @ApiOkResponse({
     description: 'OAuth 제공자 로그인 페이지로 리다이렉트됩니다.',
@@ -124,7 +126,7 @@ export class AuthController {
   githubLogin(): void {}
 
   @Get('github/link')
-  @UseGuards(JwtAccessGuard, PassportAuthGuard('github'))
+  @UseGuards(JwtAccessGuard, OAuthStateGuard, PassportAuthGuard('github'))
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'GitHub OAuth 계정 연결 시작' })
   @ApiOkResponse({
@@ -137,7 +139,7 @@ export class AuthController {
   githubLink(): void {}
 
   @Get('github/callback')
-  @UseGuards(PassportAuthGuard('github'))
+  @UseGuards(OAuthStateGuard, PassportAuthGuard('github'))
   @ApiOperation({ summary: 'GitHub OAuth 콜백 처리' })
   @ApiFoundResponse({
     description:
@@ -172,6 +174,7 @@ export class AuthController {
     @Body() dto: TestAdminLoginDto = {},
     @Res({ passthrough: true }) response: Response,
   ) {
+    assertCookieCsrf(request, 'any');
     const authSession = await this.testAdminLoginUseCase.execute(
       {
         email: 'admin@easyclip.local',

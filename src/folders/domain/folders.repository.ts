@@ -41,6 +41,7 @@ export interface FoldersRepository {
     folderId: string,
     workspaceId: string,
   ): Promise<Folder | null>;
+  assertTagManagementAvailable(folderId: string): Promise<void>;
   findTagsByFolderId(folderId: string): Promise<FolderTag[]>;
   findTagByIdInFolder(
     folderId: string,

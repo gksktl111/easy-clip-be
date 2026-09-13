@@ -31,6 +31,8 @@ export class CreateFolderTagUseCase {
       throw new FoldersError('NOT_FOUND', '폴더를 찾을 수 없습니다.');
     }
 
+    await this.foldersRepository.assertTagManagementAvailable(folder.id);
+
     const existingTag = await this.foldersRepository.findTagByNameInFolder(
       folder.id,
       name,

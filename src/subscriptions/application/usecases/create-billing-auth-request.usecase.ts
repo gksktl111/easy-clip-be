@@ -1,3 +1,4 @@
+import { resolveProMonthlyPrice } from '../helpers/pro-monthly-price.helper';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SUBSCRIPTIONS_REPOSITORY } from '../../domain/subscriptions.repository';
@@ -16,6 +17,7 @@ export class CreateBillingAuthRequestUseCase {
   ) {}
 
   async execute(userId: string): Promise<BillingAuthRequestOutput> {
+    const price = resolveProMonthlyPrice(this.configService);
     const clientKey = this.configService.get<string>(
       'TOSS_PAYMENTS_CLIENT_KEY',
     );
@@ -64,6 +66,7 @@ export class CreateBillingAuthRequestUseCase {
     }
 
     return {
+      price,
       clientKey: billingAuthConfig.clientKey,
       customerKey,
       method: 'CARD',

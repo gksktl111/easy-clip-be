@@ -1,4 +1,8 @@
 import {
+  detectClipImageMimeType,
+  resolveMaxImageBytes,
+} from '../application/helpers/clip-image-validation.helper';
+import {
   DeleteObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -16,7 +20,6 @@ import type {
 } from '../application/ports/clip-image-storage.port';
 
 const DEFAULT_IMAGE_PREFIX = 'clips';
-const DEFAULT_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 const MIME_EXTENSION_MAP: Record<string, string> = {
   'image/jpeg': '.jpg',
@@ -31,16 +34,21 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
   constructor(private readonly configService: ConfigService) {}
 
   async uploadImage(input: UploadClipImageInput): Promise<UploadedClipImage> {
-    if (!isAllowedClipImageMimeType(input.file.mimetype)) {
+    if (
+      !isAllowedClipImageMimeType(input.file.mimetype) ||
+      detectClipImageMimeType(input.file.buffer) !== input.file.mimetype
+    ) {
       throw new ImageStorageError(
         'BAD_REQUEST',
         'jpeg, png, webp, gif, avif 이미지만 업로드할 수 있습니다.',
       );
     }
 
-    const maxImageBytes = this.resolveMaxImageBytes();
+    const maxImageBytes = resolveMaxImageBytes(
+      this.configService.get('R2_MAX_IMAGE_BYTES'),
+    );
 
-    if (input.file.size > maxImageBytes) {
+    if (input.file.buffer.length > maxImageBytes) {
       throw new ImageStorageError(
         'BAD_REQUEST',
         `이미지 파일은 ${maxImageBytes} bytes 이하여야 합니다.`,
@@ -125,20 +133,6 @@ export class R2ClipImageStorageService implements ClipImageStoragePort {
     }
 
     return '';
-  }
-
-  private resolveMaxImageBytes(): number {
-    const rawValue = this.configService.get<string>('R2_MAX_IMAGE_BYTES');
-
-    if (!rawValue) {
-      return DEFAULT_MAX_IMAGE_BYTES;
-    }
-
-    const parsedValue = Number(rawValue);
-
-    return Number.isFinite(parsedValue) && parsedValue > 0
-      ? parsedValue
-      : DEFAULT_MAX_IMAGE_BYTES;
   }
 
   private resolvePublicBaseUrl(): string {

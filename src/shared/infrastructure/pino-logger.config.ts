@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Options } from 'pino-http';
+import {
+  sanitizeRequestUrl,
+  sanitizeValue,
+  sanitizeLogError,
+  sanitizeLogText,
+} from '../application/helpers/log-sanitization.helper';
 
 const REDACTED_LOG_VALUE = '[REDACTED]';
-const MAX_LOG_DEPTH = 3;
-const MAX_OBJECT_KEYS = 12;
-const MAX_ARRAY_ITEMS = 8;
-const MAX_STRING_LENGTH = 160;
 const REQUEST_ID_HEADER = 'x-request-id';
 const REQUEST_ID_PATTERN = /^[a-zA-Z0-9._:-]{1,128}$/;
 
@@ -38,11 +40,15 @@ export function createPinoHttpOptions(env: NodeJS.ProcessEnv): Options {
       censor: REDACTED_LOG_VALUE,
     },
     serializers: {
+      err: sanitizeLogError,
+      msg: sanitizeLogText,
+      path: sanitizeRequestUrl,
       req: (request: Record<string, unknown>) => ({
         ...request,
         headers: sanitizeValue(request.headers),
         query: sanitizeValue(request.query),
         url: sanitizeRequestUrl(request.url),
+        originalUrl: sanitizeRequestUrl(request.originalUrl),
       }),
       res: (response: Record<string, unknown>) => ({
         ...response,
@@ -94,110 +100,4 @@ function resolveRequestId(value: string | string[] | undefined): string {
   }
 
   return randomUUID();
-}
-
-function sanitizeRequestUrl(value: unknown): unknown {
-  if (typeof value !== 'string') {
-    return value;
-  }
-
-  try {
-    const url = new URL(value, 'http://localhost');
-
-    for (const key of new Set(url.searchParams.keys())) {
-      if (isSensitiveKey(key)) {
-        url.searchParams.set(key, REDACTED_LOG_VALUE);
-      }
-    }
-
-    return truncateString(`${url.pathname}${url.search}`);
-  } catch {
-    return truncateString(value);
-  }
-}
-
-function sanitizeValue(value: unknown, depth = 0): unknown {
-  if (value === undefined || value === null) {
-    return value;
-  }
-
-  if (depth >= MAX_LOG_DEPTH) {
-    return '[Truncated]';
-  }
-
-  if (typeof value === 'string') {
-    return truncateString(value);
-  }
-
-  if (
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    typeof value === 'bigint'
-  ) {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value
-      .slice(0, MAX_ARRAY_ITEMS)
-      .map((item) => sanitizeValue(item, depth + 1));
-  }
-
-  if (Buffer.isBuffer(value)) {
-    return `[Buffer:${value.length}]`;
-  }
-
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-
-  if (isPlainObject(value)) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([, currentValue]) => currentValue !== undefined)
-        .slice(0, MAX_OBJECT_KEYS)
-        .map(([key, currentValue]) => [
-          key,
-          isSensitiveKey(key)
-            ? REDACTED_LOG_VALUE
-            : sanitizeValue(currentValue, depth + 1),
-        ]),
-    );
-  }
-
-  if (typeof value === 'function') {
-    return `[Function:${value.name || 'anonymous'}]`;
-  }
-
-  if (typeof value === 'symbol') {
-    return value.toString();
-  }
-
-  return '[Unsupported]';
-}
-
-function truncateString(value: string): string {
-  if (value.length <= MAX_STRING_LENGTH) {
-    return value;
-  }
-
-  return `${value.slice(0, MAX_STRING_LENGTH)}...`;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Object.prototype.toString.call(value) === '[object Object]';
-}
-
-function isSensitiveKey(key: string): boolean {
-  const normalized = key.toLowerCase();
-
-  return (
-    normalized.includes('token') ||
-    normalized.includes('code') ||
-    normalized.includes('password') ||
-    normalized.includes('authorization') ||
-    normalized.includes('cookie') ||
-    normalized.includes('secret') ||
-    normalized.includes('state')
-  );
 }

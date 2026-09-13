@@ -98,7 +98,52 @@ export type BillingMailRecipient = {
   email: string;
 };
 
+export type InitialPaymentAttempt = {
+  id: string;
+  subscriptionId: string;
+  idempotencyKey: string;
+  externalOrderId: string;
+  status: SubscriptionPaymentStatus;
+  amount: number;
+  currency: string;
+  priceVersion: string;
+  customerKey: string;
+  billingKey: string | null;
+  createdAt: Date;
+};
+export type ClaimInitialPaymentParams = {
+  subscriptionId: string;
+  idempotencyKey: string;
+  externalOrderId: string;
+  amount: number;
+  currency: string;
+  priceVersion: string;
+  customerKey: string;
+};
+
 export interface SubscriptionsRepository {
+  deferInitialReconciliation(attemptId: string, nextAt: Date): Promise<void>;
+  findPendingInitialPayments(
+    before: Date,
+    limit: number,
+  ): Promise<InitialPaymentAttempt[]>;
+  findInitialPayment(
+    subscriptionId: string,
+    idempotencyKey: string,
+  ): Promise<InitialPaymentAttempt | null>;
+  claimInitialPayment(
+    params: ClaimInitialPaymentParams,
+  ): Promise<{ attempt: InitialPaymentAttempt; claimed: boolean } | null>;
+  saveInitialBillingKey(attemptId: string, billingKey: string): Promise<void>;
+  completeInitialPayment(
+    attempt: InitialPaymentAttempt,
+    payment: ActivateSubscriptionPaymentParams,
+  ): Promise<Subscription | null>;
+  failInitialPayment(
+    attempt: InitialPaymentAttempt,
+    payment: MarkPaymentFailedParams,
+  ): Promise<void>;
+
   getOrCreatePersonalSubscription(userId: string): Promise<Subscription>;
 
   findBillingMailRecipientByUserId(

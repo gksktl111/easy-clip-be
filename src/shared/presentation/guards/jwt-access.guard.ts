@@ -1,3 +1,4 @@
+import { assertCookieCsrf } from 'src/shared/presentation/helpers/cookie-csrf.helper';
 import {
   CanActivate,
   ExecutionContext,
@@ -27,6 +28,7 @@ export class JwtAccessGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
+    assertCookieCsrf(request, 'access');
     const token = extractAccessToken(request);
 
     if (!token) {

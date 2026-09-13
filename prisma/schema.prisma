@@ -156,6 +156,7 @@ model Subscription {
 
   workspaceId String @unique
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  initialPayments InitialSubscriptionPayment[]
   payments    SubscriptionPayment[]
 
   @@index([plan, status, autoRenew, nextBillingAt, id], map: "Subscription_auto_renewal_due_idx")
@@ -334,4 +335,33 @@ model ClipView {
 
   @@unique([userId, clipId]) // 사용자-클립별 최근 조회 1건 유지
   @@index([userId, viewedAt]) // 최근 조회 목록 조회 최적화
+}
+
+model InitialSubscriptionPayment {
+  cancelRequested      Boolean                   @default(false)
+  reconciliationNextAt DateTime                  @default(now())
+  id                   String                    @id @default(cuid())
+  subscriptionId       String
+  idempotencyKey       String                    @db.Uuid
+  externalOrderId      String                    @unique
+  status               SubscriptionPaymentStatus @default(PENDING)
+  amount               Int
+  currency             String
+  priceVersion         String
+  customerKey          String
+  billingKey           String?
+  createdAt            DateTime                  @default(now())
+  subscription         Subscription              @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, idempotencyKey])
+  @@index([status, reconciliationNextAt])
+  @@index([subscriptionId, status])
+}
+
+// Atomically consumed before OAuth code exchange, shared across API instances.
+model OAuthStateNonce {
+  id        String   @id
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }

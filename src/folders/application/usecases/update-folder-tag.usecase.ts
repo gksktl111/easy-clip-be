@@ -50,6 +50,8 @@ export class UpdateFolderTagUseCase {
       throw new FoldersError('NOT_FOUND', '태그를 찾을 수 없습니다.');
     }
 
+    await this.foldersRepository.assertTagManagementAvailable(folder.id);
+
     const nameChanged = name !== undefined && name !== tag.name;
     const backgroundColorChanged =
       backgroundColor !== undefined && backgroundColor !== tag.backgroundColor;

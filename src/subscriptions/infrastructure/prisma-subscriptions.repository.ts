@@ -9,6 +9,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   ActivateSubscriptionPaymentParams,
+  InitialPaymentAttempt,
+  ClaimInitialPaymentParams,
   AutoRenewalPayment,
   BillingMailRecipient,
   CancelAutoRenewalResult,
@@ -50,6 +52,147 @@ const renewalPaymentSelect = {
 @Injectable()
 export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async deferInitialReconciliation(
+    attemptId: string,
+    nextAt: Date,
+  ): Promise<void> {
+    await this.prisma.initialSubscriptionPayment.updateMany({
+      where: { id: attemptId, status: 'PENDING' },
+      data: { reconciliationNextAt: nextAt },
+    });
+  }
+  findPendingInitialPayments(
+    before: Date,
+    limit: number,
+  ): Promise<InitialPaymentAttempt[]> {
+    return this.prisma.initialSubscriptionPayment.findMany({
+      where: { status: 'PENDING', reconciliationNextAt: { lte: before } },
+      orderBy: [{ reconciliationNextAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+  }
+
+  findInitialPayment(
+    subscriptionId: string,
+    idempotencyKey: string,
+  ): Promise<InitialPaymentAttempt | null> {
+    return this.prisma.initialSubscriptionPayment.findUnique({
+      where: {
+        subscriptionId_idempotencyKey: { subscriptionId, idempotencyKey },
+      },
+    });
+  }
+
+  async claimInitialPayment(
+    params: ClaimInitialPaymentParams,
+  ): Promise<{ attempt: InitialPaymentAttempt; claimed: boolean } | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${params.subscriptionId} FOR UPDATE`;
+      const existing = await tx.initialSubscriptionPayment.findUnique({
+        where: {
+          subscriptionId_idempotencyKey: {
+            subscriptionId: params.subscriptionId,
+            idempotencyKey: params.idempotencyKey,
+          },
+        },
+      });
+      if (existing) return { attempt: existing, claimed: false };
+      const current = await tx.subscription.findUniqueOrThrow({
+        where: { id: params.subscriptionId },
+        select: subscriptionSelect,
+      });
+      if (
+        current.externalCustomerKey !== params.customerKey ||
+        (current.plan === 'PRO' &&
+          current.currentPeriodEnd &&
+          current.currentPeriodEnd > new Date())
+      )
+        return null;
+      const pending = await tx.initialSubscriptionPayment.findFirst({
+        where: { subscriptionId: params.subscriptionId, status: 'PENDING' },
+      });
+      const renewal = await tx.subscriptionPayment.findFirst({
+        where: { subscriptionId: params.subscriptionId, status: 'PENDING' },
+      });
+      if (pending || renewal) return null;
+      const attempt = await tx.initialSubscriptionPayment.create({
+        data: params,
+      });
+      return { attempt, claimed: true };
+    });
+  }
+
+  async saveInitialBillingKey(
+    attemptId: string,
+    billingKey: string,
+  ): Promise<void> {
+    await this.prisma.initialSubscriptionPayment.update({
+      where: { id: attemptId },
+      data: { billingKey },
+    });
+  }
+
+  async completeInitialPayment(
+    attempt: InitialPaymentAttempt,
+    payment: ActivateSubscriptionPaymentParams,
+  ): Promise<Subscription | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${attempt.subscriptionId} FOR UPDATE`;
+      const currentAttempt =
+        await tx.initialSubscriptionPayment.findUniqueOrThrow({
+          where: { id: attempt.id },
+          select: { cancelRequested: true },
+        });
+      const updated = await tx.initialSubscriptionPayment.updateMany({
+        where: {
+          id: attempt.id,
+          status: 'PENDING',
+          amount: payment.amount,
+          currency: payment.currency,
+        },
+        data: { status: 'DONE' },
+      });
+      if (!updated.count) return null;
+      await tx.subscriptionPayment.create({
+        data: this.toPaymentCreateData(payment),
+      });
+      return tx.subscription.update({
+        where: { id: attempt.subscriptionId },
+        data: {
+          plan: 'PRO',
+          status: currentAttempt.cancelRequested ? 'CANCELED' : 'ACTIVE',
+          autoRenew: !currentAttempt.cancelRequested,
+          startedAt: payment.startedAt,
+          currentPeriodEnd: payment.currentPeriodEnd,
+          nextBillingAt: currentAttempt.cancelRequested
+            ? null
+            : payment.nextBillingAt,
+          provider: payment.provider,
+          externalBillingKey: payment.externalBillingKey,
+          externalCustomerKey: payment.externalCustomerKey,
+        },
+        select: subscriptionSelect,
+      });
+    });
+  }
+
+  async failInitialPayment(
+    attempt: InitialPaymentAttempt,
+    payment: MarkPaymentFailedParams,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${attempt.subscriptionId} FOR UPDATE`;
+      const updated = await tx.initialSubscriptionPayment.updateMany({
+        where: { id: attempt.id, status: 'PENDING' },
+        data: { status: payment.status },
+      });
+      if (updated.count)
+        await tx.subscriptionPayment.create({
+          data: this.toPaymentCreateData(payment),
+        });
+    });
+  }
 
   async getOrCreatePersonalSubscription(userId: string): Promise<Subscription> {
     return this.prisma.$transaction(async (tx) => {
@@ -151,6 +294,10 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
           status: PrismaSubscriptionPaymentStatus.PENDING,
         },
         select: { id: true },
+      });
+      await tx.initialSubscriptionPayment.updateMany({
+        where: { subscriptionId, status: 'PENDING' },
+        data: { cancelRequested: true },
       });
       const subscription = await tx.subscription.update({
         where: { id: subscriptionId },
@@ -320,6 +467,10 @@ export class PrismaSubscriptionsRepository implements SubscriptionsRepository {
           select: { id: true },
         });
         if (pending) return false;
+        const initial = await tx.initialSubscriptionPayment.findFirst({
+          where: { subscriptionId: params.subscriptionId, status: 'PENDING' },
+        });
+        if (initial) return false;
         await tx.subscriptionPayment.create({
           data: {
             provider: params.provider as PrismaPaymentProvider,

@@ -1,3 +1,6 @@
+import { ReconcileInitialPaymentsUseCase } from '../src/subscriptions/application/usecases/reconcile-initial-payments.usecase';
+import { GetInitialPaymentUseCase } from '../src/subscriptions/application/usecases/get-initial-payment.usecase';
+import { resolveProMonthlyPrice } from '../src/subscriptions/application/helpers/pro-monthly-price.helper';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -292,6 +295,279 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
 
   afterAll(async () => {
     await Promise.all([prisma?.$disconnect(), secondPrisma?.$disconnect()]);
+  });
+
+  const initialInput = (key = randomUUID()) => ({
+    authKey: 'initial-auth',
+    customerKey: `customer-${userId}`,
+    idempotencyKey: key,
+    priceVersion: resolveProMonthlyPrice(config).priceVersion,
+  });
+  const initialUseCase = (repo = repository) =>
+    new ConfirmBillingAuthUseCase(
+      repo,
+      new TossPaymentsBillingGateway(config),
+      mailer,
+      config,
+      new ReconcileInitialPaymentsUseCase(
+        repo,
+        new TossPaymentsBillingGateway(config),
+        mailer,
+      ),
+    );
+  const makeFree = () =>
+    repository.updateSubscription(subscriptionId, {
+      plan: 'FREE',
+      autoRenew: false,
+      currentPeriodEnd: null,
+      nextBillingAt: null,
+    });
+
+  it.each(['same', 'different'])(
+    'initial concurrent %s keys charge once across DB connections',
+    async (kind) => {
+      await makeFree();
+      const firstInput = initialInput();
+      let entered!: () => void;
+      const charging = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      let release!: () => void;
+      const blocked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let chargeCount = 0;
+      fetchMock.mockImplementation(async (url, options) => {
+        if (
+          (typeof url === 'string'
+            ? url
+            : url instanceof URL
+              ? url.href
+              : url.url
+          ).includes('/authorizations/issue')
+        )
+          return jsonResponse({
+            billingKey: 'initial-billing',
+            authenticatedAt: new Date().toISOString(),
+            method: 'CARD',
+          });
+        if (options?.method === 'GET')
+          return jsonResponse({ code: 'NOT_FOUND_PAYMENT' }, 404);
+        chargeCount++;
+        const request = JSON.parse(options?.body as string) as {
+          orderId: string;
+        };
+        entered();
+        await blocked;
+        return jsonResponse(
+          paymentResponse({
+            orderId: request.orderId,
+            approvedAt: new Date().toISOString(),
+          }),
+        );
+      });
+      const first = initialUseCase().execute(userId, firstInput);
+      await charging;
+      try {
+        const second = initialUseCase(secondRepository).execute(
+          userId,
+          kind === 'same' ? firstInput : initialInput(),
+        );
+        if (kind === 'same')
+          await expect(second).resolves.toMatchObject({ status: 'PENDING' });
+        else await expect(second).rejects.toMatchObject({ code: 'CONFLICT' });
+      } finally {
+        release();
+      }
+      await expect(first).resolves.toMatchObject({ status: 'DONE' });
+      expect(chargeCount).toBe(1);
+      expect(
+        await prisma.initialSubscriptionPayment.count({
+          where: { subscriptionId },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.subscriptionPayment.count({ where: { subscriptionId } }),
+      ).toBe(1);
+      const completed = await initialUseCase(secondRepository).execute(userId, {
+        ...firstInput,
+        priceVersion: 'old-price',
+      });
+      expect(completed.status).toBe('DONE');
+      expect(chargeCount).toBe(1);
+    },
+  );
+
+  it('initial success survives a real transaction failure and owner reconciliation commits without another charge', async () => {
+    await makeFree();
+    const request = initialInput();
+    const conflicting = await prisma.subscriptionPayment.create({
+      data: {
+        subscriptionId,
+        provider: 'TOSS_PAYMENTS',
+        status: 'DONE',
+        externalOrderId: `fixture-${randomUUID()}`,
+        externalPaymentKey: paymentKey,
+        amount: 4900,
+        currency: 'KRW',
+      },
+    });
+    let chargedOrder = '';
+    let chargeCount = 0;
+    fetchMock.mockImplementation((url, options) => {
+      if (
+        (typeof url === 'string'
+          ? url
+          : url instanceof URL
+            ? url.href
+            : url.url
+        ).includes('/authorizations/issue')
+      )
+        return Promise.resolve(
+          jsonResponse({
+            billingKey: 'initial-billing',
+            authenticatedAt: new Date().toISOString(),
+            method: 'CARD',
+          }),
+        );
+      if (options?.method === 'POST') {
+        chargeCount++;
+        chargedOrder = (
+          JSON.parse(options.body as string) as { orderId: string }
+        ).orderId;
+      }
+      return Promise.resolve(
+        jsonResponse(
+          paymentResponse({
+            orderId: chargedOrder,
+            approvedAt: new Date().toISOString(),
+          }),
+        ),
+      );
+    });
+    await expect(
+      initialUseCase().execute(userId, request),
+    ).resolves.toMatchObject({ status: 'PENDING' });
+    expect(await subscriptionRow()).toMatchObject({ plan: 'FREE' });
+    expect(
+      await repository.findInitialPayment(
+        subscriptionId,
+        request.idempotencyKey,
+      ),
+    ).toMatchObject({ status: 'PENDING', billingKey: 'initial-billing' });
+    await prisma.subscriptionPayment.delete({ where: { id: conflicting.id } });
+    await expect(
+      new ReconcileInitialPaymentsUseCase(
+        secondRepository,
+        new TossPaymentsBillingGateway(config),
+        mailer,
+      ).execute(userId, request.idempotencyKey),
+    ).resolves.toMatchObject({ status: 'DONE', subscription: { plan: 'PRO' } });
+    expect(chargeCount).toBe(1);
+    expect(
+      await prisma.subscriptionPayment.count({ where: { subscriptionId } }),
+    ).toBe(1);
+    await expect(
+      new GetInitialPaymentUseCase(repository).execute(
+        userId,
+        request.idempotencyKey,
+      ),
+    ).resolves.toMatchObject({ status: 'DONE' });
+  });
+
+  it('a cancellation during initial payment preserves paid access without another renewal', async () => {
+    const request = initialInput();
+    let entered!: () => void;
+    const charging = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    fetchMock.mockImplementation(async (url, options) => {
+      if (
+        (typeof url === 'string'
+          ? url
+          : url instanceof URL
+            ? url.href
+            : url.url
+        ).includes('/authorizations/issue')
+      )
+        return jsonResponse({
+          billingKey: 'initial-billing',
+          authenticatedAt: new Date().toISOString(),
+          method: 'CARD',
+        });
+      const body = JSON.parse(options?.body as string) as { orderId: string };
+      entered();
+      await blocked;
+      return jsonResponse(
+        paymentResponse({
+          orderId: body.orderId,
+          approvedAt: new Date().toISOString(),
+        }),
+      );
+    });
+    const payment = initialUseCase().execute(userId, request);
+    await charging;
+    try {
+      await new UpdateMySubscriptionUseCase(secondRepository, mailer).execute(
+        userId,
+        { type: 'CANCEL' },
+      );
+    } finally {
+      release();
+    }
+    await expect(payment).resolves.toMatchObject({
+      status: 'DONE',
+      subscription: {
+        plan: 'PRO',
+        status: 'CANCELED',
+        autoRenew: false,
+        nextBillingAt: null,
+      },
+    });
+    const current = await subscriptionRow();
+    expect(current.currentPeriodEnd!.getTime()).toBeGreaterThan(Date.now());
+    expect(
+      (
+        await repository.findDueAutoRenewalSubscriptions(
+          new Date('2099-01-01'),
+          50,
+        )
+      ).some((item) => item.id === subscriptionId),
+    ).toBe(false);
+    expect(mailer.sendPaymentSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({ nextBillingAt: null }),
+    );
+  });
+
+  it('initial and renewal claims serialize so only one may start provider work', async () => {
+    const initial = {
+      ...initialInput(),
+      subscriptionId,
+      externalOrderId: createSubscriptionOrderId(subscriptionId),
+      amount: 4900,
+      currency: 'KRW',
+    };
+    const { authKey: ignoredAuthKey, ...params } = initial;
+    void ignoredAuthKey;
+    const [claimedInitial, claimedRenewal] = await Promise.all([
+      repository.claimInitialPayment(params),
+      secondRepository.claimAutoRenewalPayment(claimParams()),
+    ]);
+    expect(
+      Number(claimedInitial?.claimed ?? false) + Number(claimedRenewal),
+    ).toBe(1);
+    expect(
+      (await prisma.initialSubscriptionPayment.count({
+        where: { subscriptionId, status: 'PENDING' },
+      })) +
+        (await prisma.subscriptionPayment.count({
+          where: { subscriptionId, status: 'PENDING' },
+        })),
+    ).toBe(1);
   });
 
   it('fills the healthy batch past more than 50 failed and pending orders, including tied billing dates', async () => {
@@ -637,12 +913,21 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
               new TossPaymentsBillingGateway(config),
               mailer,
               config,
+              new ReconcileInitialPaymentsUseCase(
+                repository,
+                new TossPaymentsBillingGateway(config),
+                mailer,
+              ),
             ).execute(userId, {
               authKey: 'unused-resume-auth-key',
+              idempotencyKey: randomUUID(),
+              priceVersion: 'unused-resume-price',
               customerKey: `customer-${userId}`,
             });
 
-      expect(result).toMatchObject({
+      expect(
+        'subscription' in result ? result.subscription : result,
+      ).toMatchObject({
         autoRenew: true,
         currentPeriodEnd: extendedEnd,
         nextBillingAt: extendedEnd,
@@ -704,8 +989,15 @@ describe('Auto-renewal reconciliation (PostgreSQL integration)', () => {
         new TossPaymentsBillingGateway(config),
         mailer,
         config,
+        new ReconcileInitialPaymentsUseCase(
+          repository,
+          new TossPaymentsBillingGateway(config),
+          mailer,
+        ),
       ).execute(userId, {
         authKey: 'unused-pending-renewal-auth-key',
+        idempotencyKey: randomUUID(),
+        priceVersion: resolveProMonthlyPrice(config).priceVersion,
         customerKey: `customer-${userId}`,
       }),
     ).rejects.toMatchObject({ code: 'CONFLICT' });

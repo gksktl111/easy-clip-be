@@ -44,6 +44,8 @@ export class TossPaymentsBillingGateway implements BillingPaymentGateway {
         authKey: params.authKey,
         customerKey: params.customerKey,
       },
+      AbortSignal.timeout(10_000),
+      params.idempotencyKey,
     );
 
     return {
@@ -69,12 +71,13 @@ export class TossPaymentsBillingGateway implements BillingPaymentGateway {
       params.timeoutMs === undefined
         ? undefined
         : AbortSignal.timeout(params.timeoutMs),
+      params.idempotencyKey,
     );
 
     return {
       paymentKey: response.paymentKey,
       orderId: response.orderId,
-      status: response.status === 'DONE' ? 'DONE' : 'FAILED',
+      status: response.status,
       totalAmount: response.totalAmount,
       currency: response.currency,
       approvedAt: response.approvedAt ? new Date(response.approvedAt) : null,
@@ -149,11 +152,15 @@ export class TossPaymentsBillingGateway implements BillingPaymentGateway {
     path: string,
     body: Record<string, unknown>,
     signal?: AbortSignal,
+    idempotencyKey?: string,
   ): Promise<TResponse> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       signal,
-      headers: this.getRequestHeaders(),
+      headers: {
+        ...this.getRequestHeaders(),
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      },
       body: JSON.stringify(body),
     });
 

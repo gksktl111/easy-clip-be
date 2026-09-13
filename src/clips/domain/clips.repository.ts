@@ -59,6 +59,7 @@ export type FindRecentClipsParams = {
 };
 
 export interface ClipsRepository {
+  assertSearchAvailable(userId: string): Promise<void>;
   findPersonalFolderById(
     userId: string,
     folderId: string,

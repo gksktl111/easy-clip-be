@@ -260,28 +260,19 @@ describe('Folder access (PostgreSQL integration)', () => {
     ).toBe(1);
   });
 
-  it('hides locked clips from global, title, tag fallback, recent, liked and bulk-ID reads', async () => {
+  it('hides locked clips from unfiltered reads and forbids Free search', async () => {
     const global = await clips.findClips({ userId, limit: 10 });
     expect(global.map(({ id }) => id)).toEqual([visibleClipId]);
-    expect(
-      await clips.findClips({
-        userId,
-        limit: 10,
-        q: 'locked-secret',
-        searchTarget: 'title',
-      }),
-    ).toEqual([]);
-    expect(
-      await clips.findClips({
-        userId,
-        limit: 10,
-        q: 'locked-tag',
-        searchTarget: 'tag',
-      }),
-    ).toEqual([]);
-    expect(
-      await clips.findClips({ userId, limit: 10, q: 'locked-tag' }),
-    ).toEqual([]);
+    for (const searchTarget of ['title', 'tag', undefined] as const) {
+      await expect(
+        clips.findClips({
+          userId,
+          limit: 10,
+          q: 'locked-secret',
+          searchTarget,
+        }),
+      ).rejects.toMatchObject({ policyCode: 'FEATURE_NOT_AVAILABLE' });
+    }
     expect(
       (await clips.findClips({ userId, limit: 10, likedOnly: true })).map(
         ({ id }) => id,
@@ -290,9 +281,9 @@ describe('Folder access (PostgreSQL integration)', () => {
     expect(
       (await clips.findRecentClips({ userId, limit: 10 })).map(({ id }) => id),
     ).toEqual([visibleClipId]);
-    expect(
-      await clips.findRecentClips({ userId, limit: 10, q: 'locked-tag' }),
-    ).toEqual([]);
+    await expect(
+      clips.findRecentClips({ userId, limit: 10, q: 'locked-tag' }),
+    ).rejects.toMatchObject({ policyCode: 'FEATURE_NOT_AVAILABLE' });
     expect(await clips.findRecentViewedClipIds(userId, 10)).toEqual([
       visibleClipId,
     ]);
@@ -301,12 +292,12 @@ describe('Folder access (PostgreSQL integration)', () => {
         await clips.findClipsByIdsForUser(userId, [visibleClipId, lockedClipId])
       ).map(({ id }) => id),
     ).toEqual([visibleClipId]);
-    expect(await clips.hasTitleMatches({ userId, q: 'locked-secret' })).toBe(
-      false,
-    );
-    expect(
-      await clips.hasRecentTitleMatches({ userId, q: 'locked-secret' }),
-    ).toBe(false);
+    await expect(
+      clips.hasTitleMatches({ userId, q: 'locked-secret' }),
+    ).rejects.toMatchObject({ policyCode: 'FEATURE_NOT_AVAILABLE' });
+    await expect(
+      clips.hasRecentTitleMatches({ userId, q: 'locked-secret' }),
+    ).rejects.toMatchObject({ policyCode: 'FEATURE_NOT_AVAILABLE' });
     expect(
       await clips.isClipMatchingQuery({
         userId,
